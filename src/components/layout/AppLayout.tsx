@@ -1,5 +1,7 @@
-import { LayoutDashboard, Users, Columns3, Bot, Menu } from "lucide-react";
+import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +24,7 @@ const navItems = [
 
 function AppSidebarContent() {
   const { state } = useSidebar();
+  const { signOut, user } = useAuth();
   const collapsed = state === "collapsed";
 
   return (
@@ -34,7 +37,7 @@ function AppSidebarContent() {
             </div>
             <div>
               <h1 className="text-sm font-bold text-sidebar-foreground">CRM Saúde</h1>
-              <p className="text-[10px] text-muted-foreground">Gestão de Leads</p>
+              <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{user?.email}</p>
             </div>
           </div>
         )}
@@ -68,6 +71,18 @@ function AppSidebarContent() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <div className="mt-auto p-3">
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "default"}
+          onClick={signOut}
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span>Sair</span>}
+        </Button>
+      </div>
     </Sidebar>
   );
 }

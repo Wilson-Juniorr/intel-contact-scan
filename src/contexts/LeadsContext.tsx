@@ -1,21 +1,22 @@
 import React, { createContext, useContext, ReactNode } from "react";
-import { useLeads } from "@/hooks/useLeads";
-import type { Lead, FunnelStage, Interaction } from "@/types/lead";
+import { useLeadsDB } from "@/hooks/useLeadsDB";
+import type { FunnelStage } from "@/types/lead";
 
 interface LeadsContextType {
-  leads: Lead[];
-  addLead: (lead: Omit<Lead, "id" | "created_at" | "updated_at">) => Lead;
-  updateLead: (id: string, updates: Partial<Lead>) => void;
-  moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => void;
-  interactions: Interaction[];
-  addInteraction: (interaction: Omit<Interaction, "id" | "created_at">) => void;
-  getLeadInteractions: (leadId: string) => Interaction[];
+  leads: any[];
+  isLoading: boolean;
+  addLead: (lead: any) => Promise<any>;
+  updateLead: (id: string, updates: Record<string, unknown>) => Promise<void>;
+  moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => Promise<void>;
+  interactions: any[];
+  addInteraction: (interaction: { lead_id: string; type: string; description: string }) => Promise<void>;
+  getLeadInteractions: (leadId: string) => any[];
 }
 
 const LeadsContext = createContext<LeadsContextType | null>(null);
 
 export function LeadsProvider({ children }: { children: ReactNode }) {
-  const leadsData = useLeads();
+  const leadsData = useLeadsDB();
   return <LeadsContext.Provider value={leadsData}>{children}</LeadsContext.Provider>;
 }
 
