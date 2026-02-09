@@ -49,6 +49,139 @@ export type Database = {
           },
         ]
       }
+      lead_checklist: {
+        Row: {
+          completed: boolean
+          created_at: string
+          document_id: string | null
+          id: string
+          item_name: string
+          lead_id: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          item_name: string
+          lead_id: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          item_name?: string
+          lead_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_checklist_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "lead_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_checklist_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_documents: {
+        Row: {
+          category: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          lead_id: string
+          ocr_text: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          lead_id: string
+          ocr_text?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          lead_id?: string
+          ocr_text?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_documents_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_notes: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          lead_id: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           created_at: string
