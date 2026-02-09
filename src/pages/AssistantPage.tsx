@@ -27,10 +27,14 @@ const ACTION_BADGE_MAP: Record<string, { label: string; icon: string }> = {
   assign_document: { label: "Documento atribuído", icon: "document" },
 };
 
+type PendingFile = {
+  file_name: string; file_path: string; file_type: string; file_size: number;
+};
+
 interface Message {
   role: "user" | "assistant";
   content: string;
-  fileInfo?: { file_name: string };
+  fileInfo?: { file_name: string }[];
   actionBadges?: ActionBadge[];
 }
 
@@ -156,9 +160,7 @@ export default function AssistantPage() {
   const recognitionRef = useRef<any>(null);
 
   // File upload state
-  const [pendingFile, setPendingFile] = useState<{
-    file_name: string; file_path: string; file_type: string; file_size: number;
-  } | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const chatFileRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -206,16 +208,18 @@ export default function AssistantPage() {
 
   // File upload
   const handleChatFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    try {
-      const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
-      if (error) throw error;
-      setPendingFile({ file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size });
-      toast({ title: `📎 "${file.name}" pronto para enviar` });
-    } catch (err: any) {
-      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+    const files = e.target.files;
+    if (!files?.length || !user) return;
+    for (const file of Array.from(files)) {
+      try {
+        const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
+        const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+        if (error) throw error;
+        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size }]);
+        toast({ title: `📎 "${file.name}" pronto para enviar` });
+      } catch (err: any) {
+        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+      }
     }
     if (chatFileRef.current) chatFileRef.current.value = "";
   };
@@ -234,8 +238,7 @@ export default function AssistantPage() {
           const filePath = `${user.id}/chat_uploads/${Date.now()}_${fileName}`;
           const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
           if (error) throw error;
-          setPendingFile({ file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size });
-          toast({ title: `📎 "${fileName}" colado e pronto para enviar` });
+          setPendingFiles((prev) => [...prev, { file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size }]);
         } catch (err: any) {
           toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
         }
@@ -261,26 +264,29 @@ export default function AssistantPage() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (!file || !user) return;
-    try {
-      const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
-      if (error) throw error;
-      setPendingFile({ file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size });
-      toast({ title: `📎 "${file.name}" pronto para enviar` });
-    } catch (err: any) {
-      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+    const files = e.dataTransfer.files;
+    if (!files?.length || !user) return;
+    for (const file of Array.from(files)) {
+      try {
+        const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
+        const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+        if (error) throw error;
+        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size }]);
+        toast({ title: `📎 "${file.name}" pronto para enviar` });
+      } catch (err: any) {
+        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+      }
     }
   }, [user]);
 
   // Send message
   const send = async () => {
-    if (!input.trim() && !pendingFile) return;
+    if (!input.trim() && !pendingFiles.length) return;
     if (loading) return;
 
-    const userContent = input.trim() || (pendingFile ? `📎 Enviando documento: ${pendingFile.file_name}` : "");
-    const userMsg: Message = { role: "user", content: userContent, fileInfo: pendingFile ? { file_name: pendingFile.file_name } : undefined };
+    const fileNames = pendingFiles.map((f) => f.file_name).join(", ");
+    const userContent = input.trim() || (pendingFiles.length ? `📎 Enviando ${pendingFiles.length} documento(s): ${fileNames}` : "");
+    const userMsg: Message = { role: "user", content: userContent, fileInfo: pendingFiles.length ? pendingFiles.map((f) => ({ file_name: f.file_name })) : undefined };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
@@ -313,7 +319,7 @@ export default function AssistantPage() {
         body: JSON.stringify({
           messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
           crmContext,
-          fileInfo: pendingFile || undefined,
+          fileInfo: pendingFiles.length ? pendingFiles : undefined,
         }),
       });
 
@@ -379,7 +385,7 @@ export default function AssistantPage() {
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
-    setPendingFile(null);
+    setPendingFiles([]);
     setLoading(false);
   };
 
@@ -432,9 +438,11 @@ export default function AssistantPage() {
                       msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                     }`}
                   >
-                    {msg.fileInfo && (
-                      <div className="flex items-center gap-1.5 mb-1.5 text-xs opacity-80">
-                        <FileText className="h-3 w-3" /> {msg.fileInfo.file_name}
+                    {msg.fileInfo && msg.fileInfo.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5 text-xs opacity-80">
+                        {msg.fileInfo.map((f, fi) => (
+                          <span key={fi} className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> {f.file_name}</span>
+                        ))}
                       </div>
                     )}
                     {msg.actionBadges && msg.actionBadges.length > 0 && (
@@ -492,18 +500,25 @@ export default function AssistantPage() {
             </CardContent>
 
             {/* Pending file indicator */}
-            {pendingFile && (
-              <div className="px-4 py-2 border-t border-border flex items-center gap-2 bg-muted/50">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground flex-1 truncate">📎 {pendingFile.file_name}</span>
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setPendingFile(null)}>
-                  <X className="h-3 w-3" />
+            {pendingFiles.length > 0 && (
+              <div className="px-4 py-2 border-t border-border flex flex-wrap items-center gap-2 bg-muted/50">
+                {pendingFiles.map((pf, idx) => (
+                  <div key={idx} className="inline-flex items-center gap-1.5 bg-background rounded-full px-2.5 py-1 border border-border">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground max-w-[120px] truncate">{pf.file_name}</span>
+                    <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button size="sm" variant="ghost" className="text-xs h-6" onClick={() => setPendingFiles([])}>
+                  Limpar todos
                 </Button>
               </div>
             )}
 
             <div className="p-4 border-t border-border">
-              <input ref={chatFileRef} type="file" className="hidden" onChange={handleChatFileUpload} />
+              <input ref={chatFileRef} type="file" multiple className="hidden" onChange={handleChatFileUpload} />
               <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
                 <Button
                   type="button"
@@ -533,7 +548,7 @@ export default function AssistantPage() {
                   disabled={loading}
                   className={isRecording ? "border-destructive" : ""}
                 />
-                <Button type="submit" size="icon" disabled={loading || (!input.trim() && !pendingFile)}>
+                <Button type="submit" size="icon" disabled={loading || (!input.trim() && !pendingFiles.length)}>
                   <Send className="h-4 w-4" />
                 </Button>
               </form>
