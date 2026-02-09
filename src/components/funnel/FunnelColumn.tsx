@@ -1,6 +1,7 @@
 import { FunnelCard } from "./FunnelCard";
 import type { FunnelStage } from "@/types/lead";
 import { ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 
 interface StageInfo {
   key: FunnelStage;
@@ -86,15 +87,17 @@ export function FunnelColumn({
             Nenhum negócio
           </div>
         )}
-        {leads.map((lead) => (
-          <FunnelCard
-            key={lead.id}
-            lead={lead}
-            stageColor={stage.color}
-            onDragStart={() => onDragStart(lead.id)}
-            onClick={() => onLeadClick(lead.id)}
-          />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {leads.map((lead) => (
+            <FunnelCard
+              key={lead.id}
+              lead={lead}
+              stageColor={stage.color}
+              onDragStart={() => onDragStart(lead.id)}
+              onClick={() => onLeadClick(lead.id)}
+            />
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Footer totals */}
