@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import JSZip from "jszip";
+import { EmissionFormDialog } from "./EmissionFormDialog";
 
 interface Props {
   lead: Lead;
@@ -52,7 +53,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   const [whatsappMsg, setWhatsappMsg] = useState("");
   const [showMsgDialog, setShowMsgDialog] = useState(false);
   const [copied, setCopied] = useState(false);
-
+  const [showEmissionForm, setShowEmissionForm] = useState(false);
   const addTag = () => {
     const tag = noteTagInput.trim().toLowerCase();
     if (tag && !noteTags.includes(tag)) {
@@ -132,22 +133,26 @@ export function LeadObservationsPanel({ lead }: Props) {
     setLoadingSummary(false);
   };
 
-  const handleGenerateWhatsAppMsg = async () => {
+  const handleOpenEmissionForm = () => {
     if (!obs.documents.length) {
       toast({ title: "Nenhum documento", description: "Adicione documentos antes de gerar a mensagem.", variant: "destructive" });
       return;
     }
+    setShowEmissionForm(true);
+  };
+
+  const handleGenerateWhatsAppMsg = async (formData: { vigencia: string; nomePlano: string }) => {
+    setShowEmissionForm(false);
     setGeneratingMsg(true);
     setWhatsappMsg("");
     setCopied(false);
     try {
-      // Generate signed URLs (valid for 7 days) for each document
       const docsWithLinks = await Promise.all(
         obs.documents.map(async (doc: any) => {
           const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
           const { data: signedData } = await supabase.storage
             .from("lead-images")
-            .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7); // 7 days
+            .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
           return { catLabel, fileName: doc.file_name, url: signedData?.signedUrl || null };
         })
       );
@@ -156,32 +161,39 @@ export function LeadObservationsPanel({ lead }: Props) {
         d.url ? `- ${d.catLabel}: ${d.fileName}\n  🔗 Link: ${d.url}` : `- ${d.catLabel}: ${d.fileName}`
       ).join("\n");
 
-      const checklistStatus = "Sem checklist";
+      const prompt = `Gere uma mensagem profissional e organizada para enviar via WhatsApp ao time de emissão de um plano de saúde/odonto.
 
-      const prompt = `Gere uma mensagem profissional e organizada para enviar via WhatsApp ao time de emissão de um plano de saúde.
+Use EXATAMENTE este formato de referência (adapte os dados):
 
-Dados do lead:
-- Nome: ${lead.name}
-- Telefone: ${lead.phone}
-- Tipo: ${lead.type}
-- Operadora: ${lead.operator || "Não definida"}
-- Plano: ${lead.plan_type || "Não definido"}
-- Vidas: ${lead.lives || "Não informado"}
+---
+Bom dia!
+
+Segue Proposta ${lead.type} ${lead.operator || "Operadora"} para emissão:
+
+Corretora: [deixe para o corretor preencher]
+Vendedor: [deixe para o corretor preencher]
+
+Plano: ${formData.nomePlano}
+Vigência desejada: ${formData.vigencia}
+
+Titular: ${lead.name}
+Celular: ${lead.phone}
+${lead.email ? `E-mail: ${lead.email}` : ""}
+${lead.lives && lead.lives > 1 ? `Vidas: ${lead.lives}` : ""}
 
 Documentos anexados:
 ${docList}
 
-Status do checklist:
-${checklistStatus}
+Atenciosamente,
+---
 
-Monte a mensagem no seguinte formato:
-1. Saudação breve ao time de emissão
-2. Identifique o cliente (nome, tipo de plano, operadora)
-3. Liste CADA documento anexado de forma organizada, indicando o que é cada um (ex: "📄 RG do Titular - arquivo: fulano_rg.pdf") e INCLUA O LINK de download logo abaixo de cada documento para que o time possa baixar diretamente
-4. Mencione se há documentos pendentes no checklist
-5. Finalize com uma frase de fechamento profissional
-
-Use emojis moderadamente para organização visual. A mensagem deve ser clara e pronta para copiar e colar no WhatsApp. Os links são temporários (7 dias).`;
+Regras:
+1. Mantenha o formato acima, limpo e profissional
+2. Inclua TODOS os documentos listados com seus links de download
+3. Use emojis moderadamente apenas para organização visual
+4. Os links são temporários (7 dias)
+5. A mensagem deve ser pronta para copiar e colar no WhatsApp
+6. Inclua os campos "Corretora" e "Vendedor" com marcação [preencher] para o corretor completar depois`;
 
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
         method: "POST",
@@ -415,7 +427,7 @@ Use emojis moderadamente para organização visual. A mensagem deve ser clara e 
             variant="outline"
             className="w-full h-8 gap-1.5 text-xs border-secondary/30 text-secondary hover:bg-secondary/10"
             disabled={generatingMsg}
-            onClick={handleGenerateWhatsAppMsg}
+            onClick={handleOpenEmissionForm}
           >
             {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
             Montar mensagem para emissão
@@ -530,6 +542,15 @@ Use emojis moderadamente para organização visual. A mensagem deve ser clara e 
           </div>
         </DialogContent>
       </Dialog>
+      {/* Emission Form Dialog */}
+      <EmissionFormDialog
+        open={showEmissionForm}
+        onOpenChange={setShowEmissionForm}
+        lead={lead}
+        documentsCount={obs.documents.length}
+        onConfirm={handleGenerateWhatsAppMsg}
+        isLoading={generatingMsg}
+      />
     </>
   );
 }
