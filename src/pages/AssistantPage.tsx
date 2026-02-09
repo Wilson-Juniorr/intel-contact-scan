@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Bot, Send, User, Bell } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "@/hooks/use-toast";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
+import { useLeadsContext } from "@/contexts/LeadsContext";
+import { FUNNEL_STAGES } from "@/types/lead";
 
 interface Message {
   role: "user" | "assistant";
@@ -16,11 +18,67 @@ interface Message {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 export default function AssistantPage() {
+  const { leads, interactions } = useLeadsContext();
+
+  const crmContext = useMemo(() => {
+    if (!leads.length) return "";
+
+    const stageCounts: Record<string, number> = {};
+    leads.forEach((l) => {
+      const label = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
+      stageCounts[label] = (stageCounts[label] || 0) + 1;
+    });
+
+    const stagesSummary = Object.entries(stageCounts)
+      .map(([stage, count]) => `  - ${stage}: ${count}`)
+      .join("\n");
+
+    const now = Date.now();
+    const idleLeads = leads
+      .filter((l) => !["implantado", "declinado", "cancelado"].includes(l.stage))
+      .map((l) => {
+        const lastActivity = l.last_contact_at || l.updated_at || l.created_at;
+        const idleDays = Math.floor((now - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
+        return { ...l, idleDays };
+      })
+      .sort((a, b) => b.idleDays - a.idleDays);
+
+    const idleSummary = idleLeads
+      .slice(0, 15)
+      .map((l) => {
+        const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
+        return `  - ${l.name} | ${stageLabel} | ${l.type} | ${l.operator || "sem operadora"} | ${l.idleDays}d sem contato | ${l.lives || "?"} vidas`;
+      })
+      .join("\n");
+
+    const totalValue = leads.reduce((sum, l) => sum + (l.lives || 0), 0);
+
+    return `
+=== DADOS DO CRM DO USUÁRIO ===
+Total de leads: ${leads.length}
+Total de vidas: ${totalValue}
+Total de interações registradas: ${interactions.length}
+
+LEADS POR ETAPA DO FUNIL:
+${stagesSummary}
+
+LEADS ATIVOS (ordenados por inatividade):
+${idleSummary}
+
+TODOS OS LEADS:
+${leads.map((l) => {
+  const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
+  const lastActivity = l.last_contact_at || l.updated_at;
+  return `  - ${l.name} | Tel: ${l.phone} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | Último contato: ${lastActivity ? new Date(lastActivity).toLocaleDateString("pt-BR") : "nunca"} | Notas: ${l.notes || "-"}`;
+}).join("\n")}
+===`;
+  }, [leads, interactions]);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "Olá! Sou seu assistente de vendas de planos de saúde. Posso ajudar com:\n\n• Dúvidas sobre planos, coberturas e carências\n• Sugestões de abordagem para leads\n• Gerar mensagens para enviar via WhatsApp\n• Comparar operadoras e planos\n\nComo posso ajudar?",
+        "Olá! Sou seu assistente CRM Saúde IA. Tenho acesso completo aos seus dados e posso ajudar com:\n\n• **Seus leads** — status, etapas do funil, quem precisa de atenção\n• **Análises** — resumo do pipeline, métricas, priorização\n• **Planos de saúde** — coberturas, carências, comparações\n• **Mensagens** — follow-up personalizado para WhatsApp\n\nPergunte qualquer coisa sobre seus negócios!",
     },
   ]);
   const [input, setInput] = useState("");
@@ -58,7 +116,7 @@ export default function AssistantPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({ messages: allMessages, crmContext }),
       });
 
       if (!resp.ok) {
