@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Mail, Edit, User, Clock, ClipboardList } from "lucide-react";
+import { Phone, MessageCircle, Mail, User, Clock, ClipboardList } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -83,7 +83,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
         <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} color={stageColor} />
         <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} color={stageColor} />
         <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} color={stageColor} disabled={!lead.email} />
-        <ActionBtn icon={<Edit className="h-3.5 w-3.5" />} onClick={onClick} color={stageColor} />
+        
       </div>
     </motion.div>
   );
