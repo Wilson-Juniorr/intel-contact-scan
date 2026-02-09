@@ -1,27 +1,67 @@
 import { useState } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, Lead } from "@/types/lead";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Phone, MessageCircle, ChevronRight } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, MessageCircle, ChevronRight, Trash2 } from "lucide-react";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function LeadsPage() {
-  const { leads } = useLeadsContext();
+  const { leads, deleteLeads } = useLeadsContext();
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const filtered = leads.filter(
     (l) =>
       l.name.toLowerCase().includes(search.toLowerCase()) ||
       l.phone.includes(search)
   );
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((l) => l.id)));
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteLeads(Array.from(selectedIds));
+      toast.success(`${selectedIds.size} lead(s) excluído(s)`);
+      setSelectedIds(new Set());
+    } catch {
+      toast.error("Erro ao excluir leads");
+    }
+    setConfirmOpen(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -30,9 +70,16 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold">Leads</h1>
           <p className="text-sm text-muted-foreground">{leads.length} leads cadastrados</p>
         </div>
-        <Button onClick={() => setFormOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Novo Lead
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button variant="destructive" onClick={() => setConfirmOpen(true)} className="gap-2">
+              <Trash2 className="h-4 w-4" /> Excluir ({selectedIds.size})
+            </Button>
+          )}
+          <Button onClick={() => setFormOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo Lead
+          </Button>
+        </div>
       </div>
 
       <div className="relative">
@@ -45,19 +92,36 @@ export default function LeadsPage() {
         />
       </div>
 
+      {filtered.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={selectedIds.size === filtered.length && filtered.length > 0}
+            onCheckedChange={toggleAll}
+          />
+          <span className="text-xs text-muted-foreground">Selecionar todos</span>
+        </div>
+      )}
+
       <div className="space-y-2">
         {filtered.map((lead) => {
           const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
+          const isSelected = selectedIds.has(lead.id);
           return (
             <Card
               key={lead.id}
-              className="cursor-pointer hover:bg-muted/30 transition-colors"
+              className={`cursor-pointer hover:bg-muted/30 transition-colors ${isSelected ? "ring-1 ring-primary" : ""}`}
               onClick={() => setSelectedLead(lead)}
             >
               <CardContent className="p-4 flex items-center gap-4">
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleSelect(lead.id)}
+                  />
+                </div>
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="text-primary font-semibold text-sm">
-                    {lead.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                    {lead.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -96,6 +160,23 @@ export default function LeadsPage() {
 
       <LeadFormDialog open={formOpen} onOpenChange={setFormOpen} />
       <LeadDetailSheet lead={selectedLead} onClose={() => setSelectedLead(null)} />
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir {selectedIds.size} lead(s)? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
