@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   StickyNote, FileUp, CheckSquare, Sparkles, Plus, Trash2, Upload,
   Loader2, X, Tag, Download, File, Image as ImageIcon, Eye, FolderDown,
+  MessageCircle, Copy, Check,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
@@ -48,6 +49,10 @@ export function LeadObservationsPanel({ lead }: Props) {
   const [summary, setSummary] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const [generatingMsg, setGeneratingMsg] = useState(false);
+  const [whatsappMsg, setWhatsappMsg] = useState("");
+  const [showMsgDialog, setShowMsgDialog] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const addTag = () => {
     const tag = noteTagInput.trim().toLowerCase();
@@ -134,6 +139,115 @@ export function LeadObservationsPanel({ lead }: Props) {
       toast({ title: "Erro ao gerar resumo", description: e.message, variant: "destructive" });
     }
     setLoadingSummary(false);
+  };
+
+  const handleGenerateWhatsAppMsg = async () => {
+    if (!obs.documents.length) {
+      toast({ title: "Nenhum documento", description: "Adicione documentos antes de gerar a mensagem.", variant: "destructive" });
+      return;
+    }
+    setGeneratingMsg(true);
+    setWhatsappMsg("");
+    setCopied(false);
+    try {
+      const docList = obs.documents.map((doc: any) => {
+        const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
+        return `- ${catLabel}: ${doc.file_name}`;
+      }).join("\n");
+
+      const checklistStatus = obs.checklist.length
+        ? obs.checklist.map((c: any) => `- [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
+        : "Nenhum checklist";
+
+      const prompt = `Gere uma mensagem profissional e organizada para enviar via WhatsApp ao time de emissão de um plano de saúde.
+
+Dados do lead:
+- Nome: ${lead.name}
+- Telefone: ${lead.phone}
+- Tipo: ${lead.type}
+- Operadora: ${lead.operator || "Não definida"}
+- Plano: ${lead.plan_type || "Não definido"}
+- Vidas: ${lead.lives || "Não informado"}
+
+Documentos anexados:
+${docList}
+
+Status do checklist:
+${checklistStatus}
+
+Monte a mensagem no seguinte formato:
+1. Saudação breve ao time de emissão
+2. Identifique o cliente (nome, tipo de plano, operadora)
+3. Liste CADA documento anexado de forma organizada, indicando o que é cada um (ex: "📄 RG do Titular - arquivo: fulano_rg.pdf")
+4. Mencione se há documentos pendentes no checklist
+5. Finalize com uma frase de fechamento profissional
+
+Use emojis moderadamente para organização visual. A mensagem deve ser clara e pronta para copiar e colar no WhatsApp.`;
+
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: prompt }],
+          crmContext: "",
+        }),
+      });
+
+      if (!resp.ok) throw new Error("Erro ao gerar mensagem");
+
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let fullMsg = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullMsg += content;
+              setWhatsappMsg(fullMsg);
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+
+      setShowMsgDialog(true);
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar mensagem", description: e.message, variant: "destructive" });
+    }
+    setGeneratingMsg(false);
+  };
+
+  const handleCopyMsg = async () => {
+    await navigator.clipboard.writeText(whatsappMsg);
+    setCopied(true);
+    toast({ title: "Mensagem copiada!" });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendWhatsApp = () => {
+    const encoded = encodeURIComponent(whatsappMsg);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
 
   const filteredNotes = obs.notes.filter((n: any) => {
@@ -301,6 +415,19 @@ export function LeadObservationsPanel({ lead }: Props) {
           </Button>
         )}
 
+        {obs.documents.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full h-8 gap-1.5 text-xs border-secondary/30 text-secondary hover:bg-secondary/10"
+            disabled={generatingMsg}
+            onClick={handleGenerateWhatsAppMsg}
+          >
+            {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+            Montar mensagem para emissão
+          </Button>
+        )}
+
         <div className="space-y-2 max-h-[350px] overflow-y-auto">
           {obs.documents.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum documento</p>}
           {obs.documents.map((doc: any) => {
@@ -420,6 +547,29 @@ export function LeadObservationsPanel({ lead }: Props) {
                 </Button>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Message Dialog */}
+      <Dialog open={showMsgDialog} onOpenChange={setShowMsgDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" /> Mensagem para Emissão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-h-0 p-3 rounded-lg border border-border bg-muted/50">
+            <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed">{whatsappMsg}</pre>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={handleCopyMsg}>
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copiado!" : "Copiar"}
+            </Button>
+            <Button size="sm" className="flex-1 gap-1.5 text-xs bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={handleSendWhatsApp}>
+              <MessageCircle className="h-3 w-3" /> Abrir WhatsApp
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
