@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Send, User, Bell } from "lucide-react";
+import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "@/hooks/use-toast";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
@@ -11,19 +11,22 @@ import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  fileInfo?: { file_name: string };
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 export default function AssistantPage() {
   const { leads, interactions } = useLeadsContext();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const queryClient = useQueryClient();
 
+  // CRM data queries for context
   const notesQuery = useQuery({
     queryKey: ["lead_notes", user?.id],
     queryFn: async () => {
@@ -60,9 +63,9 @@ export default function AssistantPage() {
     enabled: !!user,
   });
 
+  // Build CRM context
   const crmContext = useMemo(() => {
     if (!leads.length) return "";
-
     const notes = notesQuery.data || [];
     const docs = docsQuery.data || [];
     const checklist = checklistQuery.data || [];
@@ -73,92 +76,141 @@ export default function AssistantPage() {
       const label = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
       stageCounts[label] = (stageCounts[label] || 0) + 1;
     });
-
-    const stagesSummary = Object.entries(stageCounts)
-      .map(([stage, count]) => `  - ${stage}: ${count}`)
-      .join("\n");
-
+    const stagesSummary = Object.entries(stageCounts).map(([s, c]) => `  - ${s}: ${c}`).join("\n");
     const now = Date.now();
     const totalValue = leads.reduce((sum, l) => sum + (l.lives || 0), 0);
 
     const leadsDetail = leads.map((l) => {
       const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
       const lastActivity = l.last_contact_at || l.updated_at;
-      const idleDays = Math.floor((now - new Date(lastActivity || l.created_at).getTime()) / (1000 * 60 * 60 * 24));
-
-      const leadInteractions = interactions.filter((i) => i.lead_id === l.id);
-      const intSummary = leadInteractions.length
-        ? leadInteractions.slice(0, 5).map((i) => `      [${i.type}] ${new Date(i.created_at).toLocaleDateString("pt-BR")}: ${i.description}`).join("\n")
+      const idleDays = Math.floor((now - new Date(lastActivity || l.created_at).getTime()) / 86400000);
+      const leadInt = interactions.filter((i) => i.lead_id === l.id);
+      const intSum = leadInt.length
+        ? leadInt.slice(0, 5).map((i) => `      [${i.type}] ${new Date(i.created_at).toLocaleDateString("pt-BR")}: ${i.description}`).join("\n")
         : "      Nenhuma interação";
-
       const leadNotes = notes.filter((n) => n.lead_id === l.id);
-      const notesSummary = leadNotes.length
+      const notesSum = leadNotes.length
         ? leadNotes.slice(0, 5).map((n) => `      [${n.category}] ${n.content}${n.tags?.length ? ` (tags: ${n.tags.join(", ")})` : ""}`).join("\n")
         : "      Nenhuma observação";
-
       const leadDocs = docs.filter((d) => d.lead_id === l.id);
-      const docsSummary = leadDocs.length
+      const docsSum = leadDocs.length
         ? leadDocs.map((d) => `      [${d.category}] ${d.file_name}${d.ocr_text ? ` | OCR: ${d.ocr_text.slice(0, 150)}...` : ""}`).join("\n")
         : "      Nenhum documento";
-
-      const leadChecklist = checklist.filter((c) => c.lead_id === l.id);
-      const checkSummary = leadChecklist.length
-        ? leadChecklist.map((c) => `      [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
+      const leadCheck = checklist.filter((c) => c.lead_id === l.id);
+      const checkSum = leadCheck.length
+        ? leadCheck.map((c) => `      [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
         : "      Nenhum checklist";
-
-      const leadReminders = reminders.filter((r) => r.lead_id === l.id);
-      const reminderSummary = leadReminders.length
-        ? leadReminders.map((r) => `      [${r.completed ? "✅" : "⏰"}] ${new Date(r.date).toLocaleDateString("pt-BR")}: ${r.description}`).join("\n")
+      const leadRem = reminders.filter((r) => r.lead_id === l.id);
+      const remSum = leadRem.length
+        ? leadRem.map((r) => `      [${r.completed ? "✅" : "⏰"}] ${new Date(r.date).toLocaleDateString("pt-BR")}: ${r.description}`).join("\n")
         : "      Nenhum lembrete";
 
-      return `  📋 ${l.name} | Tel: ${l.phone} | Email: ${l.email || "-"} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | ${idleDays}d sem contato | Notas: ${l.notes || "-"}
-    Interações (${leadInteractions.length}):
-${intSummary}
-    Observações (${leadNotes.length}):
-${notesSummary}
-    Documentos (${leadDocs.length}):
-${docsSummary}
-    Checklist:
-${checkSummary}
-    Lembretes:
-${reminderSummary}`;
+      return `  📋 ${l.name} | Tel: ${l.phone} | Email: ${l.email || "-"} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | ${idleDays}d sem contato
+    Interações (${leadInt.length}):\n${intSum}
+    Observações (${leadNotes.length}):\n${notesSum}
+    Documentos (${leadDocs.length}):\n${docsSum}
+    Checklist:\n${checkSum}
+    Lembretes:\n${remSum}`;
     }).join("\n\n");
 
-    return `
-=== DADOS COMPLETOS DO CRM ===
-Total de leads: ${leads.length}
-Total de vidas: ${totalValue}
-Total de interações: ${interactions.length}
-Total de observações: ${notes.length}
-Total de documentos: ${docs.length}
-Lembretes pendentes: ${reminders.filter((r) => !r.completed).length}
-
-FUNIL DE VENDAS:
-${stagesSummary}
-
-DETALHES DE CADA LEAD:
-${leadsDetail}
-===`;
+    return `\n=== DADOS COMPLETOS DO CRM ===\nTotal de leads: ${leads.length}\nTotal de vidas: ${totalValue}\nTotal de interações: ${interactions.length}\nTotal de observações: ${notes.length}\nTotal de documentos: ${docs.length}\nLembretes pendentes: ${reminders.filter((r) => !r.completed).length}\n\nFUNIL DE VENDAS:\n${stagesSummary}\n\nDETALHES DE CADA LEAD:\n${leadsDetail}\n===`;
   }, [leads, interactions, notesQuery.data, docsQuery.data, checklistQuery.data, remindersQuery.data]);
 
+  // Chat state
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "Olá! Sou seu assistente CRM Saúde IA. Tenho acesso completo aos seus dados e posso ajudar com:\n\n• **Seus leads** — status, etapas do funil, quem precisa de atenção\n• **Análises** — resumo do pipeline, métricas, priorização\n• **Planos de saúde** — coberturas, carências, comparações\n• **Mensagens** — follow-up personalizado para WhatsApp\n\nPergunte qualquer coisa sobre seus negócios!",
+        "Olá! Sou seu assistente CRM Saúde IA. Agora posso **executar ações** diretamente no sistema!\n\n" +
+        "🎯 **Comandos que entendo:**\n" +
+        "• *\"Move o lead João para cotação enviada\"*\n" +
+        "• *\"Registra uma ligação com a Maria: falamos sobre plano PME\"*\n" +
+        "• *\"Cria um lembrete para ligar pro Carlos amanhã às 10h\"*\n" +
+        "• *\"Adiciona uma nota no lead Ana: cliente prefere Unimed\"*\n" +
+        "• 📎 Envie um documento e diga a qual lead pertence\n" +
+        "• 🎤 Use o microfone para falar!\n\n" +
+        "Pergunte qualquer coisa ou peça uma ação!",
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Voice input state
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // File upload state
+  const [pendingFile, setPendingFile] = useState<{
+    file_name: string; file_path: string; file_type: string; file_size: number;
+  } | null>(null);
+  const chatFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Invalidate all CRM queries after actions
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["leads"] });
+    queryClient.invalidateQueries({ queryKey: ["interactions"] });
+    queryClient.invalidateQueries({ queryKey: ["lead_notes"] });
+    queryClient.invalidateQueries({ queryKey: ["lead_documents"] });
+    queryClient.invalidateQueries({ queryKey: ["lead_checklist"] });
+    queryClient.invalidateQueries({ queryKey: ["reminders"] });
+  }, [queryClient]);
+
+  // Voice input
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast({ title: "Navegador não suporta entrada por voz", variant: "destructive" });
+      return;
+    }
+    const recognition = new SR();
+    recognition.lang = "pt-BR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput((prev) => (prev ? prev + " " : "") + transcript);
+      setIsRecording(false);
+    };
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  }, [isRecording]);
+
+  // File upload
+  const handleChatFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    try {
+      const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+      if (error) throw error;
+      setPendingFile({ file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size });
+      toast({ title: `📎 "${file.name}" pronto para enviar` });
+    } catch (err: any) {
+      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+    }
+    if (chatFileRef.current) chatFileRef.current.value = "";
+  };
+
+  // Send message
   const send = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg: Message = { role: "user", content: input.trim() };
+    if (!input.trim() && !pendingFile) return;
+    if (loading) return;
+
+    const userContent = input.trim() || (pendingFile ? `📎 Enviando documento: ${pendingFile.file_name}` : "");
+    const userMsg: Message = { role: "user", content: userContent, fileInfo: pendingFile ? { file_name: pendingFile.file_name } : undefined };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
@@ -177,13 +229,22 @@ ${leadsDetail}
     };
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      };
+      if (session?.access_token) {
+        headers["x-user-token"] = session.access_token;
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: allMessages, crmContext }),
+        headers,
+        body: JSON.stringify({
+          messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+          crmContext,
+          fileInfo: pendingFile || undefined,
+        }),
       });
 
       if (!resp.ok) {
@@ -191,8 +252,9 @@ ${leadsDetail}
         throw new Error(err.error || "Erro no assistente");
       }
 
-      if (!resp.body) throw new Error("No stream");
+      const actionsWereTaken = resp.headers.get("x-actions-taken") === "true";
 
+      if (!resp.body) throw new Error("No stream");
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let textBuffer = "";
@@ -201,7 +263,6 @@ ${leadsDetail}
         const { done, value } = await reader.read();
         if (done) break;
         textBuffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
           let line = textBuffer.slice(0, newlineIndex);
@@ -221,9 +282,16 @@ ${leadsDetail}
           }
         }
       }
+
+      // If actions were taken, invalidate all queries
+      if (actionsWereTaken) {
+        invalidateAll();
+        toast({ title: "✅ Ação executada no CRM" });
+      }
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
+    setPendingFile(null);
     setLoading(false);
   };
 
@@ -231,18 +299,16 @@ ${leadsDetail}
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       <div className="mb-4">
         <h1 className="text-2xl font-bold">Assistente IA</h1>
-        <p className="text-sm text-muted-foreground">Especialista em planos de saúde</p>
+        <p className="text-sm text-muted-foreground">Especialista em planos de saúde — agora com ações no CRM e voz</p>
       </div>
 
       <Tabs defaultValue="followup" className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="w-fit">
           <TabsTrigger value="followup" className="gap-1.5 text-xs">
-            <Bell className="h-3.5 w-3.5" />
-            Follow-Up Inteligente
+            <Bell className="h-3.5 w-3.5" /> Follow-Up Inteligente
           </TabsTrigger>
           <TabsTrigger value="chat" className="gap-1.5 text-xs">
-            <Bot className="h-3.5 w-3.5" />
-            Chat IA
+            <Bot className="h-3.5 w-3.5" /> Chat IA
           </TabsTrigger>
         </TabsList>
 
@@ -265,6 +331,11 @@ ${leadsDetail}
                       msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                     }`}
                   >
+                    {msg.fileInfo && (
+                      <div className="flex items-center gap-1.5 mb-1.5 text-xs opacity-80">
+                        <FileText className="h-3 w-3" /> {msg.fileInfo.file_name}
+                      </div>
+                    )}
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm prose-invert max-w-none">
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -297,15 +368,48 @@ ${leadsDetail}
               <div ref={endRef} />
             </CardContent>
 
+            {/* Pending file indicator */}
+            {pendingFile && (
+              <div className="px-4 py-2 border-t border-border flex items-center gap-2 bg-muted/50">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground flex-1 truncate">📎 {pendingFile.file_name}</span>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setPendingFile(null)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+
             <div className="p-4 border-t border-border">
+              <input ref={chatFileRef} type="file" className="hidden" onChange={handleChatFileUpload} />
               <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0"
+                  onClick={() => chatFileRef.current?.click()}
+                  disabled={loading}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={isRecording ? "destructive" : "ghost"}
+                  className="shrink-0"
+                  onClick={toggleRecording}
+                  disabled={loading}
+                >
+                  {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
                 <Input
-                  placeholder="Pergunte sobre planos, coberturas, carências..."
+                  placeholder={isRecording ? "🎤 Ouvindo..." : "Digite ou use o microfone..."}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={loading}
+                  className={isRecording ? "border-destructive" : ""}
                 />
-                <Button type="submit" size="icon" disabled={loading || !input.trim()}>
+                <Button type="submit" size="icon" disabled={loading || (!input.trim() && !pendingFile)}>
                   <Send className="h-4 w-4" />
                 </Button>
               </form>
