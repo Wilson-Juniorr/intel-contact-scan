@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Upload, Loader2, Check } from "lucide-react";
+import { Camera, Upload, Loader2, Check, ClipboardPaste } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
@@ -42,12 +42,71 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
   // OCR state
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResults, setOcrResults] = useState<{ name: string; phone: string }[]>([]);
+  const [pastedPreview, setPastedPreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("manual");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const processImageFile = useCallback(async (file: File) => {
+    setOcrLoading(true);
+    setOcrResults([]);
+    setPastedPreview(null);
+
+    const preview = URL.createObjectURL(file);
+    setPastedPreview(preview);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(",")[1];
+        const { data, error } = await supabase.functions.invoke("ocr-extract", {
+          body: { imageBase64: base64 },
+        });
+        if (error) throw error;
+        const contacts = data?.contacts || [];
+        if (contacts.length === 0) {
+          toast({ title: "Nenhum contato encontrado", description: "Tente com outra imagem", variant: "destructive" });
+        } else {
+          setOcrResults(contacts);
+          if (contacts[0]) {
+            setName(contacts[0].name || "");
+            setPhone(contacts[0].phone || "");
+          }
+          toast({ title: `${contacts.length} contato(s) encontrado(s)!` });
+        }
+        setOcrLoading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (e: any) {
+      toast({ title: "Erro no OCR", description: e.message, variant: "destructive" });
+      setOcrLoading(false);
+    }
+  }, []);
+
+  // Global paste handler when dialog is open and on image tab
+  useEffect(() => {
+    if (!open || activeTab !== "image") return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) processImageFile(file);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [open, activeTab, processImageFile]);
 
   const reset = () => {
     setName(""); setPhone(""); setEmail(""); setType("PF");
     setPlanType(""); setOperator(""); setLives(""); setNotes("");
-    setOcrResults([]);
+    setOcrResults([]); setPastedPreview(null);
   };
 
   const handleSubmit = async () => {
@@ -80,40 +139,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setOcrLoading(true);
-    setOcrResults([]);
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(",")[1];
-
-        const { data, error } = await supabase.functions.invoke("ocr-extract", {
-          body: { imageBase64: base64 },
-        });
-
-        if (error) throw error;
-
-        const contacts = data?.contacts || [];
-        if (contacts.length === 0) {
-          toast({ title: "Nenhum contato encontrado", description: "Tente com outra imagem", variant: "destructive" });
-        } else {
-          setOcrResults(contacts);
-          // Auto-fill first contact
-          if (contacts[0]) {
-            setName(contacts[0].name || "");
-            setPhone(contacts[0].phone || "");
-          }
-          toast({ title: `${contacts.length} contato(s) encontrado(s)!` });
-        }
-        setOcrLoading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (e: any) {
-      toast({ title: "Erro no OCR", description: e.message, variant: "destructive" });
-      setOcrLoading(false);
-    }
+    processImageFile(file);
   };
 
   const selectOcrContact = (contact: { name: string; phone: string }) => {
@@ -128,7 +154,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
           <DialogTitle>Novo Lead</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="manual">
+        <Tabs defaultValue="manual" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full">
             <TabsTrigger value="manual" className="flex-1">Cadastro Manual</TabsTrigger>
             <TabsTrigger value="image" className="flex-1 gap-2">
@@ -195,18 +221,24 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+              className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
             >
               {ocrLoading ? (
                 <div className="space-y-3">
                   <Loader2 className="h-10 w-10 mx-auto text-primary animate-spin" />
                   <p className="text-sm font-medium">Analisando imagem com IA...</p>
                 </div>
+              ) : pastedPreview ? (
+                <img src={pastedPreview} alt="Preview" className="max-h-32 mx-auto rounded-lg object-contain" />
               ) : (
                 <>
-                  <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm font-medium">Envie uma imagem com nome e número</p>
                   <p className="text-xs text-muted-foreground mt-1">Print de WhatsApp, lista de contatos, cartão...</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-3 text-xs text-primary font-medium">
+                    <ClipboardPaste className="h-3.5 w-3.5" />
+                    Ou pressione Ctrl+V para colar da área de transferência
+                  </div>
                 </>
               )}
             </div>
