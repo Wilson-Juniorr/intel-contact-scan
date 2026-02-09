@@ -219,6 +219,30 @@ export default function AssistantPage() {
     if (chatFileRef.current) chatFileRef.current.value = "";
   };
 
+  // Paste from clipboard
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items || !user) return;
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        const fileName = file.name === "image.png" ? `captura_${Date.now()}.png` : file.name;
+        try {
+          const filePath = `${user.id}/chat_uploads/${Date.now()}_${fileName}`;
+          const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+          if (error) throw error;
+          setPendingFile({ file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size });
+          toast({ title: `📎 "${fileName}" colado e pronto para enviar` });
+        } catch (err: any) {
+          toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
+        }
+        break; // only first file
+      }
+    }
+  }, [user]);
+
   // Send message
   const send = async () => {
     if (!input.trim() && !pendingFile) return;
@@ -458,9 +482,10 @@ export default function AssistantPage() {
                   {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
                 <Input
-                  placeholder={isRecording ? "🎤 Ouvindo..." : "Digite ou use o microfone..."}
+                  placeholder={isRecording ? "🎤 Ouvindo..." : "Digite, cole ou use o microfone..."}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onPaste={handlePaste}
                   disabled={loading}
                   className={isRecording ? "border-destructive" : ""}
                 />
