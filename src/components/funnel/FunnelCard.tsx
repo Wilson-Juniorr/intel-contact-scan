@@ -1,6 +1,7 @@
 import { Phone, MessageCircle, Mail, Edit, User, Clock, ClipboardList } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { motion } from "framer-motion";
 
 interface Props {
   lead: any;
@@ -22,11 +23,17 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
   const estimatedValue = lead.lives ? lead.lives * 120 : null;
 
   return (
-    <div
+    <motion.div
+      layout
+      layoutId={lead.id}
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.8 }}
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="mx-2 my-1.5 rounded border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all group"
+      className="mx-2 my-1.5 rounded border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow group"
     >
       <div className="px-3 pt-2.5 pb-2">
         {/* Title */}
@@ -78,7 +85,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
         <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} color={stageColor} disabled={!lead.email} />
         <ActionBtn icon={<Edit className="h-3.5 w-3.5" />} onClick={onClick} color={stageColor} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
