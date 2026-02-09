@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
+import { useLeadObservations, NOTE_CATEGORIES, DOC_CATEGORIES } from "@/hooks/useLeadObservations";
+import { supabase } from "@/integrations/supabase/client";
 import { Lead, FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,11 +16,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LeadObservationsPanel } from "@/components/leads/LeadObservationsPanel";
 import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
-  Maximize2, Minimize2, Pencil, Save, X, Loader2, Trash2,
+  Maximize2, Minimize2, Pencil, Save, X, Loader2, FileUp,
+  Upload, Download, Eye, Trash2, File, Image as ImageIcon,
+  FolderDown, Sparkles, Tag, Plus, Copy, Check,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
+import JSZip from "jszip";
 
 interface Props {
   lead: Lead | null;
@@ -91,19 +97,19 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
   const needsLostReason = form.stage === "declinado" || form.stage === "cancelado";
 
   return (
-    <div className="space-y-4 mt-3">
+    <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
           <Label className="text-xs">Nome *</Label>
-          <Input value={form.name} onChange={set("name")} placeholder="Nome do lead" className="h-9 text-sm" />
+          <Input value={form.name} onChange={set("name")} className="h-9 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Telefone *</Label>
-          <Input value={form.phone} onChange={set("phone")} placeholder="11999887766" className="h-9 text-sm" />
+          <Input value={form.phone} onChange={set("phone")} className="h-9 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Email</Label>
-          <Input value={form.email} onChange={set("email")} placeholder="email@exemplo.com" type="email" className="h-9 text-sm" />
+          <Input value={form.email} onChange={set("email")} type="email" className="h-9 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Tipo</Label>
@@ -131,11 +137,11 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
         </div>
         <div>
           <Label className="text-xs">Operadora</Label>
-          <Input value={form.operator} onChange={set("operator")} placeholder="Ex: Unimed, Amil..." className="h-9 text-sm" />
+          <Input value={form.operator} onChange={set("operator")} className="h-9 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Qtd. Vidas</Label>
-          <Input value={form.lives} onChange={set("lives")} placeholder="1" type="number" min="1" className="h-9 text-sm" />
+          <Input value={form.lives} onChange={set("lives")} type="number" min="1" className="h-9 text-sm" />
         </div>
         <div>
           <Label className="text-xs">Etapa do Funil</Label>
@@ -156,18 +162,18 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
         {needsLostReason && (
           <div>
             <Label className="text-xs">Motivo da Perda</Label>
-            <Input value={form.lost_reason} onChange={set("lost_reason")} placeholder="Motivo..." className="h-9 text-sm" />
+            <Input value={form.lost_reason} onChange={set("lost_reason")} className="h-9 text-sm" />
           </div>
         )}
         <div className="md:col-span-2">
           <Label className="text-xs">Observações</Label>
-          <Textarea value={form.notes} onChange={set("notes")} placeholder="Notas sobre o lead..." rows={3} className="text-sm" />
+          <Textarea value={form.notes} onChange={set("notes")} rows={3} className="text-sm" />
         </div>
       </div>
       <div className="flex gap-2">
         <Button onClick={handleSave} disabled={saving} className="flex-1 gap-1.5 h-9 text-sm">
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-          Salvar Alterações
+          Salvar
         </Button>
         <Button variant="outline" onClick={onCancel} disabled={saving} className="h-9 text-sm gap-1.5">
           <X className="h-3.5 w-3.5" /> Cancelar
@@ -177,8 +183,457 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
   );
 }
 
-function LeadDetailContent({ lead, isFullscreen, isEditing, onStartEdit, onStopEdit }: {
-  lead: Lead; isFullscreen: boolean; isEditing: boolean; onStartEdit: () => void; onStopEdit: () => void;
+/* ═══════════ FULLSCREEN COMPLETE VIEW ═══════════ */
+
+function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
+  lead: Lead; isEditing: boolean; onStartEdit: () => void; onStopEdit: () => void;
+}) {
+  const { getLeadInteractions } = useLeadsContext();
+  const obs = useLeadObservations(lead.id);
+  const interactions = getLeadInteractions(lead.id);
+  const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
+  const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
+
+  // Document state
+  const [docCategory, setDocCategory] = useState("outros");
+  const [uploading, setUploading] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Notes state
+  const [noteContent, setNoteContent] = useState("");
+  const [noteCategory, setNoteCategory] = useState("geral");
+  const [noteTagInput, setNoteTagInput] = useState("");
+  const [noteTags, setNoteTags] = useState<string[]>([]);
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSearch, setNoteSearch] = useState("");
+
+  // AI state
+  const [summary, setSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [generatingMsg, setGeneratingMsg] = useState(false);
+  const [whatsappMsg, setWhatsappMsg] = useState("");
+  const [showMsgDialog, setShowMsgDialog] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const iconMap: Record<string, React.ReactNode> = {
+    call: <Phone className="h-3.5 w-3.5" />,
+    whatsapp: <MessageCircle className="h-3.5 w-3.5" />,
+    meeting: <User className="h-3.5 w-3.5" />,
+    email: <Mail className="h-3.5 w-3.5" />,
+    note: <Clock className="h-3.5 w-3.5" />,
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        await obs.uploadDocument({ file, category: docCategory });
+      }
+      toast({ title: `${files.length} arquivo(s) enviado(s)!` });
+    } catch (e: any) {
+      toast({ title: "Erro no upload", description: e.message, variant: "destructive" });
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleDownload = async (filePath: string, fileName: string) => {
+    const { data, error } = await supabase.storage.from("lead-images").download(filePath);
+    if (error) { toast({ title: "Erro ao baixar", variant: "destructive" }); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePreview = async (filePath: string, fileName: string, fileType: string) => {
+    const { data, error } = await supabase.storage.from("lead-images").download(filePath);
+    if (error) { toast({ title: "Erro ao visualizar", variant: "destructive" }); return; }
+    const url = URL.createObjectURL(data);
+    setPreviewDoc({ url, name: fileName, type: fileType });
+  };
+
+  const addTag = () => {
+    const tag = noteTagInput.trim().toLowerCase();
+    if (tag && !noteTags.includes(tag)) setNoteTags((prev) => [...prev, tag]);
+    setNoteTagInput("");
+  };
+
+  const handleSaveNote = async () => {
+    if (!noteContent.trim()) return;
+    setSavingNote(true);
+    try {
+      await obs.addNote({ content: noteContent.trim(), category: noteCategory, tags: noteTags });
+      setNoteContent(""); setNoteTags([]);
+      toast({ title: "Nota salva!" });
+    } catch (e: any) {
+      toast({ title: "Erro ao salvar nota", description: e.message, variant: "destructive" });
+    }
+    setSavingNote(false);
+  };
+
+  const handleGenerateSummary = async () => {
+    setLoadingSummary(true); setSummary("");
+    try {
+      const { data, error } = await supabase.functions.invoke("lead-summary", {
+        body: { lead, interactions, notes: obs.notes },
+      });
+      if (error) throw error;
+      setSummary(data.summary);
+    } catch (e: any) {
+      toast({ title: "Erro ao gerar resumo", description: e.message, variant: "destructive" });
+    }
+    setLoadingSummary(false);
+  };
+
+  const handleGenerateWhatsAppMsg = async () => {
+    if (!obs.documents.length) {
+      toast({ title: "Nenhum documento", description: "Adicione documentos antes.", variant: "destructive" });
+      return;
+    }
+    setGeneratingMsg(true); setWhatsappMsg(""); setCopied(false);
+    try {
+      const docsWithLinks = await Promise.all(
+        obs.documents.map(async (doc: any) => {
+          const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
+          const { data: signedData } = await supabase.storage.from("lead-images").createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
+          return { catLabel, fileName: doc.file_name, url: signedData?.signedUrl || null };
+        })
+      );
+      const docList = docsWithLinks.map((d) => d.url ? `- ${d.catLabel}: ${d.fileName}\n  🔗 Link: ${d.url}` : `- ${d.catLabel}: ${d.fileName}`).join("\n");
+
+      const prompt = `Gere uma mensagem profissional para WhatsApp ao time de emissão.\n\nDados: Nome: ${lead.name}, Tel: ${lead.phone}, Tipo: ${lead.type}, Operadora: ${lead.operator || "-"}, Plano: ${lead.plan_type || "-"}, Vidas: ${lead.lives || "-"}\n\nDocumentos:\n${docList}\n\nFormato: saudação, dados do cliente, lista de docs com links, fechamento profissional. Emojis moderados. Links válidos 7 dias.`;
+
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], crmContext: "" }),
+      });
+      if (!resp.ok) throw new Error("Erro ao gerar mensagem");
+
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "", fullMsg = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+        let ni: number;
+        while ((ni = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, ni);
+          textBuffer = textBuffer.slice(ni + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ") || line.startsWith(":") || !line.trim()) continue;
+          const js = line.slice(6).trim();
+          if (js === "[DONE]") break;
+          try { const p = JSON.parse(js); const c = p.choices?.[0]?.delta?.content; if (c) { fullMsg += c; setWhatsappMsg(fullMsg); } } catch { textBuffer = line + "\n" + textBuffer; break; }
+        }
+      }
+      setShowMsgDialog(true);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+    setGeneratingMsg(false);
+  };
+
+  const filteredNotes = obs.notes.filter((n: any) => {
+    if (!noteSearch) return true;
+    const q = noteSearch.toLowerCase();
+    return n.content.toLowerCase().includes(q) || (n.tags || []).some((t: string) => t.includes(q)) || n.category.toLowerCase().includes(q);
+  });
+
+  if (isEditing) {
+    return <LeadEditForm lead={lead} onSaved={onStopEdit} onCancel={onStopEdit} />;
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* ═══ COLUMN 1: Info + Contact ═══ */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" /> Informações
+            </h3>
+            <Button variant="outline" size="sm" onClick={onStartEdit} className="h-7 text-[11px] gap-1">
+              <Pencil className="h-3 w-3" /> Editar
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span>{lead.phone}</span>
+            </div>
+            {lead.email && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>{lead.email}</span>
+              </div>
+            )}
+            <Button asChild size="sm" className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground h-8 text-xs">
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+              </a>
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div><span className="text-muted-foreground text-xs">Tipo</span><p className="font-medium">{lead.type}</p></div>
+            {lead.plan_type && <div><span className="text-muted-foreground text-xs">Plano</span><p className="font-medium">{lead.plan_type}</p></div>}
+            {lead.operator && <div><span className="text-muted-foreground text-xs">Operadora</span><p className="font-medium">{lead.operator}</p></div>}
+            {lead.lives && <div><span className="text-muted-foreground text-xs">Vidas</span><p className="font-medium">{lead.lives}</p></div>}
+          </div>
+          {lead.notes && (
+            <div><span className="text-muted-foreground text-xs">Observações</span><p className="text-sm mt-1">{lead.notes}</p></div>
+          )}
+          {lead.lost_reason && (
+            <div><span className="text-muted-foreground text-xs">Motivo da Perda</span><p className="text-sm mt-1 text-destructive">{lead.lost_reason}</p></div>
+          )}
+
+          <Separator />
+
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>Criado: {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: ptBR })}</p>
+            <p>Atualizado: {formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true, locale: ptBR })}</p>
+            {lead.last_contact_at && <p>Último contato: {formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: true, locale: ptBR })}</p>}
+          </div>
+
+          <Separator />
+
+          {/* AI Summary */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> Inteligência Artificial
+            </h3>
+            <Button onClick={handleGenerateSummary} disabled={loadingSummary} size="sm" className="w-full gap-1.5 h-8 text-xs">
+              {loadingSummary ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              Gerar Resumo IA
+            </Button>
+            {summary && (
+              <div className="p-2.5 rounded-lg border border-primary/20 bg-primary/5 prose prose-sm max-w-none">
+                <div className="text-xs leading-relaxed [&>h1]:text-sm [&>h2]:text-xs [&>h3]:text-xs [&>p]:text-xs [&>ul]:text-xs [&>ol]:text-xs">
+                  <ReactMarkdown>{summary}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ═══ COLUMN 2: Documents ═══ */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+            <FileUp className="h-3.5 w-3.5" /> Documentos ({obs.documents.length})
+          </h3>
+
+          <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+          <div className="flex gap-2">
+            <Select value={docCategory} onValueChange={setDocCategory}>
+              <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DOC_CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => fileRef.current?.click()} disabled={uploading} className="h-8 gap-1 text-xs">
+              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              Enviar
+            </Button>
+          </div>
+
+          {obs.documents.length > 1 && (
+            <Button size="sm" variant="outline" className="w-full h-7 gap-1.5 text-[11px]" disabled={downloadingAll}
+              onClick={async () => {
+                setDownloadingAll(true);
+                try {
+                  const zip = new JSZip();
+                  for (const doc of obs.documents) { const { data, error } = await supabase.storage.from("lead-images").download((doc as any).file_path); if (!error && data) zip.file((doc as any).file_name, data); }
+                  const blob = await zip.generateAsync({ type: "blob" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a"); a.href = url; a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`; a.click(); URL.revokeObjectURL(url);
+                  toast({ title: "Download concluído!" });
+                } catch (e: any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
+                setDownloadingAll(false);
+              }}>
+              {downloadingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderDown className="h-3 w-3" />}
+              Baixar todos (.zip)
+            </Button>
+          )}
+
+          {obs.documents.length > 0 && (
+            <Button size="sm" variant="outline" className="w-full h-7 gap-1.5 text-[11px] border-secondary/30 text-secondary hover:bg-secondary/10" disabled={generatingMsg} onClick={handleGenerateWhatsAppMsg}>
+              {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+              Mensagem para emissão
+            </Button>
+          )}
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+            {obs.documents.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum documento enviado</p>}
+            {obs.documents.map((doc: any) => {
+              const isImage = doc.file_type?.startsWith("image/");
+              return (
+                <div key={doc.id} className="p-2 rounded-lg border border-border bg-card flex items-center gap-2">
+                  <div className="h-8 w-8 rounded bg-muted flex items-center justify-center shrink-0">
+                    {isImage ? <ImageIcon className="h-4 w-4 text-muted-foreground" /> : <File className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{doc.file_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-[9px]">{DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category}</Badge>
+                      <span className="text-[9px] text-muted-foreground">{doc.file_size ? `${(doc.file_size / 1024).toFixed(0)}KB` : ""}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-0.5">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}><Eye className="h-3 w-3" /></Button>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}><Download className="h-3 w-3" /></Button>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ═══ COLUMN 3: Notes + Timeline ═══ */}
+        <div className="space-y-4">
+          {/* Notes */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <StickyNote className="h-3.5 w-3.5" /> Notas ({obs.notes.length})
+            </h3>
+            <Textarea placeholder="Adicionar observação..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={2} className="text-sm" />
+            <div className="flex gap-1.5">
+              <Select value={noteCategory} onValueChange={setNoteCategory}>
+                <SelectTrigger className="h-7 text-[11px] w-[100px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {NOTE_CATEGORIES.map((c) => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              <Input placeholder="Tag..." value={noteTagInput} onChange={(e) => setNoteTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())} className="h-7 text-[11px] flex-1" />
+              <Button size="sm" variant="ghost" onClick={addTag} className="h-7 px-1.5"><Tag className="h-3 w-3" /></Button>
+            </div>
+            {noteTags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {noteTags.map((t) => (
+                  <Badge key={t} variant="secondary" className="text-[9px] gap-0.5 cursor-pointer" onClick={() => setNoteTags((p) => p.filter((x) => x !== t))}>
+                    {t} <X className="h-2.5 w-2.5" />
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <Button size="sm" onClick={handleSaveNote} disabled={savingNote || !noteContent.trim()} className="w-full h-7 text-xs">
+              {savingNote ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+              Salvar Nota
+            </Button>
+
+            <Input placeholder="Buscar notas..." value={noteSearch} onChange={(e) => setNoteSearch(e.target.value)} className="h-7 text-[11px]" />
+
+            <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
+              {filteredNotes.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Nenhuma nota</p>}
+              {filteredNotes.map((note: any) => (
+                <div key={note.id} className="p-2 rounded-lg border border-border bg-card space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="text-[9px]">{NOTE_CATEGORIES.find((c) => c.value === note.category)?.label || note.category}</Badge>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-muted-foreground">{format(new Date(note.created_at), "dd/MM HH:mm", { locale: ptBR })}</span>
+                      <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => obs.deleteNote(note.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                    </div>
+                  </div>
+                  <p className="text-xs whitespace-pre-wrap">{note.content}</p>
+                  {note.tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">{note.tags.map((t: string) => <Badge key={t} variant="secondary" className="text-[9px]">{t}</Badge>)}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Timeline */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> Timeline ({interactions.length})
+            </h3>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+              {interactions.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Nenhuma interação</p>}
+              {interactions.map((int) => (
+                <div key={int.id} className="flex gap-2">
+                  <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                    {iconMap[int.type] || <Clock className="h-3 w-3" />}
+                  </div>
+                  <div>
+                    <p className="text-xs">{int.description}</p>
+                    <p className="text-[10px] text-muted-foreground">{format(new Date(int.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={() => { if (previewDoc) URL.revokeObjectURL(previewDoc.url); setPreviewDoc(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader><DialogTitle className="text-sm truncate">{previewDoc?.name}</DialogTitle></DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0">
+            {previewDoc?.type?.startsWith("image/") ? (
+              <img src={previewDoc.url} alt={previewDoc.name} className="w-full h-auto rounded-lg object-contain max-h-[70vh]" />
+            ) : previewDoc?.type === "application/pdf" ? (
+              <iframe src={previewDoc.url} className="w-full h-[70vh] rounded-lg border-0" title={previewDoc.name} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <File className="h-12 w-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Pré-visualização não disponível</p>
+                <Button size="sm" onClick={() => previewDoc && handleDownload(previewDoc.url, previewDoc.name)} className="gap-1">
+                  <Download className="h-3 w-3" /> Baixar
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Message Dialog */}
+      <Dialog open={showMsgDialog} onOpenChange={setShowMsgDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" /> Mensagem para Emissão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-h-0 p-3 rounded-lg border border-border bg-muted/50">
+            <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed">{whatsappMsg}</pre>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={async () => { await navigator.clipboard.writeText(whatsappMsg); setCopied(true); toast({ title: "Copiado!" }); setTimeout(() => setCopied(false), 2000); }}>
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copiado!" : "Copiar"}
+            </Button>
+            <Button size="sm" className="flex-1 gap-1.5 text-xs bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(whatsappMsg)}`, "_blank")}>
+              <MessageCircle className="h-3 w-3" /> WhatsApp
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/* ═══════════ SIDEBAR (COMPACT) VIEW ═══════════ */
+
+function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
+  lead: Lead; isEditing: boolean; onStartEdit: () => void; onStopEdit: () => void;
 }) {
   const { getLeadInteractions } = useLeadsContext();
   const interactions = getLeadInteractions(lead.id);
@@ -210,107 +665,56 @@ function LeadDetailContent({ lead, isFullscreen, isEditing, onStartEdit, onStopE
         {isEditing ? (
           <LeadEditForm lead={lead} onSaved={onStopEdit} onCancel={onStopEdit} />
         ) : (
-          <div className={`space-y-5 mt-3 ${isFullscreen ? "grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0" : ""}`}>
-            {/* Left / Contact + Details */}
-            <div className="space-y-5">
-              {/* Edit button */}
-              <Button variant="outline" size="sm" onClick={onStartEdit} className="w-full gap-1.5 h-8 text-xs">
-                <Pencil className="h-3 w-3" /> Editar dados do lead
+          <div className="space-y-5 mt-3">
+            <Button variant="outline" size="sm" onClick={onStartEdit} className="w-full gap-1.5 h-8 text-xs">
+              <Pencil className="h-3 w-3" /> Editar dados do lead
+            </Button>
+
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase">Contato</h3>
+              <div className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-muted-foreground" /><span>{lead.phone}</span></div>
+              {lead.email && <div className="flex items-center gap-2 text-sm"><Mail className="h-4 w-4 text-muted-foreground" /><span>{lead.email}</span></div>}
+              <Button asChild size="sm" className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="h-4 w-4" /> Abrir WhatsApp</a>
               </Button>
-
-              {/* Contact */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase">Contato</h3>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{lead.phone}</span>
-                </div>
-                {lead.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{lead.email}</span>
-                  </div>
-                )}
-                <Button asChild size="sm" className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
-                  </a>
-                </Button>
-              </div>
-
-              <Separator />
-
-              {/* Details */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase">Detalhes</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground text-xs">Tipo</span>
-                    <p className="font-medium">{lead.type}</p>
-                  </div>
-                  {lead.plan_type && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Plano</span>
-                      <p className="font-medium">{lead.plan_type}</p>
-                    </div>
-                  )}
-                  {lead.operator && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Operadora</span>
-                      <p className="font-medium">{lead.operator}</p>
-                    </div>
-                  )}
-                  {lead.lives && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Vidas</span>
-                      <p className="font-medium">{lead.lives}</p>
-                    </div>
-                  )}
-                </div>
-                {lead.notes && (
-                  <div>
-                    <span className="text-muted-foreground text-xs">Observações</span>
-                    <p className="text-sm mt-1">{lead.notes}</p>
-                  </div>
-                )}
-                {lead.lost_reason && (
-                  <div>
-                    <span className="text-muted-foreground text-xs">Motivo da Perda</span>
-                    <p className="text-sm mt-1 text-destructive">{lead.lost_reason}</p>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Criado: {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: ptBR })}</p>
-                <p>Atualizado: {formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true, locale: ptBR })}</p>
-                {lead.last_contact_at && (
-                  <p>Último contato: {formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: true, locale: ptBR })}</p>
-                )}
-              </div>
             </div>
 
-            {/* Right / Timeline */}
+            <Separator />
+
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase">Detalhes</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground text-xs">Tipo</span><p className="font-medium">{lead.type}</p></div>
+                {lead.plan_type && <div><span className="text-muted-foreground text-xs">Plano</span><p className="font-medium">{lead.plan_type}</p></div>}
+                {lead.operator && <div><span className="text-muted-foreground text-xs">Operadora</span><p className="font-medium">{lead.operator}</p></div>}
+                {lead.lives && <div><span className="text-muted-foreground text-xs">Vidas</span><p className="font-medium">{lead.lives}</p></div>}
+              </div>
+              {lead.notes && <div><span className="text-muted-foreground text-xs">Observações</span><p className="text-sm mt-1">{lead.notes}</p></div>}
+              {lead.lost_reason && <div><span className="text-muted-foreground text-xs">Motivo da Perda</span><p className="text-sm mt-1 text-destructive">{lead.lost_reason}</p></div>}
+            </div>
+
+            <Separator />
+
             <div className="space-y-3">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase">Timeline</h3>
-              {interactions.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhuma interação registrada</p>
-              )}
+              {interactions.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma interação registrada</p>}
               {interactions.map((int) => (
                 <div key={int.id} className="flex gap-3">
-                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                    {iconMap[int.type] || <Clock className="h-3.5 w-3.5" />}
-                  </div>
+                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">{iconMap[int.type] || <Clock className="h-3.5 w-3.5" />}</div>
                   <div>
                     <p className="text-sm">{int.description}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {format(new Date(int.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground">{format(new Date(int.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                   </div>
                 </div>
               ))}
+            </div>
+
+            <Separator />
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Criado: {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: ptBR })}</p>
+              <p>Atualizado: {formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true, locale: ptBR })}</p>
+              {lead.last_contact_at && <p>Último contato: {formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: true, locale: ptBR })}</p>}
             </div>
           </div>
         )}
@@ -325,6 +729,8 @@ function LeadDetailContent({ lead, isFullscreen, isEditing, onStartEdit, onStopE
   );
 }
 
+/* ═══════════ MAIN EXPORT ═══════════ */
+
 export function LeadDetailSheet({ lead, onClose }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -333,46 +739,26 @@ export function LeadDetailSheet({ lead, onClose }: Props) {
 
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
 
-  const handleClose = () => {
-    setIsFullscreen(false);
-    setIsEditing(false);
-    onClose();
-  };
+  const handleClose = () => { setIsFullscreen(false); setIsEditing(false); onClose(); };
 
   const header = (
     <div className="flex items-center justify-between w-full">
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-          <span className="text-primary font-bold text-sm">
-            {lead.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-          </span>
+          <span className="text-primary font-bold text-sm">{lead.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</span>
         </div>
         <div>
           <p className="text-lg font-bold">{lead.name}</p>
-          <Badge variant="outline" className="text-[10px]" style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}>
-            {stageInfo?.label}
-          </Badge>
+          <Badge variant="outline" className="text-[10px]" style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}>{stageInfo?.label}</Badge>
         </div>
       </div>
       <div className="flex items-center gap-1">
         {!isEditing && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-            title="Editar lead"
-          >
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} title="Editar lead">
             <Pencil className="h-4 w-4" />
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={(e) => { e.stopPropagation(); setIsFullscreen(!isFullscreen); }}
-          title={isFullscreen ? "Voltar ao painel lateral" : "Abrir em tela cheia"}
-        >
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setIsFullscreen(!isFullscreen); }} title={isFullscreen ? "Painel lateral" : "Tela cheia"}>
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
       </div>
@@ -386,17 +772,11 @@ export function LeadDetailSheet({ lead, onClose }: Props) {
           <SheetContent className="hidden"><SheetHeader><SheetTitle /></SheetHeader></SheetContent>
         </Sheet>
         <Dialog open onOpenChange={handleClose}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle asChild>{header}</DialogTitle>
             </DialogHeader>
-            <LeadDetailContent
-              lead={lead}
-              isFullscreen
-              isEditing={isEditing}
-              onStartEdit={() => setIsEditing(true)}
-              onStopEdit={() => setIsEditing(false)}
-            />
+            <FullscreenLeadView lead={lead} isEditing={isEditing} onStartEdit={() => setIsEditing(true)} onStopEdit={() => setIsEditing(false)} />
           </DialogContent>
         </Dialog>
       </>
@@ -409,13 +789,7 @@ export function LeadDetailSheet({ lead, onClose }: Props) {
         <SheetHeader>
           <SheetTitle asChild>{header}</SheetTitle>
         </SheetHeader>
-        <LeadDetailContent
-          lead={lead}
-          isFullscreen={false}
-          isEditing={isEditing}
-          onStartEdit={() => setIsEditing(true)}
-          onStopEdit={() => setIsEditing(false)}
-        />
+        <SidebarLeadContent lead={lead} isEditing={isEditing} onStartEdit={() => setIsEditing(true)} onStopEdit={() => setIsEditing(false)} />
       </SheetContent>
     </Sheet>
   );
