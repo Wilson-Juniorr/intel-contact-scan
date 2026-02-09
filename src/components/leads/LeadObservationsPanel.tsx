@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import {
   StickyNote, FileUp, CheckSquare, Sparkles, Plus, Trash2, Upload,
-  Loader2, X, Tag, Download, File, Image as ImageIcon, Eye,
+  Loader2, X, Tag, Download, File, Image as ImageIcon, Eye, FolderDown,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
+import JSZip from "jszip";
 
 interface Props {
   lead: Lead;
@@ -46,6 +47,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   // AI summary state
   const [summary, setSummary] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
 
   const addTag = () => {
     const tag = noteTagInput.trim().toLowerCase();
@@ -265,6 +267,39 @@ export function LeadObservationsPanel({ lead }: Props) {
             Enviar
           </Button>
         </div>
+
+        {obs.documents.length > 1 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full h-8 gap-1.5 text-xs"
+            disabled={downloadingAll}
+            onClick={async () => {
+              setDownloadingAll(true);
+              try {
+                const zip = new JSZip();
+                for (const doc of obs.documents) {
+                  const { data, error } = await supabase.storage.from("lead-images").download((doc as any).file_path);
+                  if (!error && data) zip.file((doc as any).file_name, data);
+                }
+                const blob = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast({ title: "Download concluído!" });
+              } catch (e: any) {
+                toast({ title: "Erro ao baixar", description: e.message, variant: "destructive" });
+              }
+              setDownloadingAll(false);
+            }}
+          >
+            {downloadingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderDown className="h-3 w-3" />}
+            Baixar todos ({obs.documents.length} arquivos)
+          </Button>
+        )}
 
         <div className="space-y-2 max-h-[350px] overflow-y-auto">
           {obs.documents.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum documento</p>}
