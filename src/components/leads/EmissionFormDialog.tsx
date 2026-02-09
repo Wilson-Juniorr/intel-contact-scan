@@ -11,6 +11,8 @@ import { Calendar, FileText, Send, User, Phone, Mail, Users, Building2 } from "l
 interface EmissionFormData {
   vigencia: string;
   nomePlano: string;
+  nomeTitular: string;
+  emailTitular: string;
 }
 
 interface Props {
@@ -25,12 +27,14 @@ interface Props {
 export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, onConfirm, isLoading }: Props) {
   const [vigencia, setVigencia] = useState("");
   const [nomePlano, setNomePlano] = useState("");
+  const [nomeTitular, setNomeTitular] = useState(lead.name || "");
+  const [emailTitular, setEmailTitular] = useState(lead.email || "");
 
-  const canSubmit = vigencia.trim() && nomePlano.trim();
+  const canSubmit = vigencia.trim() && nomePlano.trim() && nomeTitular.trim();
 
   const handleConfirm = () => {
     if (!canSubmit) return;
-    onConfirm({ vigencia: vigencia.trim(), nomePlano: nomePlano.trim() });
+    onConfirm({ vigencia: vigencia.trim(), nomePlano: nomePlano.trim(), nomeTitular: nomeTitular.trim(), emailTitular: emailTitular.trim() });
   };
 
   return (
@@ -85,7 +89,38 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
 
         {/* Form fields */}
         <div className="space-y-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Informações Adicionais</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dados do Titular</p>
+
+          <div className="space-y-2">
+            <Label htmlFor="nome-titular" className="text-xs flex items-center gap-1.5">
+              <User className="h-3 w-3" />
+              Nome do Titular
+            </Label>
+            <Input
+              id="nome-titular"
+              placeholder="Nome completo do titular"
+              value={nomeTitular}
+              onChange={(e) => setNomeTitular(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email-titular" className="text-xs flex items-center gap-1.5">
+              <Mail className="h-3 w-3" />
+              E-mail do Titular
+            </Label>
+            <Input
+              id="email-titular"
+              placeholder="email@exemplo.com"
+              value={emailTitular}
+              onChange={(e) => setEmailTitular(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+
+          <Separator className="my-1" />
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Informações do Plano</p>
 
           <div className="space-y-2">
             <Label htmlFor="nome-plano" className="text-xs flex items-center gap-1.5">
