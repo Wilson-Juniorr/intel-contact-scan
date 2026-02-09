@@ -160,6 +160,7 @@ export default function AssistantPage() {
     file_name: string; file_path: string; file_type: string; file_size: number;
   } | null>(null);
   const chatFileRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -238,8 +239,38 @@ export default function AssistantPage() {
         } catch (err: any) {
           toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
         }
-        break; // only first file
+        break;
       }
+    }
+  }, [user]);
+
+  // Drag and drop
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !user) return;
+    try {
+      const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+      if (error) throw error;
+      setPendingFile({ file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size });
+      toast({ title: `📎 "${file.name}" pronto para enviar` });
+    } catch (err: any) {
+      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
     }
   }, [user]);
 
@@ -374,7 +405,20 @@ export default function AssistantPage() {
         </TabsContent>
 
         <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden mt-3">
-          <Card className="flex-1 flex flex-col overflow-hidden">
+          <Card
+            className={`flex-1 flex flex-col overflow-hidden relative ${isDragging ? "ring-2 ring-primary ring-offset-2" : ""}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center rounded-lg border-2 border-dashed border-primary">
+                <div className="text-center">
+                  <FileUp className="h-10 w-10 text-primary mx-auto mb-2" />
+                  <p className="text-sm font-medium text-primary">Solte o arquivo aqui</p>
+                </div>
+              </div>
+            )}
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
