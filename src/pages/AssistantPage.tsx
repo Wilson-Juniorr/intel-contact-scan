@@ -136,15 +136,15 @@ export default function AssistantPage() {
     {
       role: "assistant",
       content:
-        "Olá! Sou seu assistente CRM Saúde IA. Agora posso **executar ações** diretamente no sistema!\n\n" +
+        "Olá! Sou seu assistente CRM Saúde IA. Posso **executar ações** no sistema — sempre com **confirmação** antes!\n\n" +
         "🎯 **Comandos que entendo:**\n" +
         "• *\"Move o lead João para cotação enviada\"*\n" +
         "• *\"Registra uma ligação com a Maria: falamos sobre plano PME\"*\n" +
         "• *\"Cria um lembrete para ligar pro Carlos amanhã às 10h\"*\n" +
         "• *\"Adiciona uma nota no lead Ana: cliente prefere Unimed\"*\n" +
-        "• 📎 Envie um documento e diga a qual lead pertence\n" +
+        "• 📎 Envie ou cole (Ctrl+V) um documento e diga a qual lead pertence\n" +
         "• 🎤 Use o microfone para falar!\n\n" +
-        "Pergunte qualquer coisa ou peça uma ação!",
+        "🔒 Antes de qualquer ação, vou mostrar os dados do lead e pedir sua confirmação.",
     },
   ]);
   const [input, setInput] = useState("");

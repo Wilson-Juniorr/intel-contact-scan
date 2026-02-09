@@ -26,12 +26,27 @@ const CRM_TOOLS = [
   {
     type: "function",
     function: {
-      name: "move_lead_stage",
-      description: "Move um lead para uma nova etapa do funil de vendas.",
+      name: "search_lead",
+      description: "Busca leads pelo nome e retorna dados completos para confirmação do usuário ANTES de executar qualquer ação. SEMPRE use esta ferramenta primeiro.",
       parameters: {
         type: "object",
         properties: {
-          lead_name: { type: "string", description: "Nome do lead (parcial ou completo)" },
+          lead_name: { type: "string", description: "Nome parcial ou completo do lead" },
+        },
+        required: ["lead_name"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "move_lead_stage",
+      description: "Move um lead para uma nova etapa do funil. SÓ use após confirmação do usuário via search_lead.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string", description: "UUID do lead (obtido via search_lead)" },
           new_stage: {
             type: "string",
             enum: Object.keys(STAGE_LABELS),
@@ -39,7 +54,7 @@ const CRM_TOOLS = [
           },
           lost_reason: { type: "string", description: "Motivo (obrigatório para declinado/cancelado)" },
         },
-        required: ["lead_name", "new_stage"],
+        required: ["lead_id", "new_stage"],
         additionalProperties: false,
       },
     },
@@ -48,15 +63,15 @@ const CRM_TOOLS = [
     type: "function",
     function: {
       name: "add_interaction",
-      description: "Registra uma interação com um lead (ligação, mensagem, reunião, email ou anotação).",
+      description: "Registra uma interação com um lead. SÓ use após confirmação do usuário.",
       parameters: {
         type: "object",
         properties: {
-          lead_name: { type: "string", description: "Nome do lead" },
+          lead_id: { type: "string", description: "UUID do lead" },
           type: { type: "string", enum: ["call", "whatsapp", "meeting", "email", "note"], description: "Tipo da interação" },
           description: { type: "string", description: "Descrição da interação" },
         },
-        required: ["lead_name", "type", "description"],
+        required: ["lead_id", "type", "description"],
         additionalProperties: false,
       },
     },
@@ -65,15 +80,15 @@ const CRM_TOOLS = [
     type: "function",
     function: {
       name: "create_reminder",
-      description: "Cria um lembrete/follow-up agendado para um lead.",
+      description: "Cria um lembrete/follow-up agendado. SÓ use após confirmação do usuário.",
       parameters: {
         type: "object",
         properties: {
-          lead_name: { type: "string", description: "Nome do lead" },
+          lead_id: { type: "string", description: "UUID do lead" },
           date: { type: "string", description: "Data ISO 8601 (ex: 2025-03-15T10:00:00)" },
           description: { type: "string", description: "Descrição do lembrete" },
         },
-        required: ["lead_name", "date", "description"],
+        required: ["lead_id", "date", "description"],
         additionalProperties: false,
       },
     },
@@ -82,16 +97,16 @@ const CRM_TOOLS = [
     type: "function",
     function: {
       name: "add_note",
-      description: "Adiciona uma observação/nota a um lead.",
+      description: "Adiciona uma observação/nota a um lead. SÓ use após confirmação do usuário.",
       parameters: {
         type: "object",
         properties: {
-          lead_name: { type: "string", description: "Nome do lead" },
+          lead_id: { type: "string", description: "UUID do lead" },
           content: { type: "string", description: "Conteúdo da nota" },
           category: { type: "string", enum: ["geral", "negociacao", "documentacao", "reclamacao", "financeiro", "tecnico"] },
           tags: { type: "array", items: { type: "string" }, description: "Tags opcionais" },
         },
-        required: ["lead_name", "content"],
+        required: ["lead_id", "content"],
         additionalProperties: false,
       },
     },
@@ -100,28 +115,39 @@ const CRM_TOOLS = [
     type: "function",
     function: {
       name: "assign_document",
-      description: "Atribui um documento enviado pelo usuário a um lead.",
+      description: "Atribui um documento enviado pelo usuário a um lead. SÓ use após confirmação do usuário.",
       parameters: {
         type: "object",
         properties: {
-          lead_name: { type: "string", description: "Nome do lead" },
+          lead_id: { type: "string", description: "UUID do lead" },
           category: { type: "string", enum: ["rg_cpf", "comprovante_residencia", "cartao_sus", "contrato_social", "proposta", "declaracao_saude", "outros"] },
         },
-        required: ["lead_name", "category"],
+        required: ["lead_id", "category"],
         additionalProperties: false,
       },
     },
   },
 ];
 
-async function findLeadByName(supabase: any, name: string) {
+async function searchLeads(supabase: any, name: string) {
   const { data } = await supabase
     .from("leads")
-    .select("id, name")
+    .select("id, name, phone, email, type, stage, operator, plan_type, lives, last_contact_at")
     .ilike("name", `%${name}%`)
     .limit(5);
-  if (!data?.length) return null;
-  return data.find((l: any) => l.name.toLowerCase() === name.toLowerCase()) || data[0];
+  if (!data?.length) return { found: 0, leads: [], message: `Nenhum lead encontrado com "${name}"` };
+  const results = data.map((l: any) => ({
+    id: l.id,
+    name: l.name,
+    phone: l.phone,
+    email: l.email || "-",
+    type: l.type,
+    stage: STAGE_LABELS[l.stage] || l.stage,
+    operator: l.operator || "-",
+    plan_type: l.plan_type || "-",
+    lives: l.lives || "-",
+  }));
+  return { found: results.length, leads: results };
 }
 
 async function executeTool(supabase: any, userId: string, toolCall: any, fileInfo?: any) {
@@ -135,50 +161,43 @@ async function executeTool(supabase: any, userId: string, toolCall: any, fileInf
 
   try {
     switch (fnName) {
+      case "search_lead": {
+        return await searchLeads(supabase, params.lead_name);
+      }
       case "move_lead_stage": {
-        const lead = await findLeadByName(supabase, params.lead_name);
-        if (!lead) return { error: `Lead "${params.lead_name}" não encontrado` };
         const update: any = { stage: params.new_stage };
         if (params.lost_reason) update.lost_reason = params.lost_reason;
-        const { error } = await supabase.from("leads").update(update).eq("id", lead.id);
+        const { error } = await supabase.from("leads").update(update).eq("id", params.lead_id);
         if (error) return { error: error.message };
-        return { success: true, message: `Lead "${lead.name}" movido para "${STAGE_LABELS[params.new_stage]}"` };
+        return { success: true, message: `Lead movido para "${STAGE_LABELS[params.new_stage]}"` };
       }
       case "add_interaction": {
-        const lead = await findLeadByName(supabase, params.lead_name);
-        if (!lead) return { error: `Lead "${params.lead_name}" não encontrado` };
         const { error } = await supabase.from("interactions").insert({
-          lead_id: lead.id, user_id: userId, type: params.type, description: params.description,
+          lead_id: params.lead_id, user_id: userId, type: params.type, description: params.description,
         });
         if (error) return { error: error.message };
-        await supabase.from("leads").update({ last_contact_at: new Date().toISOString() }).eq("id", lead.id);
-        return { success: true, message: `Interação registrada para "${lead.name}": ${params.description}` };
+        await supabase.from("leads").update({ last_contact_at: new Date().toISOString() }).eq("id", params.lead_id);
+        return { success: true, message: `Interação registrada: ${params.description}` };
       }
       case "create_reminder": {
-        const lead = await findLeadByName(supabase, params.lead_name);
-        if (!lead) return { error: `Lead "${params.lead_name}" não encontrado` };
         const { error } = await supabase.from("reminders").insert({
-          lead_id: lead.id, user_id: userId, date: params.date, description: params.description,
+          lead_id: params.lead_id, user_id: userId, date: params.date, description: params.description,
         });
         if (error) return { error: error.message };
-        return { success: true, message: `Lembrete criado para "${lead.name}": ${params.description}` };
+        return { success: true, message: `Lembrete criado: ${params.description}` };
       }
       case "add_note": {
-        const lead = await findLeadByName(supabase, params.lead_name);
-        if (!lead) return { error: `Lead "${params.lead_name}" não encontrado` };
         const { error } = await supabase.from("lead_notes").insert({
-          lead_id: lead.id, user_id: userId, content: params.content,
+          lead_id: params.lead_id, user_id: userId, content: params.content,
           category: params.category || "geral", tags: params.tags || [],
         });
         if (error) return { error: error.message };
-        return { success: true, message: `Nota adicionada ao lead "${lead.name}"` };
+        return { success: true, message: `Nota adicionada ao lead` };
       }
       case "assign_document": {
         if (!fileInfo) return { error: "Nenhum arquivo foi enviado com a mensagem" };
-        const lead = await findLeadByName(supabase, params.lead_name);
-        if (!lead) return { error: `Lead "${params.lead_name}" não encontrado` };
         const { error } = await supabase.from("lead_documents").insert({
-          lead_id: lead.id, user_id: userId,
+          lead_id: params.lead_id, user_id: userId,
           file_name: fileInfo.file_name, file_path: fileInfo.file_path,
           file_type: fileInfo.file_type, file_size: fileInfo.file_size,
           category: params.category,
@@ -225,18 +244,23 @@ serve(async (req) => {
 
 Você tem ACESSO TOTAL aos dados do CRM e pode EXECUTAR AÇÕES diretamente no sistema.
 
-## AÇÕES DISPONÍVEIS (use as ferramentas/tools quando necessário):
+## AÇÕES DISPONÍVEIS:
+- **search_lead**: Buscar lead pelo nome (SEMPRE use primeiro!)
 - **move_lead_stage**: Mover lead de etapa no funil
 - **add_interaction**: Registrar ligação, mensagem, reunião, email ou anotação
 - **create_reminder**: Criar lembrete/follow-up agendado
 - **add_note**: Adicionar observação/nota a um lead
 - **assign_document**: Atribuir documento enviado a um lead
 
-## REGRAS:
-1. Quando o usuário pedir claramente uma ação, EXECUTE IMEDIATAMENTE usando as ferramentas
-2. Se houver ambiguidade no nome do lead (mais de um com nome similar), pergunte qual
-3. Após executar, confirme com um resumo claro do que foi feito
-4. Se o usuário enviar um arquivo, pergunte a qual lead pertence e a categoria
+## REGRAS OBRIGATÓRIAS DE CONFIRMAÇÃO:
+1. ANTES de qualquer ação, SEMPRE use search_lead primeiro para buscar o lead
+2. Apresente os dados do lead encontrado ao usuário em formato organizado:
+   - Nome completo, Telefone, Tipo (PF/PME/Adesão), Etapa atual, Operadora
+3. Se encontrar MAIS DE UM lead, liste TODOS e pergunte qual é o correto
+4. PEÇA CONFIRMAÇÃO explícita: "Confirma que deseja [ação] para este lead?"
+5. SÓ execute a ação (move_lead_stage, add_interaction, etc.) DEPOIS que o usuário confirmar
+6. Use o lead_id (UUID) retornado pelo search_lead para executar as ações
+7. Se o usuário enviar um arquivo, pergunte a qual lead pertence e a categoria, mostre os dados e confirme
 
 ## CONHECIMENTOS:
 - Operadoras (Unimed, Amil, Bradesco Saúde, SulAmérica, Hapvida, Porto Seguro, etc.)
@@ -295,6 +319,7 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     // Tool calls detected - execute actions
     if (choice?.message?.tool_calls?.length > 0 && supabase && userId) {
       const actionNames = choice.message.tool_calls.map((tc: any) => tc.function.name);
+      const mutationNames = actionNames.filter((n: string) => n !== "search_lead");
       console.log("Tool calls:", actionNames);
 
       const toolResults = [];
@@ -308,13 +333,14 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
         });
       }
 
-      // Streaming follow-up with tool results
+      // Streaming follow-up with tool results (allow tools again for multi-step confirmation flow)
       const streamResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: aiHeaders,
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [...allMessages, choice.message, ...toolResults],
+          tools: CRM_TOOLS,
           stream: true,
         }),
       });
@@ -326,12 +352,15 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
         });
       }
 
+      const hasRealActions = mutationNames.length > 0;
       return new Response(streamResponse.body, {
         headers: {
           ...corsHeaders,
           "Content-Type": "text/event-stream",
-          "x-actions-taken": "true",
-          "x-action-names": actionNames.join(","),
+          ...(hasRealActions ? {
+            "x-actions-taken": "true",
+            "x-action-names": mutationNames.join(","),
+          } : {}),
         },
       });
     }
