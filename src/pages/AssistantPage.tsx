@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText, ArrowRightLeft, Phone, CalendarClock, StickyNote, FileUp, CheckCircle2 } from "lucide-react";
+import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText, ArrowRightLeft, Phone, CalendarClock, StickyNote, FileUp, CheckCircle2, Image } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "@/hooks/use-toast";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
@@ -29,6 +29,7 @@ const ACTION_BADGE_MAP: Record<string, { label: string; icon: string }> = {
 
 type PendingFile = {
   file_name: string; file_path: string; file_type: string; file_size: number;
+  previewUrl?: string;
 };
 
 interface Message {
@@ -215,7 +216,8 @@ export default function AssistantPage() {
         const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
         const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
         if (error) throw error;
-        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size }]);
+        const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
         toast({ title: `📎 "${file.name}" pronto para enviar` });
       } catch (err: any) {
         toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
@@ -238,7 +240,8 @@ export default function AssistantPage() {
           const filePath = `${user.id}/chat_uploads/${Date.now()}_${fileName}`;
           const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
           if (error) throw error;
-          setPendingFiles((prev) => [...prev, { file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size }]);
+          const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+          setPendingFiles((prev) => [...prev, { file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
         } catch (err: any) {
           toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
         }
@@ -271,7 +274,8 @@ export default function AssistantPage() {
         const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
         const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
         if (error) throw error;
-        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size }]);
+        const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
         toast({ title: `📎 "${file.name}" pronto para enviar` });
       } catch (err: any) {
         toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
@@ -503,10 +507,17 @@ export default function AssistantPage() {
             {pendingFiles.length > 0 && (
               <div className="px-4 py-2 border-t border-border flex flex-wrap items-center gap-2 bg-muted/50">
                 {pendingFiles.map((pf, idx) => (
-                  <div key={idx} className="inline-flex items-center gap-1.5 bg-background rounded-full px-2.5 py-1 border border-border">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div key={idx} className="inline-flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border border-border">
+                    {pf.previewUrl ? (
+                      <img src={pf.previewUrl} alt={pf.file_name} className="h-8 w-8 rounded object-cover" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
                     <span className="text-xs text-muted-foreground max-w-[120px] truncate">{pf.file_name}</span>
-                    <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
+                    <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => {
+                      if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl);
+                      setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+                    }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
