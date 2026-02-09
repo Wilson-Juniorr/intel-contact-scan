@@ -1,4 +1,4 @@
-import { MessageCircle, Phone, Mail, Edit, User, Clock } from "lucide-react";
+import { Phone, MessageCircle, Mail, Edit, User, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -16,36 +16,47 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
     ? formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: false, locale: ptBR })
     : null;
 
-  const typeLabel = lead.type === "PF" ? "Pessoa Física" : lead.type === "PJ" ? "Pessoa Jurídica" : "PME";
+  const typeLabel = lead.type === "PF" ? "PF" : lead.type === "PJ" ? "PJ" : "PME";
+  const typeFull = lead.type === "PF" ? "Pessoa Física" : lead.type === "PJ" ? "Pessoa Jurídica - CNPJ" : "PME";
+
+  const estimatedValue = lead.lives ? lead.lives * 120 : null;
 
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="border-b border-border bg-card hover:bg-muted/40 cursor-grab active:cursor-grabbing transition-colors group"
+      className="mx-2 my-1.5 rounded-md border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow"
     >
-      {/* Card content */}
-      <div className="px-3 py-2.5">
-        {/* Title row - HubSpot style: bold name | type */}
-        <p className="text-sm font-bold text-foreground leading-tight">
+      <div className="px-3 pt-2.5 pb-1.5">
+        {/* Title: Name | Type - colored like HubSpot */}
+        <p className="text-[13px] font-bold leading-tight" style={{ color: stageColor }}>
           {lead.name}{" "}
-          <span className="font-normal text-muted-foreground">| {lead.type}</span>
+          <span className="font-bold">| {typeLabel}</span>
         </p>
 
+        {/* Extended type label for PJ */}
+        {lead.type !== "PF" && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">{typeFull}</p>
+        )}
+
+        {/* Value & Status */}
+        {estimatedValue && (
+          <p className="text-xs text-foreground mt-1.5">
+            Valor: R$ {estimatedValue.toLocaleString("pt-BR")}
+          </p>
+        )}
+        {lead.operator && (
+          <p className="text-xs text-foreground">
+            Status do Negócio: {lead.operator}
+          </p>
+        )}
+
         {/* Contact name with icon */}
-        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-          <User className="h-3 w-3 shrink-0" style={{ color: stageColor }} />
+        <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
+          <User className="h-3.5 w-3.5 shrink-0" style={{ color: stageColor }} />
           <span className="truncate">{lead.name}</span>
         </div>
-
-        {/* Extra info: operator, lives, plan */}
-        {(lead.operator || lead.lives || lead.plan_type) && (
-          <div className="mt-1 text-[11px] text-muted-foreground leading-snug">
-            {lead.plan_type && <div>Valor: R$ {lead.lives ? (lead.lives * 120).toLocaleString("pt-BR") : "—"}</div>}
-            {lead.operator && <div>Status do Negócio: {lead.operator}</div>}
-          </div>
-        )}
 
         {/* Time since last contact */}
         {timeSince && (
@@ -63,25 +74,25 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
         )}
       </div>
 
-      {/* Action bar - HubSpot style icon row at bottom */}
-      <div className="flex items-center gap-0 px-2 py-1 border-t border-border/40">
-        <ActionIcon
+      {/* Action icons bar - HubSpot style */}
+      <div className="flex items-center gap-0 px-1.5 py-1 border-t border-border/50">
+        <ActionBtn
           icon={<Phone className="h-3.5 w-3.5" />}
           href={`tel:+55${lead.phone.replace(/\D/g, "")}`}
           color={stageColor}
         />
-        <ActionIcon
+        <ActionBtn
           icon={<MessageCircle className="h-3.5 w-3.5" />}
           href={whatsappUrl}
           color={stageColor}
         />
-        <ActionIcon
+        <ActionBtn
           icon={<Mail className="h-3.5 w-3.5" />}
           href={lead.email ? `mailto:${lead.email}` : undefined}
           color={stageColor}
           disabled={!lead.email}
         />
-        <ActionIcon
+        <ActionBtn
           icon={<Edit className="h-3.5 w-3.5" />}
           onClick={onClick}
           color={stageColor}
@@ -91,7 +102,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
   );
 }
 
-function ActionIcon({
+function ActionBtn({
   icon,
   href,
   onClick,
@@ -106,33 +117,19 @@ function ActionIcon({
 }) {
   const style = disabled ? {} : { color };
   const cls = `p-1.5 rounded transition-colors ${
-    disabled
-      ? "text-muted-foreground/20 cursor-not-allowed"
-      : "hover:bg-muted"
+    disabled ? "text-muted-foreground/20 cursor-not-allowed" : "hover:bg-muted"
   }`;
 
   if (href && !disabled) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className={cls}
-        style={style}
-      >
+      <a href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={cls} style={style}>
         {icon}
       </a>
     );
   }
 
   return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      disabled={disabled}
-      className={cls}
-      style={style}
-    >
+    <button onClick={(e) => { e.stopPropagation(); onClick?.(); }} disabled={disabled} className={cls} style={style}>
       {icon}
     </button>
   );
