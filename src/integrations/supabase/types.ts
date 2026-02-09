@@ -14,7 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      interactions: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          lead_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          lead_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          lead_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          last_contact_at: string | null
+          lives: number | null
+          lost_reason: string | null
+          name: string
+          notes: string | null
+          operator: string | null
+          phone: string
+          plan_type: string | null
+          stage: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_contact_at?: string | null
+          lives?: number | null
+          lost_reason?: string | null
+          name: string
+          notes?: string | null
+          operator?: string | null
+          phone: string
+          plan_type?: string | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          last_contact_at?: string | null
+          lives?: number | null
+          lost_reason?: string | null
+          name?: string
+          notes?: string | null
+          operator?: string | null
+          phone?: string
+          plan_type?: string | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reminders: {
+        Row: {
+          completed: boolean
+          created_at: string
+          date: string
+          description: string
+          id: string
+          lead_id: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          date: string
+          description: string
+          id?: string
+          lead_id: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          lead_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

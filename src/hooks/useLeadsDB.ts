@@ -1,0 +1,106 @@
+import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import type { FunnelStage } from "@/types/lead";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+export function useLeadsDB() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const leadsQuery = useQuery({
+    queryKey: ["leads", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const interactionsQuery = useQuery({
+    queryKey: ["interactions", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("interactions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const addLeadMutation = useMutation({
+    mutationFn: async (lead: {
+      name: string;
+      phone: string;
+      email?: string;
+      type: string;
+      plan_type?: string;
+      operator?: string;
+      lives?: number;
+      notes?: string;
+      stage: string;
+    }) => {
+      const { data, error } = await supabase
+        .from("leads")
+        .insert({ ...lead, user_id: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+  });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
+      const { error } = await supabase.from("leads").update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+  });
+
+  const moveStageMutation = useMutation({
+    mutationFn: async ({ id, stage, lost_reason }: { id: string; stage: FunnelStage; lost_reason?: string }) => {
+      const { error } = await supabase.from("leads").update({ stage, lost_reason }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+  });
+
+  const addInteractionMutation = useMutation({
+    mutationFn: async (interaction: { lead_id: string; type: string; description: string }) => {
+      const { error: intError } = await supabase
+        .from("interactions")
+        .insert({ ...interaction, user_id: user!.id });
+      if (intError) throw intError;
+
+      await supabase.from("leads").update({ last_contact_at: new Date().toISOString() }).eq("id", interaction.lead_id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["interactions"] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+
+  const getLeadInteractions = useCallback(
+    (leadId: string) => (interactionsQuery.data || []).filter((i) => i.lead_id === leadId),
+    [interactionsQuery.data]
+  );
+
+  return {
+    leads: leadsQuery.data || [],
+    isLoading: leadsQuery.isLoading,
+    interactions: interactionsQuery.data || [],
+    addLead: addLeadMutation.mutateAsync,
+    updateLead: (id: string, updates: Record<string, unknown>) => updateLeadMutation.mutateAsync({ id, updates }),
+    moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => moveStageMutation.mutateAsync({ id, stage, lost_reason }),
+    addInteraction: addInteractionMutation.mutateAsync,
+    getLeadInteractions,
+  };
+}
