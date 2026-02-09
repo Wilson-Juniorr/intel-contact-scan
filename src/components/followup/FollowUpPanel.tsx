@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const FOLLOW_UP_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`;
@@ -50,6 +51,8 @@ export function FollowUpPanel() {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [contexts, setContexts] = useState<Record<string, string>>({});
 
   const excludedStages = ["implantado", "declinado", "cancelado"];
 
@@ -75,17 +78,19 @@ export function FollowUpPanel() {
   const generateMessage = async (il: IdleLead) => {
     setGeneratingFor(il.lead.id);
     try {
+      const userContext = contexts[il.lead.id]?.trim() || "";
       const resp = await fetch(FOLLOW_UP_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ lead: il.lead, idleHours: il.idleHours, idleDays: il.idleDays }),
+        body: JSON.stringify({ lead: il.lead, idleHours: il.idleHours, idleDays: il.idleDays, userContext }),
       });
       if (!resp.ok) throw new Error("Erro ao gerar mensagem");
       const data = await resp.json();
       setMessages((prev) => ({ ...prev, [il.lead.id]: data.message }));
+      setEditingId(null);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
@@ -172,10 +177,32 @@ export function FollowUpPanel() {
                   </Badge>
                 </div>
 
+                {/* Context input */}
+                <div className="space-y-1.5">
+                  <Textarea
+                    placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto', 'Tentei ligar 2x sem resposta')"
+                    value={contexts[il.lead.id] || ""}
+                    onChange={(e) => setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
+                    className="text-xs min-h-[48px] resize-none"
+                    rows={2}
+                  />
+                </div>
+
                 {/* AI message */}
                 {msg && (
-                  <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-wrap border border-border">
-                    {msg}
+                  <div className="space-y-2">
+                    {editingId === il.lead.id ? (
+                      <Textarea
+                        value={msg}
+                        onChange={(e) => setMessages((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
+                        className="text-sm min-h-[80px]"
+                        rows={4}
+                      />
+                    ) : (
+                      <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-wrap border border-border">
+                        {msg}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -202,11 +229,20 @@ export function FollowUpPanel() {
                     <>
                       <Button
                         size="sm"
+                        variant="outline"
+                        className="text-xs gap-1"
+                        onClick={() => setEditingId(editingId === il.lead.id ? null : il.lead.id)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {editingId === il.lead.id ? "Pronto" : "Editar"}
+                      </Button>
+                      <Button
+                        size="sm"
                         className="text-xs gap-1.5 bg-[hsl(142,70%,40%)] hover:bg-[hsl(142,70%,35%)] text-white"
                         onClick={() => sendToWhatsApp(il.lead, msg)}
                       >
                         <MessageCircle className="h-3.5 w-3.5" />
-                        Enviar no WhatsApp
+                        WhatsApp
                       </Button>
                       <Button
                         size="sm"
