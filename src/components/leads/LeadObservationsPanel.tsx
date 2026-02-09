@@ -13,8 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import {
   StickyNote, FileUp, CheckSquare, Sparkles, Plus, Trash2, Upload,
-  Loader2, X, Tag, Download, File, Image as ImageIcon,
+  Loader2, X, Tag, Download, File, Image as ImageIcon, Eye,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,6 +40,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   // Document state
   const [docCategory, setDocCategory] = useState("outros");
   const [uploading, setUploading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // AI summary state
@@ -97,6 +99,16 @@ export function LeadObservationsPanel({ lead }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const handlePreview = async (filePath: string, fileName: string, fileType: string) => {
+    const { data, error } = await supabase.storage.from("lead-images").download(filePath);
+    if (error) {
+      toast({ title: "Erro ao visualizar", variant: "destructive" });
+      return;
+    }
+    const url = URL.createObjectURL(data);
+    setPreviewDoc({ url, name: fileName, type: fileType });
+  };
+
   const handleInitChecklist = async () => {
     try {
       await obs.initChecklist(lead.type);
@@ -136,6 +148,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   const totalItems = obs.checklist.length;
 
   return (
+    <>
     <Tabs defaultValue="notes" className="w-full">
       <TabsList className="w-full grid grid-cols-4 h-9">
         <TabsTrigger value="notes" className="text-[10px] gap-1 px-1">
@@ -274,6 +287,9 @@ export function LeadObservationsPanel({ lead }: Props) {
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
+                    <Eye className="h-3 w-3" />
+                  </Button>
                   <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
                     <Download className="h-3 w-3" />
                   </Button>
@@ -345,5 +361,33 @@ export function LeadObservationsPanel({ lead }: Props) {
         )}
       </TabsContent>
     </Tabs>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={() => {
+        if (previewDoc) URL.revokeObjectURL(previewDoc.url);
+        setPreviewDoc(null);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm truncate">{previewDoc?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0">
+            {previewDoc?.type?.startsWith("image/") ? (
+              <img src={previewDoc.url} alt={previewDoc.name} className="w-full h-auto rounded-lg object-contain max-h-[70vh]" />
+            ) : previewDoc?.type === "application/pdf" ? (
+              <iframe src={previewDoc.url} className="w-full h-[70vh] rounded-lg border-0" title={previewDoc.name} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <File className="h-12 w-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Pré-visualização não disponível para este tipo de arquivo</p>
+                <Button size="sm" onClick={() => previewDoc && handleDownload(previewDoc.url, previewDoc.name)} className="gap-1">
+                  <Download className="h-3 w-3" /> Baixar arquivo
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
