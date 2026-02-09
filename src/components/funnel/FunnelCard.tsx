@@ -11,12 +11,6 @@ interface Props {
 
 export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
-  const initials = lead.name
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   const timeSince = lead.last_contact_at
     ? formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: false, locale: ptBR })
@@ -29,99 +23,92 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="border-b border-border last:border-b-0 p-3 cursor-grab active:cursor-grabbing hover:bg-muted/40 transition-all group"
+      className="border-b border-border bg-card hover:bg-muted/40 cursor-grab active:cursor-grabbing transition-colors group"
     >
-      {/* Title */}
-      <p className="text-sm font-bold leading-tight text-foreground truncate">
-        {lead.name}{" "}
-        <span className="font-normal text-muted-foreground">| {lead.type}</span>
-      </p>
+      {/* Card content */}
+      <div className="px-3 py-2.5">
+        {/* Title row - HubSpot style: bold name | type */}
+        <p className="text-sm font-bold text-foreground leading-tight">
+          {lead.name}{" "}
+          <span className="font-normal text-muted-foreground">| {lead.type}</span>
+        </p>
 
-      {/* Contact info */}
-      <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-        <User className="h-3 w-3 shrink-0" />
-        <span className="truncate">{lead.name}</span>
+        {/* Contact name with icon */}
+        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+          <User className="h-3 w-3 shrink-0" style={{ color: stageColor }} />
+          <span className="truncate">{lead.name}</span>
+        </div>
+
+        {/* Extra info: operator, lives, plan */}
+        {(lead.operator || lead.lives || lead.plan_type) && (
+          <div className="mt-1 text-[11px] text-muted-foreground leading-snug">
+            {lead.plan_type && <div>Valor: R$ {lead.lives ? (lead.lives * 120).toLocaleString("pt-BR") : "—"}</div>}
+            {lead.operator && <div>Status do Negócio: {lead.operator}</div>}
+          </div>
+        )}
+
+        {/* Time since last contact */}
+        {timeSince && (
+          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span>Tarefa há {timeSince}</span>
+          </div>
+        )}
+
+        {/* Lost reason */}
+        {lead.stage === "perdido" && lead.lost_reason && (
+          <div className="mt-1.5 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
+            Motivo: {lead.lost_reason}
+          </div>
+        )}
       </div>
 
-      {/* Extra info */}
-      {(lead.operator || lead.lives) && (
-        <div className="mt-1.5 text-xs text-muted-foreground">
-          {lead.operator && <span>Operadora: {lead.operator}</span>}
-          {lead.operator && lead.lives ? " • " : ""}
-          {lead.lives && <span>{lead.lives} vidas</span>}
-        </div>
-      )}
-
-      {/* Stage-specific info */}
-      {lead.plan_type && (
-        <div className="mt-1 text-xs text-muted-foreground">
-          Plano: {lead.plan_type}
-        </div>
-      )}
-
-      {/* Time indicator */}
-      {timeSince && (
-        <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          <span>Contato há {timeSince}</span>
-        </div>
-      )}
-
-      {/* Lost reason */}
-      {lead.stage === "perdido" && lead.lost_reason && (
-        <div className="mt-1.5 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5">
-          Motivo: {lead.lost_reason}
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-border/50">
-        <ActionButton
+      {/* Action bar - HubSpot style icon row at bottom */}
+      <div className="flex items-center gap-0 px-2 py-1 border-t border-border/40">
+        <ActionIcon
           icon={<Phone className="h-3.5 w-3.5" />}
           href={`tel:+55${lead.phone.replace(/\D/g, "")}`}
-          tooltip="Ligar"
+          color={stageColor}
         />
-        <ActionButton
+        <ActionIcon
           icon={<MessageCircle className="h-3.5 w-3.5" />}
           href={whatsappUrl}
-          tooltip="WhatsApp"
-          className="text-secondary"
+          color={stageColor}
         />
-        <ActionButton
+        <ActionIcon
           icon={<Mail className="h-3.5 w-3.5" />}
           href={lead.email ? `mailto:${lead.email}` : undefined}
-          tooltip="Email"
+          color={stageColor}
           disabled={!lead.email}
         />
-        <ActionButton
+        <ActionIcon
           icon={<Edit className="h-3.5 w-3.5" />}
           onClick={onClick}
-          tooltip="Editar"
+          color={stageColor}
         />
       </div>
     </div>
   );
 }
 
-function ActionButton({
+function ActionIcon({
   icon,
   href,
   onClick,
-  tooltip,
-  className = "",
+  color,
   disabled = false,
 }: {
   icon: React.ReactNode;
   href?: string;
   onClick?: () => void;
-  tooltip: string;
-  className?: string;
+  color: string;
   disabled?: boolean;
 }) {
-  const baseClasses = `p-1.5 rounded-md transition-colors ${
+  const style = disabled ? {} : { color };
+  const cls = `p-1.5 rounded transition-colors ${
     disabled
-      ? "text-muted-foreground/30 cursor-not-allowed"
-      : `text-muted-foreground hover:text-primary hover:bg-primary/10 ${className}`
+      ? "text-muted-foreground/20 cursor-not-allowed"
+      : "hover:bg-muted"
   }`;
 
   if (href && !disabled) {
@@ -131,8 +118,8 @@ function ActionButton({
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className={baseClasses}
-        title={tooltip}
+        className={cls}
+        style={style}
       >
         {icon}
       </a>
@@ -141,13 +128,10 @@ function ActionButton({
 
   return (
     <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
+      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       disabled={disabled}
-      className={baseClasses}
-      title={tooltip}
+      className={cls}
+      style={style}
     >
       {icon}
     </button>
