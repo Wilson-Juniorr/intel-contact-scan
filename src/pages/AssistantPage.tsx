@@ -395,13 +395,13 @@ export default function AssistantPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
-      <div className="mb-4">
+      <div className="mb-4 shrink-0">
         <h1 className="text-2xl font-bold">Assistente IA</h1>
         <p className="text-sm text-muted-foreground">Especialista em planos de saúde — agora com ações no CRM e voz</p>
       </div>
 
-      <Tabs defaultValue="followup" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="w-fit">
+      <Tabs defaultValue="followup" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="w-fit shrink-0">
           <TabsTrigger value="followup" className="gap-1.5 text-xs">
             <Bell className="h-3.5 w-3.5" /> Follow-Up Inteligente
           </TabsTrigger>
@@ -410,7 +410,7 @@ export default function AssistantPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="followup" className="flex-1 overflow-y-auto mt-3">
+        <TabsContent value="followup" className="flex-1 overflow-y-auto mt-3 pb-4">
           <FollowUpPanel />
         </TabsContent>
 
