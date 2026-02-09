@@ -150,10 +150,20 @@ export function LeadObservationsPanel({ lead }: Props) {
     setWhatsappMsg("");
     setCopied(false);
     try {
-      const docList = obs.documents.map((doc: any) => {
-        const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
-        return `- ${catLabel}: ${doc.file_name}`;
-      }).join("\n");
+      // Generate signed URLs (valid for 7 days) for each document
+      const docsWithLinks = await Promise.all(
+        obs.documents.map(async (doc: any) => {
+          const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
+          const { data: signedData } = await supabase.storage
+            .from("lead-images")
+            .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7); // 7 days
+          return { catLabel, fileName: doc.file_name, url: signedData?.signedUrl || null };
+        })
+      );
+
+      const docList = docsWithLinks.map((d) =>
+        d.url ? `- ${d.catLabel}: ${d.fileName}\n  🔗 Link: ${d.url}` : `- ${d.catLabel}: ${d.fileName}`
+      ).join("\n");
 
       const checklistStatus = obs.checklist.length
         ? obs.checklist.map((c: any) => `- [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
@@ -178,11 +188,11 @@ ${checklistStatus}
 Monte a mensagem no seguinte formato:
 1. Saudação breve ao time de emissão
 2. Identifique o cliente (nome, tipo de plano, operadora)
-3. Liste CADA documento anexado de forma organizada, indicando o que é cada um (ex: "📄 RG do Titular - arquivo: fulano_rg.pdf")
+3. Liste CADA documento anexado de forma organizada, indicando o que é cada um (ex: "📄 RG do Titular - arquivo: fulano_rg.pdf") e INCLUA O LINK de download logo abaixo de cada documento para que o time possa baixar diretamente
 4. Mencione se há documentos pendentes no checklist
 5. Finalize com uma frase de fechamento profissional
 
-Use emojis moderadamente para organização visual. A mensagem deve ser clara e pronta para copiar e colar no WhatsApp.`;
+Use emojis moderadamente para organização visual. A mensagem deve ser clara e pronta para copiar e colar no WhatsApp. Os links são temporários (7 dias).`;
 
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
         method: "POST",
