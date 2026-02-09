@@ -9,6 +9,9 @@ import { toast } from "@/hooks/use-toast";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES } from "@/types/lead";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,9 +22,51 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 export default function AssistantPage() {
   const { leads, interactions } = useLeadsContext();
+  const { user } = useAuth();
+
+  const notesQuery = useQuery({
+    queryKey: ["lead_notes", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("lead_notes").select("*").order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const docsQuery = useQuery({
+    queryKey: ["lead_documents", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("lead_documents").select("*").order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const checklistQuery = useQuery({
+    queryKey: ["lead_checklist", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("lead_checklist").select("*");
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const remindersQuery = useQuery({
+    queryKey: ["reminders", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("reminders").select("*").order("date", { ascending: true });
+      return data || [];
+    },
+    enabled: !!user,
+  });
 
   const crmContext = useMemo(() => {
     if (!leads.length) return "";
+
+    const notes = notesQuery.data || [];
+    const docs = docsQuery.data || [];
+    const checklist = checklistQuery.data || [];
+    const reminders = remindersQuery.data || [];
 
     const stageCounts: Record<string, number> = {};
     leads.forEach((l) => {
@@ -34,45 +79,67 @@ export default function AssistantPage() {
       .join("\n");
 
     const now = Date.now();
-    const idleLeads = leads
-      .filter((l) => !["implantado", "declinado", "cancelado"].includes(l.stage))
-      .map((l) => {
-        const lastActivity = l.last_contact_at || l.updated_at || l.created_at;
-        const idleDays = Math.floor((now - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24));
-        return { ...l, idleDays };
-      })
-      .sort((a, b) => b.idleDays - a.idleDays);
-
-    const idleSummary = idleLeads
-      .slice(0, 15)
-      .map((l) => {
-        const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
-        return `  - ${l.name} | ${stageLabel} | ${l.type} | ${l.operator || "sem operadora"} | ${l.idleDays}d sem contato | ${l.lives || "?"} vidas`;
-      })
-      .join("\n");
-
     const totalValue = leads.reduce((sum, l) => sum + (l.lives || 0), 0);
 
+    const leadsDetail = leads.map((l) => {
+      const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
+      const lastActivity = l.last_contact_at || l.updated_at;
+      const idleDays = Math.floor((now - new Date(lastActivity || l.created_at).getTime()) / (1000 * 60 * 60 * 24));
+
+      const leadInteractions = interactions.filter((i) => i.lead_id === l.id);
+      const intSummary = leadInteractions.length
+        ? leadInteractions.slice(0, 5).map((i) => `      [${i.type}] ${new Date(i.created_at).toLocaleDateString("pt-BR")}: ${i.description}`).join("\n")
+        : "      Nenhuma interação";
+
+      const leadNotes = notes.filter((n) => n.lead_id === l.id);
+      const notesSummary = leadNotes.length
+        ? leadNotes.slice(0, 5).map((n) => `      [${n.category}] ${n.content}${n.tags?.length ? ` (tags: ${n.tags.join(", ")})` : ""}`).join("\n")
+        : "      Nenhuma observação";
+
+      const leadDocs = docs.filter((d) => d.lead_id === l.id);
+      const docsSummary = leadDocs.length
+        ? leadDocs.map((d) => `      [${d.category}] ${d.file_name}${d.ocr_text ? ` | OCR: ${d.ocr_text.slice(0, 150)}...` : ""}`).join("\n")
+        : "      Nenhum documento";
+
+      const leadChecklist = checklist.filter((c) => c.lead_id === l.id);
+      const checkSummary = leadChecklist.length
+        ? leadChecklist.map((c) => `      [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
+        : "      Nenhum checklist";
+
+      const leadReminders = reminders.filter((r) => r.lead_id === l.id);
+      const reminderSummary = leadReminders.length
+        ? leadReminders.map((r) => `      [${r.completed ? "✅" : "⏰"}] ${new Date(r.date).toLocaleDateString("pt-BR")}: ${r.description}`).join("\n")
+        : "      Nenhum lembrete";
+
+      return `  📋 ${l.name} | Tel: ${l.phone} | Email: ${l.email || "-"} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | ${idleDays}d sem contato | Notas: ${l.notes || "-"}
+    Interações (${leadInteractions.length}):
+${intSummary}
+    Observações (${leadNotes.length}):
+${notesSummary}
+    Documentos (${leadDocs.length}):
+${docsSummary}
+    Checklist:
+${checkSummary}
+    Lembretes:
+${reminderSummary}`;
+    }).join("\n\n");
+
     return `
-=== DADOS DO CRM DO USUÁRIO ===
+=== DADOS COMPLETOS DO CRM ===
 Total de leads: ${leads.length}
 Total de vidas: ${totalValue}
-Total de interações registradas: ${interactions.length}
+Total de interações: ${interactions.length}
+Total de observações: ${notes.length}
+Total de documentos: ${docs.length}
+Lembretes pendentes: ${reminders.filter((r) => !r.completed).length}
 
-LEADS POR ETAPA DO FUNIL:
+FUNIL DE VENDAS:
 ${stagesSummary}
 
-LEADS ATIVOS (ordenados por inatividade):
-${idleSummary}
-
-TODOS OS LEADS:
-${leads.map((l) => {
-  const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
-  const lastActivity = l.last_contact_at || l.updated_at;
-  return `  - ${l.name} | Tel: ${l.phone} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | Último contato: ${lastActivity ? new Date(lastActivity).toLocaleDateString("pt-BR") : "nunca"} | Notas: ${l.notes || "-"}`;
-}).join("\n")}
+DETALHES DE CADA LEAD:
+${leadsDetail}
 ===`;
-  }, [leads, interactions]);
+  }, [leads, interactions, notesQuery.data, docsQuery.data, checklistQuery.data, remindersQuery.data]);
 
   const [messages, setMessages] = useState<Message[]>([
     {
