@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Lead } from "@/types/lead";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,13 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, FileText, Send, User, Phone, Mail, Users, Building2 } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CalendarIcon, FileText, Send, User, Phone, Mail, Users, Building2 } from "lucide-react";
 
-interface EmissionFormData {
+export interface EmissionFormData {
   vigencia: string;
   nomePlano: string;
   nomeTitular: string;
   emailTitular: string;
+  celularTitular: string;
 }
 
 interface Props {
@@ -24,22 +30,68 @@ interface Props {
   isLoading?: boolean;
 }
 
+const EMAIL_DOMAINS = ["@gmail.com", "@outlook.com", "@hotmail.com", "@yahoo.com.br", "@icloud.com"];
+
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, onConfirm, isLoading }: Props) {
-  const [vigencia, setVigencia] = useState("");
+  const [vigenciaDate, setVigenciaDate] = useState<Date | undefined>(undefined);
   const [nomePlano, setNomePlano] = useState("");
   const [nomeTitular, setNomeTitular] = useState(lead.name || "");
   const [emailTitular, setEmailTitular] = useState(lead.email || "");
+  const [celularTitular, setCelularTitular] = useState(lead.phone || "");
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit = vigencia.trim() && nomePlano.trim() && nomeTitular.trim();
+  // Reset when dialog opens with new lead
+  useEffect(() => {
+    if (open) {
+      setNomeTitular(lead.name || "");
+      setEmailTitular(lead.email || "");
+      setCelularTitular(lead.phone ? formatPhone(lead.phone) : "");
+      setVigenciaDate(undefined);
+      setNomePlano("");
+    }
+  }, [open, lead]);
+
+  const vigencia = vigenciaDate ? format(vigenciaDate, "dd/MM/yyyy") : "";
+  const canSubmit = vigenciaDate && nomePlano.trim() && nomeTitular.trim();
 
   const handleConfirm = () => {
     if (!canSubmit) return;
-    onConfirm({ vigencia: vigencia.trim(), nomePlano: nomePlano.trim(), nomeTitular: nomeTitular.trim(), emailTitular: emailTitular.trim() });
+    onConfirm({
+      vigencia,
+      nomePlano: nomePlano.trim(),
+      nomeTitular: nomeTitular.trim(),
+      emailTitular: emailTitular.trim(),
+      celularTitular: celularTitular.trim(),
+    });
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCelularTitular(formatPhone(e.target.value));
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setEmailTitular(val);
+    setShowEmailSuggestions(val.includes("@") === false && val.length > 0);
+  };
+
+  const handleEmailDomain = (domain: string) => {
+    const localPart = emailTitular.split("@")[0];
+    setEmailTitular(localPart + domain);
+    setShowEmailSuggestions(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base flex items-center gap-2">
             <Send className="h-4 w-4 text-primary" />
@@ -106,17 +158,52 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="celular-titular" className="text-xs flex items-center gap-1.5">
+              <Phone className="h-3 w-3" />
+              Celular do Titular
+            </Label>
+            <Input
+              id="celular-titular"
+              placeholder="(11) 99999-9999"
+              value={celularTitular}
+              onChange={handlePhoneChange}
+              className="h-9 text-sm"
+              inputMode="tel"
+            />
+          </div>
+
+          <div className="space-y-2 relative">
             <Label htmlFor="email-titular" className="text-xs flex items-center gap-1.5">
               <Mail className="h-3 w-3" />
               E-mail do Titular
             </Label>
             <Input
+              ref={emailRef}
               id="email-titular"
               placeholder="email@exemplo.com"
               value={emailTitular}
-              onChange={(e) => setEmailTitular(e.target.value)}
+              onChange={handleEmailChange}
+              onFocus={() => {
+                if (!emailTitular.includes("@") && emailTitular.length > 0) setShowEmailSuggestions(true);
+              }}
+              onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
               className="h-9 text-sm"
+              inputMode="email"
             />
+            {showEmailSuggestions && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md p-1">
+                {EMAIL_DOMAINS.map((domain) => (
+                  <button
+                    key={domain}
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors"
+                    onMouseDown={(e) => { e.preventDefault(); handleEmailDomain(domain); }}
+                  >
+                    {emailTitular.split("@")[0]}{domain}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <Separator className="my-1" />
@@ -137,17 +224,34 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="vigencia" className="text-xs flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" />
+            <Label className="text-xs flex items-center gap-1.5">
+              <CalendarIcon className="h-3 w-3" />
               Vigência Desejada
             </Label>
-            <Input
-              id="vigencia"
-              placeholder="Ex: 20/02/2025"
-              value={vigencia}
-              onChange={(e) => setVigencia(e.target.value)}
-              className="h-9 text-sm"
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full h-9 justify-start text-left text-sm font-normal",
+                    !vigenciaDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                  {vigenciaDate ? format(vigenciaDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecione a data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={vigenciaDate}
+                  onSelect={setVigenciaDate}
+                  initialFocus
+                  locale={ptBR}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
