@@ -8,11 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  StickyNote, FileUp, CheckSquare, Sparkles, Plus, Trash2, Upload,
+  StickyNote, FileUp, Sparkles, Plus, Trash2, Upload,
   Loader2, X, Tag, Download, File, Image as ImageIcon, Eye, FolderDown,
   MessageCircle, Copy, Check,
 } from "lucide-react";
@@ -116,14 +115,6 @@ export function LeadObservationsPanel({ lead }: Props) {
     setPreviewDoc({ url, name: fileName, type: fileType });
   };
 
-  const handleInitChecklist = async () => {
-    try {
-      await obs.initChecklist(lead.type);
-      toast({ title: "Checklist criado!" });
-    } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
-    }
-  };
 
   const handleGenerateSummary = async () => {
     setLoadingSummary(true);
@@ -165,9 +156,7 @@ export function LeadObservationsPanel({ lead }: Props) {
         d.url ? `- ${d.catLabel}: ${d.fileName}\n  🔗 Link: ${d.url}` : `- ${d.catLabel}: ${d.fileName}`
       ).join("\n");
 
-      const checklistStatus = obs.checklist.length
-        ? obs.checklist.map((c: any) => `- [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
-        : "Nenhum checklist";
+      const checklistStatus = "Sem checklist";
 
       const prompt = `Gere uma mensagem profissional e organizada para enviar via WhatsApp ao time de emissão de um plano de saúde.
 
@@ -270,21 +259,16 @@ Use emojis moderadamente para organização visual. A mensagem deve ser clara e 
     );
   });
 
-  const completedItems = obs.checklist.filter((c: any) => c.completed).length;
-  const totalItems = obs.checklist.length;
 
   return (
     <>
     <Tabs defaultValue="notes" className="w-full">
-      <TabsList className="w-full grid grid-cols-4 h-9">
+      <TabsList className="w-full grid grid-cols-3 h-9">
         <TabsTrigger value="notes" className="text-[10px] gap-1 px-1">
           <StickyNote className="h-3 w-3" /> Notas
         </TabsTrigger>
         <TabsTrigger value="docs" className="text-[10px] gap-1 px-1">
           <FileUp className="h-3 w-3" /> Docs
-        </TabsTrigger>
-        <TabsTrigger value="checklist" className="text-[10px] gap-1 px-1">
-          <CheckSquare className="h-3 w-3" /> Check
         </TabsTrigger>
         <TabsTrigger value="ai" className="text-[10px] gap-1 px-1">
           <Sparkles className="h-3 w-3" /> IA
@@ -475,43 +459,6 @@ Use emojis moderadamente para organização visual. A mensagem deve ser clara e 
         </div>
       </TabsContent>
 
-      {/* CHECKLIST */}
-      <TabsContent value="checklist" className="space-y-3 mt-3">
-        {obs.checklist.length === 0 ? (
-          <div className="text-center py-6 space-y-2">
-            <CheckSquare className="h-8 w-8 mx-auto text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">Nenhum checklist criado</p>
-            <Button size="sm" onClick={handleInitChecklist} className="text-xs gap-1">
-              <Plus className="h-3 w-3" /> Criar checklist ({lead.type})
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium">{completedItems}/{totalItems} completos</p>
-              <div className="h-1.5 flex-1 mx-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: totalItems ? `${(completedItems / totalItems) * 100}%` : "0%" }}
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5 max-h-[350px] overflow-y-auto">
-              {obs.checklist.map((item: any) => (
-                <div key={item.id} className="flex items-center gap-2.5 p-2 rounded-lg border border-border bg-card">
-                  <Checkbox
-                    checked={item.completed}
-                    onCheckedChange={(checked) => obs.toggleChecklist({ id: item.id, completed: !!checked })}
-                  />
-                  <span className={`text-xs flex-1 ${item.completed ? "line-through text-muted-foreground" : ""}`}>
-                    {item.item_name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </TabsContent>
 
       {/* IA */}
       <TabsContent value="ai" className="space-y-3 mt-3">
