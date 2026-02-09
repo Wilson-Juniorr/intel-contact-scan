@@ -19,12 +19,12 @@ export default function Dashboard() {
 
     const newToday = leads.filter((l) => new Date(l.created_at) >= today).length;
     const newWeek = leads.filter((l) => new Date(l.created_at) >= weekAgo).length;
-    const negotiating = leads.filter((l) => l.stage === "em_negociacao").length;
-    const converted = leads.filter((l) => l.stage === "convertido").length;
-    const lost = leads.filter((l) => l.stage === "perdido").length;
+    const negotiating = leads.filter((l) => l.stage === "cotacao_enviada" || l.stage === "cotacao_aprovada").length;
+    const converted = leads.filter((l) => l.stage === "implantado").length;
+    const lost = leads.filter((l) => l.stage === "cancelado" || l.stage === "declinado").length;
 
     const needsFollowUp = leads.filter((l) => {
-      if (l.stage === "convertido" || l.stage === "perdido") return false;
+      if (l.stage === "implantado" || l.stage === "cancelado" || l.stage === "declinado") return false;
       if (!l.last_contact_at) return true;
       const daysSince = (Date.now() - new Date(l.last_contact_at).getTime()) / (1000 * 60 * 60 * 24);
       return daysSince >= 2;
@@ -34,7 +34,7 @@ export default function Dashboard() {
   }, [leads]);
 
   const funnelData = useMemo(() => {
-    return FUNNEL_STAGES.filter((s) => s.key !== "perdido").map((stage) => ({
+    return FUNNEL_STAGES.filter((s) => s.key !== "cancelado" && s.key !== "declinado").map((stage) => ({
       name: stage.label,
       value: leads.filter((l) => l.stage === stage.key).length,
       color: stage.color,
@@ -48,9 +48,9 @@ export default function Dashboard() {
   const statCards = [
     { label: "Total de Leads", value: stats.total, icon: Users, accent: "text-primary" },
     { label: "Novos (semana)", value: stats.newWeek, icon: UserPlus, accent: "text-primary" },
-    { label: "Em Negociação", value: stats.negotiating, icon: Handshake, accent: "text-warning" },
-    { label: "Convertidos", value: stats.converted, icon: TrendingUp, accent: "text-secondary" },
-    { label: "Perdidos", value: stats.lost, icon: AlertTriangle, accent: "text-destructive" },
+    { label: "Em Cotação", value: stats.negotiating, icon: Handshake, accent: "text-warning" },
+    { label: "Implantados", value: stats.converted, icon: TrendingUp, accent: "text-secondary" },
+    { label: "Cancelados", value: stats.lost, icon: AlertTriangle, accent: "text-destructive" },
     { label: "Follow-up", value: stats.needsFollowUp.length, icon: Phone, accent: "text-warning" },
   ];
 

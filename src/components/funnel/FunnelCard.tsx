@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Mail, Edit, User, Clock } from "lucide-react";
+import { Phone, MessageCircle, Mail, Edit, User, Clock, ClipboardList } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -17,7 +17,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
     : null;
 
   const typeLabel = lead.type === "PF" ? "PF" : lead.type === "PJ" ? "PJ" : "PME";
-  const typeFull = lead.type === "PF" ? "Pessoa Física" : lead.type === "PJ" ? "Pessoa Jurídica - CNPJ" : "PME";
+  const typeFull = lead.type === "PJ" ? "Pessoa Jurídica - CNPJ" : lead.type === "PME" ? "PME" : "";
 
   const estimatedValue = lead.lives ? lead.lives * 120 : null;
 
@@ -26,99 +26,69 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="mx-2 my-1.5 rounded-md border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow"
+      className="mx-2 my-1.5 rounded border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all group"
     >
-      <div className="px-3 pt-2.5 pb-1.5">
-        {/* Title: Name | Type - colored like HubSpot */}
-        <p className="text-[13px] font-bold leading-tight" style={{ color: stageColor }}>
-          {lead.name}{" "}
-          <span className="font-bold">| {typeLabel}</span>
+      <div className="px-3 pt-2.5 pb-2">
+        {/* Title */}
+        <p className="text-[13px] font-bold leading-snug break-words" style={{ color: stageColor }}>
+          {lead.name}
+          {typeFull ? ` | ${typeFull}` : ` | ${typeLabel}`}
         </p>
 
-        {/* Extended type label for PJ */}
-        {lead.type !== "PF" && (
-          <p className="text-[10px] text-muted-foreground mt-0.5">{typeFull}</p>
-        )}
-
-        {/* Value & Status */}
+        {/* Value */}
         {estimatedValue && (
           <p className="text-xs text-foreground mt-1.5">
             Valor: R$ {estimatedValue.toLocaleString("pt-BR")}
           </p>
         )}
+
+        {/* Status */}
         {lead.operator && (
           <p className="text-xs text-foreground">
             Status do Negócio: {lead.operator}
           </p>
         )}
 
-        {/* Contact name with icon */}
+        {/* Contact person */}
         <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
           <User className="h-3.5 w-3.5 shrink-0" style={{ color: stageColor }} />
           <span className="truncate">{lead.name}</span>
         </div>
 
-        {/* Time since last contact */}
+        {/* Time */}
         {timeSince && (
-          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
-            <Clock className="h-3 w-3 shrink-0" />
-            <span>Tarefa há {timeSince}</span>
-          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">
+            Tarefa há {timeSince}
+          </p>
         )}
 
         {/* Lost reason */}
-        {lead.stage === "perdido" && lead.lost_reason && (
+        {(lead.stage === "perdido" || lead.stage === "declinado" || lead.stage === "cancelado") && lead.lost_reason && (
           <div className="mt-1.5 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
-            Motivo: {lead.lost_reason}
+            {lead.lost_reason}
           </div>
         )}
       </div>
 
-      {/* Action icons bar - HubSpot style */}
-      <div className="flex items-center gap-0 px-1.5 py-1 border-t border-border/50">
-        <ActionBtn
-          icon={<Phone className="h-3.5 w-3.5" />}
-          href={`tel:+55${lead.phone.replace(/\D/g, "")}`}
-          color={stageColor}
-        />
-        <ActionBtn
-          icon={<MessageCircle className="h-3.5 w-3.5" />}
-          href={whatsappUrl}
-          color={stageColor}
-        />
-        <ActionBtn
-          icon={<Mail className="h-3.5 w-3.5" />}
-          href={lead.email ? `mailto:${lead.email}` : undefined}
-          color={stageColor}
-          disabled={!lead.email}
-        />
-        <ActionBtn
-          icon={<Edit className="h-3.5 w-3.5" />}
-          onClick={onClick}
-          color={stageColor}
-        />
+      {/* Action icons */}
+      <div className="flex items-center gap-0 px-1.5 py-1 border-t border-border/40">
+        <ActionBtn icon={<ClipboardList className="h-3.5 w-3.5" />} onClick={onClick} color={stageColor} />
+        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} color={stageColor} />
+        <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} color={stageColor} />
+        <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} color={stageColor} disabled={!lead.email} />
+        <ActionBtn icon={<Edit className="h-3.5 w-3.5" />} onClick={onClick} color={stageColor} />
       </div>
     </div>
   );
 }
 
 function ActionBtn({
-  icon,
-  href,
-  onClick,
-  color,
-  disabled = false,
+  icon, href, onClick, color, disabled = false,
 }: {
-  icon: React.ReactNode;
-  href?: string;
-  onClick?: () => void;
-  color: string;
-  disabled?: boolean;
+  icon: React.ReactNode; href?: string; onClick?: () => void; color: string; disabled?: boolean;
 }) {
   const style = disabled ? {} : { color };
-  const cls = `p-1.5 rounded transition-colors ${
-    disabled ? "text-muted-foreground/20 cursor-not-allowed" : "hover:bg-muted"
-  }`;
+  const cls = `p-1.5 rounded transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : "hover:bg-muted"}`;
 
   if (href && !disabled) {
     return (
@@ -127,7 +97,6 @@ function ActionBtn({
       </a>
     );
   }
-
   return (
     <button onClick={(e) => { e.stopPropagation(); onClick?.(); }} disabled={disabled} className={cls} style={style}>
       {icon}

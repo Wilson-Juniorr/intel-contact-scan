@@ -4,23 +4,31 @@ export type PlanType = "Individual" | "Familiar" | "Empresarial" | "PME";
 
 export type FunnelStage =
   | "novo"
-  | "primeiro_contato"
+  | "tentativa_contato"
+  | "contato_realizado"
   | "cotacao_enviada"
-  | "em_negociacao"
-  | "proposta_aceita"
-  | "implantacao"
-  | "convertido"
-  | "perdido";
+  | "cotacao_aprovada"
+  | "documentacao_completa"
+  | "em_emissao"
+  | "aguardando_implantacao"
+  | "implantado"
+  | "retrabalho"
+  | "declinado"
+  | "cancelado";
 
-export const FUNNEL_STAGES: { key: FunnelStage; label: string; color: string }[] = [
-  { key: "novo", label: "Novo Lead", color: "hsl(199, 89%, 48%)" },
-  { key: "primeiro_contato", label: "Primeiro Contato", color: "hsl(210, 70%, 55%)" },
-  { key: "cotacao_enviada", label: "Cotação Enviada", color: "hsl(270, 60%, 55%)" },
-  { key: "em_negociacao", label: "Em Negociação", color: "hsl(35, 92%, 55%)" },
-  { key: "proposta_aceita", label: "Proposta Aceita", color: "hsl(160, 60%, 45%)" },
-  { key: "implantacao", label: "Implantação", color: "hsl(160, 80%, 35%)" },
-  { key: "convertido", label: "Convertido", color: "hsl(140, 70%, 40%)" },
-  { key: "perdido", label: "Perdido", color: "hsl(0, 72%, 51%)" },
+export const FUNNEL_STAGES: { key: FunnelStage; label: string; color: string; weight: number }[] = [
+  { key: "novo", label: "Novo Negócio", color: "hsl(199, 89%, 48%)", weight: 10 },
+  { key: "tentativa_contato", label: "Tentativa de Contato", color: "hsl(199, 75%, 48%)", weight: 10 },
+  { key: "contato_realizado", label: "Contato Realizado", color: "hsl(199, 65%, 45%)", weight: 10 },
+  { key: "cotacao_enviada", label: "Cotação Enviada", color: "hsl(199, 55%, 42%)", weight: 20 },
+  { key: "cotacao_aprovada", label: "Cotação Aprovada", color: "hsl(170, 60%, 40%)", weight: 50 },
+  { key: "documentacao_completa", label: "Documentação Completa", color: "hsl(170, 70%, 38%)", weight: 70 },
+  { key: "em_emissao", label: "Em Emissão", color: "hsl(150, 60%, 38%)", weight: 100 },
+  { key: "aguardando_implantacao", label: "Aguardando Implantação", color: "hsl(150, 70%, 35%)", weight: 100 },
+  { key: "implantado", label: "Implantado", color: "hsl(140, 70%, 40%)", weight: 100 },
+  { key: "retrabalho", label: "Retrabalho", color: "hsl(35, 85%, 50%)", weight: 0 },
+  { key: "declinado", label: "Declinado", color: "hsl(0, 60%, 55%)", weight: 0 },
+  { key: "cancelado", label: "Cancelado", color: "hsl(0, 72%, 51%)", weight: 0 },
 ];
 
 export interface Lead {
