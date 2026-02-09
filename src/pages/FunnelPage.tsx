@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
-import { Badge } from "@/components/ui/badge";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { FunnelColumn } from "@/components/funnel/FunnelColumn";
 
@@ -38,16 +37,20 @@ export default function FunnelPage() {
   };
 
   return (
-    <div className="space-y-4 h-[calc(100vh-7rem)] flex flex-col">
-      <div>
-        <h1 className="text-2xl font-bold">Funil de Vendas</h1>
-        <p className="text-sm text-muted-foreground">
-          Arraste os cards entre as colunas • {leads.length} leads no total
-        </p>
+    <div className="h-[calc(100vh-5rem)] flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-1 pb-3">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Pipeline de Vendas</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Arraste os cards entre as colunas • {leads.length} negócios
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1 flex gap-3 overflow-x-auto pb-2">
-        {FUNNEL_STAGES.map((stage) => {
+      {/* Pipeline columns */}
+      <div className="flex-1 flex gap-0 overflow-x-auto">
+        {FUNNEL_STAGES.map((stage, index) => {
           const stageLeads = leads.filter((l) => l.stage === stage.key);
           return (
             <FunnelColumn
@@ -55,6 +58,8 @@ export default function FunnelPage() {
               stage={stage}
               leads={stageLeads}
               isDragOver={dragOverStage === stage.key}
+              isFirst={index === 0}
+              isLast={index === FUNNEL_STAGES.length - 1}
               onDragStart={handleDragStart}
               onDragOver={(e) => handleDragOver(e, stage.key)}
               onDragLeave={handleDragLeave}
