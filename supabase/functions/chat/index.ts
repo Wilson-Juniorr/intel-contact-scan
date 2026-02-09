@@ -316,53 +316,82 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     const firstResult = await firstResponse.json();
     const choice = firstResult.choices?.[0];
 
-    // Tool calls detected - execute actions
+    // Tool calls detected - execute in a loop (supports multi-step: search → confirm → execute)
     if (choice?.message?.tool_calls?.length > 0 && supabase && userId) {
-      const actionNames = choice.message.tool_calls.map((tc: any) => tc.function.name);
-      const mutationNames = actionNames.filter((n: string) => n !== "search_lead");
-      console.log("Tool calls:", actionNames);
+      let currentMessages = [...allMessages];
+      let currentChoice = choice;
+      const allActionNames: string[] = [];
+      const MAX_ROUNDS = 5;
 
-      const toolResults = [];
-      for (const tc of choice.message.tool_calls) {
-        const result = await executeTool(supabase, userId, tc, fileInfo);
-        console.log(`Tool ${tc.function.name}:`, result);
-        toolResults.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          content: JSON.stringify(result),
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        const actionNames = currentChoice.message.tool_calls.map((tc: any) => tc.function.name);
+        console.log(`Tool calls round ${round}:`, actionNames);
+        allActionNames.push(...actionNames);
+
+        const toolResults = [];
+        for (const tc of currentChoice.message.tool_calls) {
+          const result = await executeTool(supabase, userId, tc, fileInfo);
+          console.log(`Tool ${tc.function.name}:`, result);
+          toolResults.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            content: JSON.stringify(result),
+          });
+        }
+
+        currentMessages = [...currentMessages, currentChoice.message, ...toolResults];
+
+        // Check if AI wants to call more tools (non-streaming)
+        const nextResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: aiHeaders,
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: currentMessages,
+            tools: CRM_TOOLS,
+            stream: false,
+          }),
         });
+
+        if (!nextResponse.ok) {
+          console.error("Follow-up error:", nextResponse.status);
+          return new Response(JSON.stringify({ error: "Erro ao processar ação" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const nextResult = await nextResponse.json();
+        currentChoice = nextResult.choices?.[0];
+
+        // If no more tool calls, stream the final text response
+        if (!currentChoice?.message?.tool_calls?.length) {
+          const content = currentChoice?.message?.content || "Ação processada.";
+          const mutationNames = allActionNames.filter((n) => n !== "search_lead");
+          const chunks: string[] = [];
+          const chunkSize = 30;
+          for (let i = 0; i < content.length; i += chunkSize) {
+            chunks.push(`data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(i, i + chunkSize) } }] })}\n\n`);
+          }
+          chunks.push("data: [DONE]\n\n");
+
+          return new Response(chunks.join(""), {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "text/event-stream",
+              ...(mutationNames.length > 0 ? {
+                "x-actions-taken": "true",
+                "x-action-names": mutationNames.join(","),
+              } : {}),
+            },
+          });
+        }
       }
 
-      // Streaming follow-up with tool results (allow tools again for multi-step confirmation flow)
-      const streamResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: aiHeaders,
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [...allMessages, choice.message, ...toolResults],
-          tools: CRM_TOOLS,
-          stream: true,
-        }),
-      });
-
-      if (!streamResponse.ok) {
-        console.error("Follow-up error:", streamResponse.status);
-        return new Response(JSON.stringify({ error: "Erro ao confirmar ação" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const hasRealActions = mutationNames.length > 0;
-      return new Response(streamResponse.body, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          ...(hasRealActions ? {
-            "x-actions-taken": "true",
-            "x-action-names": mutationNames.join(","),
-          } : {}),
-        },
-      });
+      // Safety: max rounds reached
+      return new Response(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "Processamento encerrado após múltiplas etapas." } }] })}\n\ndata: [DONE]\n\n`,
+        { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } },
+      );
     }
 
     // No tool calls - return content as SSE
