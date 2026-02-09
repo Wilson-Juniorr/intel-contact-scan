@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText } from "lucide-react";
+import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText, ArrowRightLeft, Phone, CalendarClock, StickyNote, FileUp, CheckCircle2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "@/hooks/use-toast";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
@@ -13,10 +13,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+type ActionBadge = {
+  action: string;
+  label: string;
+  icon: string;
+};
+
+const ACTION_BADGE_MAP: Record<string, { label: string; icon: string }> = {
+  move_lead_stage: { label: "Lead movido", icon: "move" },
+  add_interaction: { label: "Interação registrada", icon: "interaction" },
+  create_reminder: { label: "Lembrete criado", icon: "reminder" },
+  add_note: { label: "Nota adicionada", icon: "note" },
+  assign_document: { label: "Documento atribuído", icon: "document" },
+};
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   fileInfo?: { file_name: string };
+  actionBadges?: ActionBadge[];
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -253,6 +268,14 @@ export default function AssistantPage() {
       }
 
       const actionsWereTaken = resp.headers.get("x-actions-taken") === "true";
+      const actionNamesRaw = resp.headers.get("x-action-names") || "";
+      const actionBadges: ActionBadge[] = actionNamesRaw
+        .split(",")
+        .filter(Boolean)
+        .map((name) => {
+          const info = ACTION_BADGE_MAP[name] || { label: name, icon: "default" };
+          return { action: name, ...info };
+        });
 
       if (!resp.body) throw new Error("No stream");
       const reader = resp.body.getReader();
@@ -283,8 +306,18 @@ export default function AssistantPage() {
         }
       }
 
-      // If actions were taken, invalidate all queries
+      // If actions were taken, attach badges to the last assistant message and invalidate
       if (actionsWereTaken) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          for (let i = updated.length - 1; i >= 0; i--) {
+            if (updated[i].role === "assistant") {
+              updated[i] = { ...updated[i], actionBadges: actionBadges };
+              break;
+            }
+          }
+          return updated;
+        });
         invalidateAll();
         toast({ title: "✅ Ação executada no CRM" });
       }
@@ -334,6 +367,28 @@ export default function AssistantPage() {
                     {msg.fileInfo && (
                       <div className="flex items-center gap-1.5 mb-1.5 text-xs opacity-80">
                         <FileText className="h-3 w-3" /> {msg.fileInfo.file_name}
+                      </div>
+                    )}
+                    {msg.actionBadges && msg.actionBadges.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2 animate-fade-in">
+                        {msg.actionBadges.map((badge, bi) => {
+                          const IconComp =
+                            badge.icon === "move" ? ArrowRightLeft :
+                            badge.icon === "interaction" ? Phone :
+                            badge.icon === "reminder" ? CalendarClock :
+                            badge.icon === "note" ? StickyNote :
+                            badge.icon === "document" ? FileUp : CheckCircle2;
+                          return (
+                            <span
+                              key={bi}
+                              className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary px-2.5 py-0.5 text-xs font-medium animate-scale-in"
+                              style={{ animationDelay: `${bi * 100}ms`, animationFillMode: "backwards" }}
+                            >
+                              <IconComp className="h-3 w-3" />
+                              {badge.label}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                     {msg.role === "assistant" ? (

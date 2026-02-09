@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-user-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Expose-Headers": "x-actions-taken, x-action-names",
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -293,7 +294,8 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
 
     // Tool calls detected - execute actions
     if (choice?.message?.tool_calls?.length > 0 && supabase && userId) {
-      console.log("Tool calls:", choice.message.tool_calls.map((tc: any) => tc.function.name));
+      const actionNames = choice.message.tool_calls.map((tc: any) => tc.function.name);
+      console.log("Tool calls:", actionNames);
 
       const toolResults = [];
       for (const tc of choice.message.tool_calls) {
@@ -325,7 +327,12 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
       }
 
       return new Response(streamResponse.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "x-actions-taken": "true" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "x-actions-taken": "true",
+          "x-action-names": actionNames.join(","),
+        },
       });
     }
 
