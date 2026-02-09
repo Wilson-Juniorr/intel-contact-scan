@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.lead-summary]
 verify_jwt = false
+
+[functions.follow-up-message]
+verify_jwt = false
