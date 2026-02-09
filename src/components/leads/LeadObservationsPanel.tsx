@@ -141,7 +141,7 @@ export function LeadObservationsPanel({ lead }: Props) {
     setShowEmissionForm(true);
   };
 
-  const handleGenerateWhatsAppMsg = async (formData: { vigencia: string; nomePlano: string; nomeTitular: string; emailTitular: string }) => {
+  const handleGenerateWhatsAppMsg = async (formData: { vigencia: string; nomePlano: string; nomeTitular: string; emailTitular: string; celularTitular: string }) => {
     setShowEmissionForm(false);
     setGeneratingMsg(true);
     setWhatsappMsg("");
@@ -177,7 +177,7 @@ Plano: ${formData.nomePlano}
 Vigência desejada: ${formData.vigencia}
 
 Titular: ${formData.nomeTitular}
-Celular: ${lead.phone}
+Celular: ${formData.celularTitular || lead.phone}
 ${formData.emailTitular ? `E-mail: ${formData.emailTitular}` : ""}
 ${lead.lives && lead.lives > 1 ? `Vidas: ${lead.lives}` : ""}
 
