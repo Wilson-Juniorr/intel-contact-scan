@@ -154,9 +154,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={setType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                   <SelectContent>
                     <SelectItem value="PF">Pessoa Física</SelectItem>
-                    <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
+                    <SelectItem value="ADESAO">Adesão</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>
@@ -168,7 +168,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                   <SelectContent>
                     <SelectItem value="Individual">Individual</SelectItem>
                     <SelectItem value="Familiar">Familiar</SelectItem>
-                    <SelectItem value="Empresarial">Empresarial</SelectItem>
+                    <SelectItem value="Adesão">Adesão</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>
