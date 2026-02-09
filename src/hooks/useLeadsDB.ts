@@ -70,7 +70,18 @@ export function useLeadsDB() {
       const { error } = await supabase.from("leads").update({ stage, lost_reason }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+    onMutate: async ({ id, stage, lost_reason }) => {
+      await queryClient.cancelQueries({ queryKey: ["leads"] });
+      const previous = queryClient.getQueryData(["leads", user?.id]);
+      queryClient.setQueryData(["leads", user?.id], (old: any[] | undefined) =>
+        (old || []).map((l) => l.id === id ? { ...l, stage, lost_reason: lost_reason ?? l.lost_reason, updated_at: new Date().toISOString() } : l)
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(["leads", user?.id], context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
 
   const addInteractionMutation = useMutation({
