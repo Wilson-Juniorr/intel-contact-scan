@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { useLeadObservations, NOTE_CATEGORIES, DOC_CATEGORIES } from "@/hooks/useLeadObservations";
+import { useLeadMembers } from "@/hooks/useLeadMembers";
 import { supabase } from "@/integrations/supabase/client";
 import { Lead, FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -14,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LeadObservationsPanel } from "@/components/leads/LeadObservationsPanel";
+import { MemberSection } from "@/components/leads/MemberSection";
 import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
   Maximize2, Minimize2, Pencil, Save, X, Loader2, FileUp,
@@ -183,6 +185,69 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
   );
 }
 
+/* ─── General Docs Section for Fullscreen ─── */
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, FileText as FileTextIcon } from "lucide-react";
+import { motion } from "framer-motion";
+
+function GeneralDocsSectionFullscreen({ documents, docCategory, setDocCategory, fileRef, uploading, handleFileUpload, handlePreview, handleDownload, onDeleteDoc }: {
+  documents: any[]; docCategory: string; setDocCategory: (v: string) => void; fileRef: React.RefObject<HTMLInputElement>;
+  uploading: boolean; handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handlePreview: (fp: string, fn: string, ft: string) => void; handleDownload: (fp: string, fn: string) => void; onDeleteDoc: (doc: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(true);
+  return (
+    <div className="rounded-lg border bg-gradient-to-b from-muted/40 to-muted/20 border-border/60 overflow-hidden">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-accent/30 transition-colors">
+          <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center">
+            <FileTextIcon className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <span className="text-xs font-semibold tracking-wide flex-1 text-left">Documentos Gerais</span>
+          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">{documents.length}</Badge>
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </motion.div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-2 pb-2 space-y-2">
+            <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+            <div className="flex gap-2">
+              <Select value={docCategory} onValueChange={setDocCategory}>
+                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+                <SelectContent>{DOC_CATEGORIES.map((c) => (<SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>))}</SelectContent>
+              </Select>
+              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />} Enviar
+              </Button>
+            </div>
+            {documents.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento geral</p>}
+            {documents.map((doc: any) => {
+              const isImage = doc.file_type?.startsWith("image/");
+              return (
+                <div key={doc.id} className="flex items-center gap-2.5 p-2 rounded-md border border-border bg-card hover:bg-accent/20 transition-colors group">
+                  <div className="h-7 w-7 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
+                    {isImage ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <File className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium truncate">{doc.file_name}</p>
+                    <Badge variant="outline" className="text-[8px] mt-0.5">{DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label || doc.category}</Badge>
+                  </div>
+                  <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}><Eye className="h-3 w-3" /></Button>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}><Download className="h-3 w-3" /></Button>
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onDeleteDoc(doc)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 /* ═══════════ FULLSCREEN COMPLETE VIEW ═══════════ */
 
 function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
@@ -190,6 +255,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
 }) {
   const { getLeadInteractions } = useLeadsContext();
   const obs = useLeadObservations(lead.id);
+  const membersHook = useLeadMembers(lead.id);
   const interactions = getLeadInteractions(lead.id);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
@@ -426,27 +492,11 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
           </div>
         </div>
 
-        {/* ═══ COLUMN 2: Documents ═══ */}
+        {/* ═══ COLUMN 2: Documents (organized by member) ═══ */}
         <div className="space-y-3">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
             <FileUp className="h-3.5 w-3.5" /> Documentos ({obs.documents.length})
           </h3>
-
-          <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
-          <div className="flex gap-2">
-            <Select value={docCategory} onValueChange={setDocCategory}>
-              <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {DOC_CATEGORIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={() => fileRef.current?.click()} disabled={uploading} className="h-8 gap-1 text-xs">
-              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-              Enviar
-            </Button>
-          </div>
 
           {obs.documents.length > 1 && (
             <Button size="sm" variant="outline" className="w-full h-7 gap-1.5 text-[11px]" disabled={downloadingAll}
@@ -474,30 +524,43 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
             </Button>
           )}
 
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {obs.documents.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum documento enviado</p>}
-            {obs.documents.map((doc: any) => {
-              const isImage = doc.file_type?.startsWith("image/");
-              return (
-                <div key={doc.id} className="p-2 rounded-lg border border-border bg-card flex items-center gap-2">
-                  <div className="h-8 w-8 rounded bg-muted flex items-center justify-center shrink-0">
-                    {isImage ? <ImageIcon className="h-4 w-4 text-muted-foreground" /> : <File className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{doc.file_name}</p>
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="text-[9px]">{DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category}</Badge>
-                      <span className="text-[9px] text-muted-foreground">{doc.file_size ? `${(doc.file_size / 1024).toFixed(0)}KB` : ""}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-0.5">
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}><Eye className="h-3 w-3" /></Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}><Download className="h-3 w-3" /></Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+            {/* Documentos Gerais */}
+            <GeneralDocsSectionFullscreen
+              documents={obs.documents.filter((d: any) => !d.member_id)}
+              docCategory={docCategory}
+              setDocCategory={setDocCategory}
+              fileRef={fileRef}
+              uploading={uploading}
+              handleFileUpload={handleFileUpload}
+              handlePreview={handlePreview}
+              handleDownload={handleDownload}
+              onDeleteDoc={(doc: any) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+            />
+            <MemberSection
+              role="titular"
+              members={membersHook.titulares}
+              documents={obs.documents as any}
+              onAddMember={membersHook.addMember}
+              onDeleteMember={membersHook.deleteMember}
+              onUpdateMember={membersHook.updateMember}
+              onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
+              onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+              onPreview={handlePreview}
+              onDownload={handleDownload}
+            />
+            <MemberSection
+              role="dependente"
+              members={membersHook.dependentes}
+              documents={obs.documents as any}
+              onAddMember={membersHook.addMember}
+              onDeleteMember={membersHook.deleteMember}
+              onUpdateMember={membersHook.updateMember}
+              onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
+              onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+              onPreview={handlePreview}
+              onDownload={handleDownload}
+            />
           </div>
         </div>
 
