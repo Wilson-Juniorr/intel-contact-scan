@@ -17,6 +17,7 @@ import {
   MessageCircle, Copy, Check, FileText, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -48,61 +49,77 @@ function GeneralDocsSection({
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-2 w-full py-1.5 hover:bg-accent/50 rounded px-1 transition-colors">
-        {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        <FileText className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-semibold">Documentos Gerais</span>
-        <Badge variant="secondary" className="text-[9px] ml-auto">{documents.length}</Badge>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 pl-2 mt-1">
-        <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
-        <div className="flex gap-1">
-          <Select value={docCategory} onValueChange={setDocCategory}>
-            <SelectTrigger className="h-7 text-[10px] flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DOC_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-            Enviar
-          </Button>
-        </div>
-        {documents.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento geral</p>}
-        {documents.map((doc: any) => {
-          const isImage = doc.file_type?.startsWith("image/");
-          return (
-            <div key={doc.id} className="flex items-center gap-2 p-1.5 rounded border border-border bg-card">
-              <div className="h-6 w-6 rounded bg-muted flex items-center justify-center shrink-0">
-                {isImage ? <ImageIcon className="h-3 w-3 text-muted-foreground" /> : <File className="h-3 w-3 text-muted-foreground" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-medium truncate">{doc.file_name}</p>
-                <Badge variant="outline" className="text-[8px]">
-                  {DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label || doc.category}
-                </Badge>
-              </div>
-              <div className="flex gap-0.5">
-                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
-                  <Eye className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
-                  <Download className="h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeleteDoc(doc)}>
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
+    <div className="rounded-lg border bg-gradient-to-b from-muted/40 to-muted/20 border-border/60 overflow-hidden">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-accent/30 transition-colors">
+          <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center">
+            <FileText className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <span className="text-xs font-semibold tracking-wide flex-1 text-left">Documentos Gerais</span>
+          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">{documents.length}</Badge>
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </motion.div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-2 pb-2 space-y-2">
+            <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+            <div className="flex gap-2">
+              <Select value={docCategory} onValueChange={setDocCategory}>
+                <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOC_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                Enviar
+              </Button>
             </div>
-          );
-        })}
-      </CollapsibleContent>
-    </Collapsible>
+            {documents.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento geral</p>}
+            <AnimatePresence>
+              {documents.map((doc: any) => {
+                const isImage = doc.file_type?.startsWith("image/");
+                return (
+                  <motion.div
+                    key={doc.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 8 }}
+                    className="flex items-center gap-2.5 p-2 rounded-md border border-border bg-card hover:bg-accent/20 transition-colors group"
+                  >
+                    <div className="h-7 w-7 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
+                      {isImage ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <File className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium truncate">{doc.file_name}</p>
+                      <Badge variant="outline" className="text-[8px] mt-0.5">
+                        {DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label || doc.category}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
+                        <Download className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onDeleteDoc(doc)}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
