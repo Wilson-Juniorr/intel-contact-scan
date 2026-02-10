@@ -94,7 +94,7 @@ export function useLeadObservations(leadId: string | undefined) {
   });
 
   const uploadDocumentMutation = useMutation({
-    mutationFn: async (params: { file: File; category: string }) => {
+    mutationFn: async (params: { file: File; category: string; memberId?: string }) => {
       const filePath = `${user!.id}/${leadId}/${Date.now()}_${params.file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("lead-images")
@@ -109,6 +109,7 @@ export function useLeadObservations(leadId: string | undefined) {
         file_type: params.file.type,
         file_size: params.file.size,
         category: params.category,
+        member_id: params.memberId || null,
       });
       if (dbError) throw dbError;
     },

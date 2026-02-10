@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useLeadObservations, NOTE_CATEGORIES, DOC_CATEGORIES } from "@/hooks/useLeadObservations";
+import { useLeadMembers } from "@/hooks/useLeadMembers";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Lead } from "@/types/lead";
@@ -13,8 +14,9 @@ import { Separator } from "@/components/ui/separator";
 import {
   StickyNote, FileUp, Sparkles, Plus, Trash2, Upload,
   Loader2, X, Tag, Download, File, Image as ImageIcon, Eye, FolderDown,
-  MessageCircle, Copy, Check,
+  MessageCircle, Copy, Check, FileText, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -22,15 +24,92 @@ import { ptBR } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import JSZip from "jszip";
 import { EmissionFormDialog } from "./EmissionFormDialog";
+import { MemberSection } from "./MemberSection";
 
 interface Props {
   lead: Lead;
 }
 
+/* ─── Documentos Gerais (sem membro vinculado) ─── */
+function GeneralDocsSection({
+  documents, docCategory, setDocCategory, fileRef, uploading, handleFileUpload,
+  handlePreview, handleDownload, onDeleteDoc,
+}: {
+  documents: any[];
+  docCategory: string;
+  setDocCategory: (v: string) => void;
+  fileRef: React.RefObject<HTMLInputElement>;
+  uploading: boolean;
+  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handlePreview: (fp: string, fn: string, ft: string) => void;
+  handleDownload: (fp: string, fn: string) => void;
+  onDeleteDoc: (doc: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full py-1.5 hover:bg-accent/50 rounded px-1 transition-colors">
+        {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        <FileText className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-semibold">Documentos Gerais</span>
+        <Badge variant="secondary" className="text-[9px] ml-auto">{documents.length}</Badge>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2 pl-2 mt-1">
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+        <div className="flex gap-1">
+          <Select value={docCategory} onValueChange={setDocCategory}>
+            <SelectTrigger className="h-7 text-[10px] flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DOC_CATEGORIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+            Enviar
+          </Button>
+        </div>
+        {documents.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento geral</p>}
+        {documents.map((doc: any) => {
+          const isImage = doc.file_type?.startsWith("image/");
+          return (
+            <div key={doc.id} className="flex items-center gap-2 p-1.5 rounded border border-border bg-card">
+              <div className="h-6 w-6 rounded bg-muted flex items-center justify-center shrink-0">
+                {isImage ? <ImageIcon className="h-3 w-3 text-muted-foreground" /> : <File className="h-3 w-3 text-muted-foreground" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-medium truncate">{doc.file_name}</p>
+                <Badge variant="outline" className="text-[8px]">
+                  {DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label || doc.category}
+                </Badge>
+              </div>
+              <div className="flex gap-0.5">
+                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
+                  <Eye className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
+                  <Download className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeleteDoc(doc)}>
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function LeadObservationsPanel({ lead }: Props) {
   const { getLeadInteractions } = useLeadsContext();
   const obs = useLeadObservations(lead.id);
-
+  const membersHook = useLeadMembers(lead.id);
   // Notes state
   const [noteContent, setNoteContent] = useState("");
   const [noteCategory, setNoteCategory] = useState("geral");
@@ -368,26 +447,8 @@ Regras:
         </div>
       </TabsContent>
 
-      {/* DOCUMENTOS */}
       <TabsContent value="docs" className="space-y-3 mt-3">
-        <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
-        <div className="flex gap-2">
-          <Select value={docCategory} onValueChange={setDocCategory}>
-            <SelectTrigger className="h-8 text-xs flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DOC_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" onClick={() => fileRef.current?.click()} disabled={uploading} className="h-8 gap-1 text-xs">
-            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-            Enviar
-          </Button>
-        </div>
-
+        {/* Ações globais */}
         {obs.documents.length > 1 && (
           <Button
             size="sm"
@@ -434,41 +495,46 @@ Regras:
           </Button>
         )}
 
-        <div className="space-y-2 max-h-[350px] overflow-y-auto">
-          {obs.documents.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum documento</p>}
-          {obs.documents.map((doc: any) => {
-            const isImage = doc.file_type?.startsWith("image/");
-            return (
-              <div key={doc.id} className="p-2.5 rounded-lg border border-border bg-card flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center shrink-0">
-                  {isImage ? <ImageIcon className="h-4 w-4 text-muted-foreground" /> : <File className="h-4 w-4 text-muted-foreground" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{doc.file_name}</p>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className="text-[9px]">
-                      {DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category}
-                    </Badge>
-                    <span className="text-[9px] text-muted-foreground">
-                      {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)}KB` : ""}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
-                    <Eye className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
-                    <Download className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}>
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* ─── Documentos Gerais (sem member_id) ─── */}
+        <GeneralDocsSection
+          documents={obs.documents.filter((d: any) => !d.member_id)}
+          docCategory={docCategory}
+          setDocCategory={setDocCategory}
+          fileRef={fileRef}
+          uploading={uploading}
+          handleFileUpload={handleFileUpload}
+          handlePreview={handlePreview}
+          handleDownload={handleDownload}
+          onDeleteDoc={(doc: any) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+        />
+
+        {/* ─── Titulares ─── */}
+        <MemberSection
+          role="titular"
+          members={membersHook.titulares}
+          documents={obs.documents as any}
+          onAddMember={membersHook.addMember}
+          onDeleteMember={membersHook.deleteMember}
+          onUpdateMember={membersHook.updateMember}
+          onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
+          onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+          onPreview={handlePreview}
+          onDownload={handleDownload}
+        />
+
+        {/* ─── Dependentes ─── */}
+        <MemberSection
+          role="dependente"
+          members={membersHook.dependentes}
+          documents={obs.documents as any}
+          onAddMember={membersHook.addMember}
+          onDeleteMember={membersHook.deleteMember}
+          onUpdateMember={membersHook.updateMember}
+          onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
+          onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+          onPreview={handlePreview}
+          onDownload={handleDownload}
+        />
       </TabsContent>
 
 

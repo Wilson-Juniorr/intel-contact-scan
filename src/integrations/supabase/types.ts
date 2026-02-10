@@ -104,6 +104,7 @@ export type Database = {
           file_type: string | null
           id: string
           lead_id: string
+          member_id: string | null
           ocr_text: string | null
           user_id: string
         }
@@ -116,6 +117,7 @@ export type Database = {
           file_type?: string | null
           id?: string
           lead_id: string
+          member_id?: string | null
           ocr_text?: string | null
           user_id: string
         }
@@ -128,12 +130,73 @@ export type Database = {
           file_type?: string | null
           id?: string
           lead_id?: string
+          member_id?: string | null
           ocr_text?: string | null
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "lead_documents_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_documents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "lead_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_members: {
+        Row: {
+          birth_date: string | null
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          lead_id: string
+          name: string
+          phone: string | null
+          role: string
+          updated_at: string
+          user_id: string
+          vinculo: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_id: string
+          name: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id: string
+          vinculo?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_id?: string
+          name?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
+          vinculo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_members_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
