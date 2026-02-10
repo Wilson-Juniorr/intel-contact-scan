@@ -404,39 +404,16 @@ Atenciosamente 🤝`;
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex-1 flex gap-1">
-              <Input
-                placeholder="Tag..."
-                value={noteTagInput}
-                onChange={(e) => setNoteTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                className="h-7 text-[11px]"
-              />
-              <Button size="sm" variant="ghost" onClick={addTag} className="h-7 px-2">
-                <Tag className="h-3 w-3" />
-              </Button>
-            </div>
+            <Button size="sm" onClick={handleSaveNote} disabled={savingNote || !noteContent.trim()} className="flex-1 h-7 text-xs">
+              {savingNote ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+              Salvar Nota
+            </Button>
           </div>
-          {noteTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {noteTags.map((t) => (
-                <Badge key={t} variant="secondary" className="text-[10px] gap-1 cursor-pointer" onClick={() => setNoteTags((prev) => prev.filter((x) => x !== t))}>
-                  {t} <X className="h-2.5 w-2.5" />
-                </Badge>
-              ))}
-            </div>
-          )}
-          <Button size="sm" onClick={handleSaveNote} disabled={savingNote || !noteContent.trim()} className="w-full h-7 text-xs">
-            {savingNote ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-            Salvar Nota
-          </Button>
         </div>
 
-        <Input placeholder="Buscar notas..." value={noteSearch} onChange={(e) => setNoteSearch(e.target.value)} className="h-7 text-[11px]" />
-
         <div className="space-y-2 max-h-[300px] overflow-y-auto">
-          {filteredNotes.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhuma nota</p>}
-          {filteredNotes.map((note: any) => (
+          {obs.notes.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhuma nota</p>}
+          {obs.notes.map((note: any) => (
             <div key={note.id} className="p-2.5 rounded-lg border border-border bg-card space-y-1.5">
               <div className="flex items-center justify-between">
                 <Badge variant="outline" className="text-[9px]">
@@ -452,13 +429,6 @@ Atenciosamente 🤝`;
                 </div>
               </div>
               <p className="text-xs whitespace-pre-wrap">{note.content}</p>
-              {note.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {note.tags.map((t: string) => (
-                    <Badge key={t} variant="secondary" className="text-[9px]">{t}</Badge>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
