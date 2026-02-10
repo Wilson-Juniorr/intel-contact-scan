@@ -243,107 +243,107 @@ export function LeadObservationsPanel({ lead }: Props) {
     setWhatsappMsg("");
     setCopied(false);
     try {
+      // Build signed URLs for all docs
       const docsWithLinks = await Promise.all(
         obs.documents.map(async (doc: any) => {
           const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
           const { data: signedData } = await supabase.storage
             .from("lead-images")
             .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
-          return { catLabel, fileName: doc.file_name, url: signedData?.signedUrl || null };
+          return {
+            catLabel,
+            fileName: doc.file_name,
+            url: signedData?.signedUrl || null,
+            memberId: doc.member_id,
+          };
         })
       );
 
-      const docList = docsWithLinks.map((d) =>
-        d.url ? `- ${d.catLabel}: ${d.fileName}\n  🔗 Link: ${d.url}` : `- ${d.catLabel}: ${d.fileName}`
-      ).join("\n");
+      // Group docs: general, by titular, by dependente
+      const generalDocs = docsWithLinks.filter((d) => !d.memberId);
+      const allMembers = membersHook.members;
 
-      const prompt = `Gere uma mensagem profissional e organizada para enviar via WhatsApp ao time de emissão de um plano de saúde/odonto.
+      const formatDocLine = (d: typeof docsWithLinks[0]) =>
+        d.url
+          ? `   📎 ${d.catLabel}: ${d.fileName}\n   🔗 ${d.url}`
+          : `   📎 ${d.catLabel}: ${d.fileName}`;
 
-Use EXATAMENTE este formato de referência (adapte os dados):
+      // Build structured doc sections
+      let docSections = "";
 
----
-Bom dia!
-
-Segue Proposta ${lead.type} ${lead.operator || "Operadora"} para emissão:
-
-Corretora: [deixe para o corretor preencher]
-Vendedor: [deixe para o corretor preencher]
-
-Plano: ${formData.nomePlano}
-Vigência desejada: ${formData.vigencia}
-
-Titular: ${formData.nomeTitular}
-Celular: ${formData.celularTitular || lead.phone}
-${formData.emailTitular ? `E-mail: ${formData.emailTitular}` : ""}
-${lead.lives && lead.lives > 1 ? `Vidas: ${lead.lives}` : ""}
-
-Documentos anexados:
-${docList}
-
-Atenciosamente,
----
-
-Regras:
-1. Mantenha o formato acima, limpo e profissional
-2. Inclua TODOS os documentos listados com seus links de download
-3. Use emojis moderadamente apenas para organização visual
-4. Os links são temporários (7 dias)
-5. A mensagem deve ser pronta para copiar e colar no WhatsApp
-6. Inclua os campos "Corretora" e "Vendedor" com marcação [preencher] para o corretor completar depois`;
-
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: prompt }],
-          crmContext: "",
-        }),
-      });
-
-      if (!resp.ok) throw new Error("Erro ao gerar mensagem");
-
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let fullMsg = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              fullMsg += content;
-              setWhatsappMsg(fullMsg);
-            }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
+      if (generalDocs.length > 0) {
+        docSections += `\n📄 *Documentos do Contrato:*\n${generalDocs.map(formatDocLine).join("\n")}\n`;
       }
 
+      const titulares = allMembers.filter((m) => m.role === "titular");
+      const dependentes = allMembers.filter((m) => m.role === "dependente");
+
+      titulares.forEach((member, idx) => {
+        const memberDocs = docsWithLinks.filter((d) => d.memberId === member.id);
+        const label = titulares.length > 1 ? `Titular ${idx + 1}` : "Titular";
+        docSections += `\n👤 *${label}: ${member.name}*${member.cpf ? ` (CPF: ${member.cpf})` : ""}\n`;
+        if (memberDocs.length > 0) {
+          docSections += memberDocs.map(formatDocLine).join("\n") + "\n";
+        } else {
+          docSections += "   _Sem documentos anexados_\n";
+        }
+      });
+
+      dependentes.forEach((member, idx) => {
+        const memberDocs = docsWithLinks.filter((d) => d.memberId === member.id);
+        const label = dependentes.length > 1 ? `Dependente ${idx + 1}` : "Dependente";
+        docSections += `\n👥 *${label}: ${member.name}*${member.vinculo ? ` (${member.vinculo})` : ""}${member.cpf ? ` — CPF: ${member.cpf}` : ""}\n`;
+        if (memberDocs.length > 0) {
+          docSections += memberDocs.map(formatDocLine).join("\n") + "\n";
+        } else {
+          docSections += "   _Sem documentos anexados_\n";
+        }
+      });
+
+      // If no members at all, list all docs flat
+      if (allMembers.length === 0 && generalDocs.length === 0) {
+        docSections = `\n📄 *Documentos:*\n${docsWithLinks.map(formatDocLine).join("\n")}\n`;
+      }
+
+      // Build final message directly — no AI needed for structure
+      const totalVidas = lead.lives && lead.lives > 1 ? `\n👥 *Vidas:* ${lead.lives}` : "";
+      const emailLine = formData.emailTitular ? `\n📧 *E-mail:* ${formData.emailTitular}` : "";
+
+      const message = `Bom dia! ☀️
+
+Segue Proposta *${lead.type}* — *${lead.operator || "[Operadora]"}* para emissão:
+
+━━━━━━━━━━━━━━━━━━━
+
+🏢 *Corretora:* [preencher]
+🧑‍💼 *Vendedor:* [preencher]
+
+━━━━━━━━━━━━━━━━━━━
+
+📋 *Plano:* ${formData.nomePlano}
+📅 *Vigência desejada:* ${formData.vigencia}
+
+👤 *Titular:* ${formData.nomeTitular}
+📱 *Celular:* ${formData.celularTitular || lead.phone}${emailLine}${totalVidas}
+
+━━━━━━━━━━━━━━━━━━━
+${docSections}
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ _Links válidos por 7 dias_
+
+Atenciosamente 🤝`;
+
+      setWhatsappMsg(message);
       setShowMsgDialog(true);
     } catch (e: any) {
       toast({ title: "Erro ao gerar mensagem", description: e.message, variant: "destructive" });
     }
     setGeneratingMsg(false);
   };
+
+
+
 
   const handleCopyMsg = async () => {
     await navigator.clipboard.writeText(whatsappMsg);
