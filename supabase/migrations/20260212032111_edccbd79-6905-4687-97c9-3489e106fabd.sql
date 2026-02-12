@@ -1,0 +1,2 @@
+ALTER TABLE public.whatsapp_messages DROP CONSTRAINT whatsapp_messages_message_type_check;
+ALTER TABLE public.whatsapp_messages ADD CONSTRAINT whatsapp_messages_message_type_check CHECK (message_type = ANY (ARRAY['text', 'audio', 'ptt', 'image', 'document', 'video', 'sticker', 'media', 'unknown']));
