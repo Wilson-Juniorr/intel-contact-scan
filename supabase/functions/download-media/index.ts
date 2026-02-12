@@ -48,28 +48,80 @@ Deno.serve(async (req) => {
 
     if (msgErr || !msg) throw new Error("Message not found");
 
-    const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const h = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
+    const uazapiId = msg.uazapi_message_id;
+    // The stored ID format is "owner:messageKey" — try multiple formats
+    const messageKey = uazapiId?.includes(":") ? uazapiId.split(":").pop() : uazapiId;
+    
+    console.log(`Downloading media for message ${message_id}, uazapi_id: ${uazapiId}, key: ${messageKey}`);
 
-    // Download media via UaZapi
-    const resp = await fetch(`${baseUrl}/message/download`, {
-      method: "POST",
-      headers: h,
-      body: JSON.stringify({
-        messageId: msg.uazapi_message_id,
-        return_base64: true,
-      }),
-    });
+    // Try with full ID first, then just the key part
+    let downloadResp: Response | null = null;
+    let downloadData: any = null;
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error(`Download failed: ${resp.status} - ${errText}`);
-      throw new Error(`Download failed: ${resp.status}`);
+    for (const idToTry of [uazapiId, messageKey]) {
+      if (!idToTry) continue;
+      
+      // Try different parameter names the API might expect
+      for (const paramName of ["messageId", "id", "message_id"]) {
+        try {
+          const body: any = { [paramName]: idToTry, return_base64: true };
+          console.log(`Trying ${paramName}=${idToTry}`);
+          
+          const resp = await fetch(`${baseUrl}/message/download`, {
+            method: "POST",
+            headers: h,
+            body: JSON.stringify(body),
+          });
+
+          const text = await resp.text();
+          
+          if (resp.ok) {
+            try {
+              downloadData = JSON.parse(text);
+              if (downloadData.base64 || downloadData.data) {
+                console.log(`Success with ${paramName}=${idToTry}`);
+                downloadResp = resp;
+                break;
+              }
+            } catch {}
+          } else {
+            console.log(`${paramName}=${idToTry} → ${resp.status}: ${text.slice(0, 100)}`);
+          }
+        } catch (e) {
+          console.error(`Error trying ${paramName}=${idToTry}:`, e);
+        }
+      }
+      if (downloadData?.base64 || downloadData?.data) break;
     }
 
-    const data = await resp.json();
-    const base64 = data.base64 || data.data || null;
-    const mimeType = data.mimetype || data.mimeType || data.contentType || guessMime(msg.message_type);
+    // If API download fails, try using media_url directly (may work for recent messages)
+    if (!downloadData?.base64 && !downloadData?.data && msg.media_url) {
+      console.log("API download failed, trying direct media_url fetch...");
+      try {
+        const directResp = await fetch(msg.media_url);
+        if (directResp.ok) {
+          const buffer = await directResp.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const b64 = btoa(binary);
+          const contentType = directResp.headers.get("content-type") || guessMime(msg.message_type);
+          downloadData = { base64: b64, mimetype: contentType };
+          console.log(`Direct download success: ${contentType}, ${b64.length} chars`);
+        }
+      } catch (e) {
+        console.error("Direct download also failed:", e);
+      }
+    }
+
+    if (!downloadData?.base64 && !downloadData?.data) {
+      throw new Error("Could not download media from any source");
+    }
+
+    const base64 = downloadData.base64 || downloadData.data || null;
+    const mimeType = downloadData.mimetype || downloadData.mimeType || downloadData.contentType || guessMime(msg.message_type);
 
     if (!base64) {
       throw new Error("No base64 data returned");
