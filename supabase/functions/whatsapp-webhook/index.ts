@@ -302,13 +302,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (isFromMe) {
-      console.log("Outbound message from webhook, ignoring (already tracked)");
-      return new Response(JSON.stringify({ status: "ignored", reason: "outbound" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Save outbound messages from phone too (for complete history)
+    // Skip only if it was sent from our app (has a recent optimistic message)
 
     if (uazapiMessageId) {
       const { data: existing } = await supabase
@@ -386,6 +381,9 @@ Deno.serve(async (req) => {
                         body.message?.pushName || body.message?.notifyName || null;
     const cleanContactName = contactName && contactName.trim() && contactName !== "." ? contactName.trim() : null;
 
+    const direction = isFromMe ? "outbound" : "inbound";
+    const msgStatus = isFromMe ? "sent" : "received";
+
     // === STEP 1: Save message immediately (for realtime) ===
     const { data: savedMsg, error: insertError } = await supabase
       .from("whatsapp_messages")
@@ -393,12 +391,12 @@ Deno.serve(async (req) => {
         user_id: userId,
         lead_id: leadId,
         phone: normalizedPhone,
-        direction: "inbound",
+        direction,
         message_type: messageType,
         content: content,
         media_url: mediaUrl,
         uazapi_message_id: uazapiMessageId,
-        status: "received",
+        status: msgStatus,
         contact_name: cleanContactName,
       })
       .select("id")
@@ -434,6 +432,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // === STEP 3: If image or document, analyze with AI ===
+    if ((messageType === "image" || messageType === "document") && uazapiMessageId && messageId) {
+      console.log(`${messageType} message detected, starting AI analysis...`);
+      try {
+        const analyzeResp = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-media`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message_id: messageId,
+              uazapi_message_id: uazapiMessageId,
+              message_type: messageType,
+            }),
+          }
+        );
+        const analyzeResult = await analyzeResp.json();
+        if (analyzeResult.analyzed) {
+          console.log("Media analyzed successfully");
+          if (analyzeResult.description) {
+            const prefix = messageType === "document" ? "📄" : "🖼️";
+            content = content ? `${content}\n${prefix} ${analyzeResult.description}` : `${prefix} ${analyzeResult.description}`;
+          }
+        }
+      } catch (e) {
+        console.error("Media analysis error (non-blocking):", e);
+      }
+    }
+
     // Update lead last_contact_at
     if (leadId) {
       await supabase
@@ -444,18 +471,20 @@ Deno.serve(async (req) => {
 
     // Log interaction
     if (leadId && userId) {
+      const interactionType = isFromMe ? "whatsapp_sent" : "whatsapp_received";
+      const interactionLabel = isFromMe ? "Mensagem enviada" : "Mensagem recebida";
       await supabase.from("interactions").insert({
         lead_id: leadId,
         user_id: userId,
-        type: "whatsapp_received",
-        description: `Mensagem recebida via WhatsApp: ${(content || "[Mídia]").slice(0, 100)}`,
+        type: interactionType,
+        description: `${interactionLabel} via WhatsApp: ${(content || "[Mídia]").slice(0, 100)}`,
       });
     }
 
-    console.log("Inbound message saved successfully for phone:", normalizedPhone, "type:", messageType);
+    console.log(`${direction} message saved for phone:`, normalizedPhone, "type:", messageType);
 
     return new Response(
-      JSON.stringify({ status: "ok", saved: true, lead_id: leadId, transcribed: messageType === "audio" || messageType === "ptt" }),
+      JSON.stringify({ status: "ok", saved: true, direction, lead_id: leadId, transcribed: messageType === "audio" || messageType === "ptt" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {

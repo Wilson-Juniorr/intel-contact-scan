@@ -57,6 +57,21 @@ const CRM_TOOLS = [
   {
     type: "function",
     function: {
+      name: "detect_silent_contacts",
+      description: "Identifica contatos/leads que não responderam há X dias. Útil para gerar listas de follow-up. Retorna contatos ordenados pelo tempo de silêncio (mais antigos primeiro).",
+      parameters: {
+        type: "object",
+        properties: {
+          days_without_response: { type: "number", description: "Mínimo de dias sem resposta do cliente (padrão: 3)" },
+          limit: { type: "number", description: "Quantidade máxima de resultados (padrão: 20)" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "move_lead_stage",
       description: "Move um lead para uma nova etapa do funil. SÓ use após confirmação do usuário via search_lead.",
       parameters: {
@@ -246,6 +261,64 @@ async function executeTool(supabase: any, userId: string, toolCall: any, fileInf
           messages: formatted,
         };
       }
+      case "detect_silent_contacts": {
+        const minDays = params.days_without_response || 3;
+        const limit = Math.min(params.limit || 20, 50);
+        const cutoff = new Date(Date.now() - minDays * 24 * 60 * 60 * 1000).toISOString();
+        
+        // Get all phones with their last inbound (client response) message
+        const { data: allMsgs } = await supabase
+          .from("whatsapp_messages")
+          .select("phone, direction, created_at, contact_name")
+          .order("created_at", { ascending: false });
+        
+        if (!allMsgs?.length) return { found: 0, message: "Nenhuma mensagem encontrada" };
+        
+        // Group by phone: find last outbound (our msg) and last inbound (client response)
+        const phoneMap = new Map<string, { lastOutbound: string | null; lastInbound: string | null; contactName: string | null }>();
+        for (const m of allMsgs) {
+          if (!phoneMap.has(m.phone)) {
+            phoneMap.set(m.phone, { lastOutbound: null, lastInbound: null, contactName: m.contact_name });
+          }
+          const entry = phoneMap.get(m.phone)!;
+          if (!entry.contactName && m.contact_name) entry.contactName = m.contact_name;
+          if (m.direction === "outbound" && !entry.lastOutbound) entry.lastOutbound = m.created_at;
+          if (m.direction === "inbound" && !entry.lastInbound) entry.lastInbound = m.created_at;
+        }
+        
+        // Find contacts where: we sent something, client hasn't responded since
+        const silentContacts: any[] = [];
+        for (const [phone, data] of phoneMap) {
+          if (!data.lastOutbound) continue; // We never messaged them
+          
+          // Client never responded, or responded before our last message
+          const clientSilent = !data.lastInbound || new Date(data.lastInbound) < new Date(data.lastOutbound);
+          if (!clientSilent) continue;
+          
+          // Check if our last outbound is older than cutoff
+          if (new Date(data.lastOutbound) > new Date(cutoff)) continue;
+          
+          const daysSilent = Math.floor((Date.now() - new Date(data.lastOutbound).getTime()) / (1000 * 60 * 60 * 24));
+          
+          silentContacts.push({
+            phone,
+            contactName: data.contactName || phone,
+            daysSilent,
+            lastOutbound: new Date(data.lastOutbound).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+            lastInbound: data.lastInbound 
+              ? new Date(data.lastInbound).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) 
+              : "Nunca respondeu",
+          });
+        }
+        
+        silentContacts.sort((a, b) => b.daysSilent - a.daysSilent);
+        
+        return {
+          found: silentContacts.length,
+          minDaysFilter: minDays,
+          contacts: silentContacts.slice(0, limit),
+        };
+      }
       case "move_lead_stage": {
         const update: any = { stage: params.new_stage };
         if (params.lost_reason) update.lost_reason = params.lost_reason;
@@ -328,19 +401,23 @@ Você tem ACESSO TOTAL aos dados do CRM E às conversas do WhatsApp. Pode EXECUT
 
 ## AÇÕES DISPONÍVEIS:
 - **search_lead**: Buscar lead pelo nome (SEMPRE use primeiro!)
-- **get_whatsapp_history**: Buscar histórico de conversa WhatsApp de um contato (inclui textos, transcrições de áudio 🎤 e legendas de imagem). USE SEMPRE que o usuário perguntar sobre um contato, pedir sugestão de follow-up, ou quiser entender o contexto de uma conversa.
+- **get_whatsapp_history**: Buscar histórico de conversa WhatsApp (inclui textos, transcrições de áudio 🎤, descrições de imagens 🖼️ e análises de PDFs/documentos 📄)
+- **detect_silent_contacts**: Identificar contatos que não responderam há X dias — ESSENCIAL para gerar listas de follow-up
 - **move_lead_stage**: Mover lead de etapa no funil
 - **add_interaction**: Registrar ligação, mensagem, reunião, email ou anotação
 - **create_reminder**: Criar lembrete/follow-up agendado
 - **add_note**: Adicionar observação/nota a um lead
 - **assign_document**: Atribuir documento enviado a um lead
 
-## INTELIGÊNCIA WHATSAPP:
-- Você tem acesso ao histórico COMPLETO de conversas WhatsApp
+## INTELIGÊNCIA WHATSAPP COMPLETA:
+- Você tem acesso ao histórico COMPLETO de conversas WhatsApp (incluindo mensagens enviadas pelo celular)
 - Transcrições de áudio aparecem com prefixo 🎤
+- Descrições de imagens aparecem com prefixo 🖼️ (propostas, tabelas de preço, prints)
+- Análises de PDFs/documentos aparecem com prefixo 📄 (propostas completas com valores, rede, coberturas)
 - Ao sugerir follow-ups, SEMPRE busque o histórico primeiro para entender contexto
+- Use detect_silent_contacts para identificar quem precisa de follow-up
 - Analise o tom, interesse e objeções do cliente nas mensagens
-- Sugira abordagens personalizadas baseadas no que o cliente disse
+- Sugira abordagens personalizadas baseadas no que o cliente disse E no que foi enviado (propostas, imagens)
 
 ## REGRAS OBRIGATÓRIAS DE CONFIRMAÇÃO:
 1. ANTES de qualquer ação, SEMPRE use search_lead primeiro para buscar o lead
