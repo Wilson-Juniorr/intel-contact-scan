@@ -15,6 +15,7 @@ interface WhatsAppMessage {
   status: string | null;
   lead_id: string | null;
   created_at: string;
+  media_url?: string | null;
 }
 
 interface Props {

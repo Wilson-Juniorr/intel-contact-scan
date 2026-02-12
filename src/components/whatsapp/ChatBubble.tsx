@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, CheckCheck, Mic } from "lucide-react";
+import { Clock, CheckCheck, Mic, Image, FileText, Video, Download, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WhatsAppMessage {
   id: string;
@@ -12,6 +14,7 @@ interface WhatsAppMessage {
   status: string | null;
   lead_id: string | null;
   created_at: string;
+  media_url?: string | null;
 }
 
 interface Props {
@@ -23,14 +26,135 @@ interface Props {
 export default function ChatBubble({ msg, showDate, index }: Props) {
   const isOutbound = msg.direction === "outbound";
   const isAudio = msg.message_type === "audio" || msg.message_type === "ptt";
+  const isImage = msg.message_type === "image" || msg.message_type === "sticker";
+  const isVideo = msg.message_type === "video";
+  const isDocument = msg.message_type === "document";
+  const hasMedia = isImage || isVideo || isDocument;
   const isTranscribed = isAudio && msg.content?.startsWith("🎤 ");
   const transcriptionText = isTranscribed ? msg.content!.slice(3) : null;
+
+  const [mediaData, setMediaData] = useState<string | null>(null);
+  const [mediaMime, setMediaMime] = useState<string | null>(null);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
+
+  const loadMedia = async () => {
+    if (mediaData || loadingMedia) return;
+    setLoadingMedia(true);
+    setMediaError(false);
+    try {
+      const { data, error } = await supabase.functions.invoke("download-media", {
+        body: { message_id: msg.id },
+      });
+      if (error) throw error;
+      if (data?.base64 && data?.mimeType) {
+        setMediaData(`data:${data.mimeType};base64,${data.base64}`);
+        setMediaMime(data.mimeType);
+      } else {
+        setMediaError(true);
+      }
+    } catch (e) {
+      console.error("Media download error:", e);
+      setMediaError(true);
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
 
   const bubbleColor = isOutbound
     ? msg.status === "failed"
       ? "bg-red-900/60"
       : "bg-[#005c4b]"
     : "bg-[#202c33]";
+
+  const renderMedia = () => {
+    if (isImage) {
+      if (mediaData) {
+        return (
+          <img
+            src={mediaData}
+            alt="Mídia"
+            className="rounded-md max-w-full max-h-[300px] object-contain cursor-pointer mb-1"
+            onClick={() => window.open(mediaData, "_blank")}
+          />
+        );
+      }
+      return (
+        <button
+          onClick={loadMedia}
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+        >
+          {loadingMedia ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
+          ) : mediaError ? (
+            <span className="text-[12px] text-[#8696a0]">⚠ Erro ao carregar</span>
+          ) : (
+            <>
+              <Image className="h-4 w-4 text-[#8696a0]" />
+              <span className="text-[12px] text-[#8696a0]">Carregar imagem</span>
+            </>
+          )}
+        </button>
+      );
+    }
+
+    if (isVideo) {
+      if (mediaData) {
+        return (
+          <video controls className="rounded-md max-w-full max-h-[300px] mb-1">
+            <source src={mediaData} type={mediaMime || "video/mp4"} />
+          </video>
+        );
+      }
+      return (
+        <button
+          onClick={loadMedia}
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+        >
+          {loadingMedia ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
+          ) : (
+            <>
+              <Video className="h-4 w-4 text-[#8696a0]" />
+              <span className="text-[12px] text-[#8696a0]">Carregar vídeo</span>
+            </>
+          )}
+        </button>
+      );
+    }
+
+    if (isDocument) {
+      if (mediaData) {
+        return (
+          <a
+            href={mediaData}
+            download="documento"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+          >
+            <Download className="h-4 w-4 text-[#8696a0]" />
+            <span className="text-[12px] text-[#8696a0]">Baixar documento</span>
+          </a>
+        );
+      }
+      return (
+        <button
+          onClick={loadMedia}
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+        >
+          {loadingMedia ? (
+            <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
+          ) : (
+            <>
+              <FileText className="h-4 w-4 text-[#8696a0]" />
+              <span className="text-[12px] text-[#8696a0]">Carregar documento</span>
+            </>
+          )}
+        </button>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div>
@@ -48,7 +172,10 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
         transition={{ duration: 0.15 }}
       >
         <div className={`max-w-[65%] rounded-lg px-2.5 py-1.5 text-[14px] ${bubbleColor} text-[#e9edef] shadow-sm relative`}>
-          {/* Tail */}
+          {/* Media content */}
+          {hasMedia && renderMedia()}
+
+          {/* Audio indicator */}
           {isAudio && (
             <div className="flex items-center gap-2 mb-1">
               <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -70,9 +197,12 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
             </div>
           )}
 
-          <p className="whitespace-pre-wrap break-words leading-[19px]">
-            {isAudio ? (transcriptionText || msg.content || "[Áudio]") : (msg.content || "[Mídia]")}
-          </p>
+          {/* Text content */}
+          {(msg.content || (!hasMedia && !isAudio)) && (
+            <p className="whitespace-pre-wrap break-words leading-[19px]">
+              {isAudio ? (transcriptionText || msg.content || "[Áudio]") : (msg.content || "[Mídia]")}
+            </p>
+          )}
 
           <div className="flex items-center gap-1 justify-end mt-0.5 -mb-0.5">
             <span className="text-[11px] text-[#ffffff99]">
