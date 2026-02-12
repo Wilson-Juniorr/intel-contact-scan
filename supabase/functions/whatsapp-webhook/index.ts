@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function downloadAudioFromUazapi(mediaInfo: any): Promise<{ base64: string; format: string } | null> {
+async function downloadAudioFromUazapi(mediaInfo: any, messageId: string | null): Promise<{ base64: string; format: string } | null> {
   try {
     const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
@@ -16,9 +16,10 @@ async function downloadAudioFromUazapi(mediaInfo: any): Promise<{ base64: string
     }
 
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const headers = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
+    const postHeaders = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
+    const getHeaders = { token: UAZAPI_TOKEN };
 
-    // Extract media decryption params from the webhook payload content object
+    // Extract media decryption params
     const content = mediaInfo?.content || mediaInfo;
     const url = content?.URL || content?.url || content?.directPath;
     const mediaKey = content?.mediaKey || content?.MediaKey;
@@ -27,56 +28,119 @@ async function downloadAudioFromUazapi(mediaInfo: any): Promise<{ base64: string
     const fileEncSHA256 = content?.fileEncSHA256 || content?.FileEncSHA256;
     const mimetype = content?.mimetype || content?.Mimetype || "audio/ogg; codecs=opus";
 
-    if (!url || !mediaKey) {
-      console.error("Missing media decryption params (URL or mediaKey)");
-      return null;
+    // Extract chatId and full message ID for UaZapi V2
+    const chatId = mediaInfo?.chatid || mediaInfo?.chatId || null;
+    // The message ID format from UaZapi is "owner:messageId" - extract just the messageId part
+    const rawMsgId = messageId || mediaInfo?.id || mediaInfo?.messageid || null;
+    const shortMsgId = rawMsgId?.includes(":") ? rawMsgId.split(":").pop() : rawMsgId;
+
+    console.log("Download attempt - msgId:", rawMsgId, "shortMsgId:", shortMsgId, "chatId:", chatId, "hasURL:", !!url, "hasMediaKey:", !!mediaKey);
+
+    // === Strategy 1: UaZapi V2 - POST /message/download-media with messageId ===
+    if (shortMsgId) {
+      const msgIdBodies = [
+        { MessageId: shortMsgId },
+        { messageId: shortMsgId },
+        { Id: shortMsgId },
+        { id: shortMsgId },
+        { MessageId: rawMsgId },
+        ...(chatId ? [{ MessageId: shortMsgId, ChatId: chatId }, { messageId: shortMsgId, chatId }] : []),
+      ];
+
+      const s1Endpoints = [
+        "/message/download-media",
+        "/message/downloadMedia", 
+        "/message/download",
+        "/chat/downloadmedia",
+        "/chat/downloadaudio",
+        "/chat/getLink",
+        "/message/getLink",
+        "/media/download",
+      ];
+
+      for (const endpoint of s1Endpoints) {
+        for (const body of msgIdBodies.slice(0, 2)) { // Only try first 2 body variants per endpoint
+          try {
+            console.log(`[S1] POST ${endpoint} body:`, JSON.stringify(body));
+            const resp = await fetch(`${baseUrl}${endpoint}`, {
+              method: "POST",
+              headers: postHeaders,
+              body: JSON.stringify(body),
+            });
+            const result = await tryExtractAudio(resp, `POST ${endpoint}`);
+            if (result) return result;
+          } catch (e) {
+            console.log(`POST ${endpoint} error:`, e);
+          }
+        }
+      }
     }
 
-    const downloadBody = {
-      Url: url,
-      MediaKey: mediaKey,
-      Mimetype: mimetype,
-      FileSHA256: fileSHA256,
-      FileLength: fileLength || 0,
-      FileEncSHA256: fileEncSHA256,
-    };
+    // === Strategy 2: GET with messageId in query params ===
+    if (shortMsgId) {
+      const s2Endpoints = [
+        `/message/download-media?messageId=${encodeURIComponent(shortMsgId)}`,
+        `/message/downloadMedia?messageId=${encodeURIComponent(shortMsgId)}`,
+        `/chat/getLink?messageId=${encodeURIComponent(shortMsgId)}`,
+        `/message/getLink?messageId=${encodeURIComponent(shortMsgId)}`,
+        `/media/${encodeURIComponent(shortMsgId)}`,
+      ];
 
-    console.log("Attempting /chat/downloadaudio with decryption params, URL:", url.slice(0, 80));
-
-    // === Strategy 1: POST /chat/downloadaudio (correct wuzapi/UaZapiGO endpoint) ===
-    const audioEndpoints = ["/chat/downloadaudio", "/chat/downloadimage", "/chat/downloadvideo", "/chat/downloaddocument"];
-    for (const endpoint of audioEndpoints) {
-      try {
-        console.log(`[S1] POST ${endpoint}`);
-        const resp = await fetch(`${baseUrl}${endpoint}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(downloadBody),
-        });
-        const result = await tryExtractAudio(resp, endpoint);
-        if (result) return result;
-      } catch (e) {
-        console.log(`${endpoint} failed:`, e);
+      for (const endpoint of s2Endpoints) {
+        try {
+          console.log(`[S2] GET ${endpoint}`);
+          const resp = await fetch(`${baseUrl}${endpoint}`, {
+            method: "GET",
+            headers: getHeaders,
+          });
+          const result = await tryExtractAudio(resp, `GET ${endpoint}`);
+          if (result) return result;
+        } catch (e) {
+          console.log(`GET ${endpoint} error:`, e);
+        }
       }
-      // Only try the first endpoint for audio, the rest are fallbacks for wrong type detection
-      if (endpoint === "/chat/downloadaudio") continue;
-      break;
     }
 
-    // === Strategy 2: POST /chat/downloadmedia (generic endpoint some versions support) ===
-    for (const endpoint of ["/chat/downloadmedia", "/chat/downloadMediaMessage"]) {
-      try {
-        console.log(`[S2] POST ${endpoint}`);
-        const resp = await fetch(`${baseUrl}${endpoint}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(downloadBody),
-        });
-        const result = await tryExtractAudio(resp, endpoint);
-        if (result) return result;
-      } catch (e) {
-        console.log(`${endpoint} failed:`, e);
+    // === Strategy 3: POST with decryption params (original wuzapi approach) ===
+    if (url && mediaKey) {
+      const downloadBody = {
+        Url: url,
+        MediaKey: mediaKey,
+        Mimetype: mimetype,
+        FileSHA256: fileSHA256,
+        FileLength: fileLength || 0,
+        FileEncSHA256: fileEncSHA256,
+      };
+
+      const s3Endpoints = ["/chat/downloadaudio", "/chat/downloadmedia"];
+      for (const endpoint of s3Endpoints) {
+        try {
+          console.log(`[S3] POST ${endpoint} (decrypt params)`);
+          const resp = await fetch(`${baseUrl}${endpoint}`, {
+            method: "POST",
+            headers: postHeaders,
+            body: JSON.stringify(downloadBody),
+          });
+          const result = await tryExtractAudio(resp, `POST ${endpoint} (decrypt)`);
+          if (result) return result;
+        } catch (e) {
+          console.log(`${endpoint} decrypt error:`, e);
+        }
       }
+    }
+
+    // === Strategy 4: Fetch Swagger/API discovery to log available endpoints ===
+    try {
+      console.log("[S4] Fetching API spec to discover endpoints...");
+      const specResp = await fetch(`${baseUrl}/api`, { headers: getHeaders });
+      if (specResp.ok) {
+        const specText = await specResp.text();
+        console.log("API discovery response:", specText.slice(0, 500));
+      } else {
+        console.log("API discovery returned:", specResp.status);
+      }
+    } catch (e) {
+      console.log("API discovery failed:", e);
     }
 
     console.error("All UaZapi download attempts failed");
@@ -126,7 +190,7 @@ function arrayBufferToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function transcribeAudio(mediaInfo: any): Promise<string | null> {
+async function transcribeAudio(mediaInfo: any, messageId: string | null): Promise<string | null> {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -134,8 +198,8 @@ async function transcribeAudio(mediaInfo: any): Promise<string | null> {
       return null;
     }
 
-    // Download via UaZapi using media decryption params
-    const audioData = await downloadAudioFromUazapi(mediaInfo);
+    // Download via UaZapi using message ID and media decryption params
+    const audioData = await downloadAudioFromUazapi(mediaInfo, messageId);
 
     if (!audioData) {
       console.error("Could not download audio via UaZapi");
@@ -456,9 +520,9 @@ Deno.serve(async (req) => {
     if ((messageType === "audio" || messageType === "ptt") && uazapiMessageId) {
       console.log("Audio message detected, starting transcription...");
       
-      // Pass the message content object which contains media decryption params
-      const messageContent = body?.message?.content || body?.message || null;
-      const transcription = await transcribeAudio(messageContent);
+      // Pass the message content object and message ID for UaZapi V2 download
+      const messageContent = body?.message || null;
+      const transcription = await transcribeAudio(messageContent, uazapiMessageId);
       
       if (transcription && messageId) {
         // Update message with transcription
