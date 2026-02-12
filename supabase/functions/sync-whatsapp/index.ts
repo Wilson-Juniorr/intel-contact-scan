@@ -19,6 +19,65 @@ interface ContactInfo {
   profilePicUrl: string | null;
 }
 
+async function downloadAudioFromUazapi(messageId: string): Promise<{ base64: string; format: string } | null> {
+  const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) return null;
+
+  const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
+  const shortId = messageId.includes(":") ? messageId.split(":").pop()! : messageId;
+
+  try {
+    const resp = await fetch(`${baseUrl}/message/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({ id: shortId, return_base64: true }),
+    });
+    if (!resp.ok) { await resp.text(); return null; }
+    const data = await resp.json();
+    const b64 = data.base64Data || data.base64 || data.data || data.result;
+    if (b64 && typeof b64 === "string" && b64.length > 100) {
+      const fmt = (data.mimetype || "").includes("mp3") ? "mp3" : "ogg";
+      return { base64: b64, format: fmt };
+    }
+  } catch (e) { console.error("Audio download error:", e); }
+  return null;
+}
+
+async function transcribeAudio(messageId: string): Promise<string | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return null;
+
+  const audioData = await downloadAudioFromUazapi(messageId);
+  if (!audioData) return null;
+
+  const mimeType = audioData.format === "mp3" ? "audio/mpeg" : "audio/ogg";
+  const dataUri = `data:${mimeType};base64,${audioData.base64}`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Transcreva este áudio de voz em português brasileiro com precisão. Retorne APENAS o texto transcrito, sem aspas, sem explicações. Se inaudível, retorne '[Áudio não compreendido]'." },
+            { type: "image_url", image_url: { url: dataUri } },
+          ],
+        }],
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) { console.error("Transcription error:", e); return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -357,20 +416,23 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // STEP 5.5: Analyze media (images + documents) via AI
+    // STEP 5.5: Process media (images, documents, audios) via AI
     // =============================================
     const mediaMessages = insertedMessages.filter(
       m => m.message_type === "image" || m.message_type === "document"
     );
+    const audioMessages = insertedMessages.filter(
+      m => m.message_type === "audio" || m.message_type === "ptt"
+    );
     let mediaAnalyzed = 0;
+    let audiosTranscribed = 0;
     
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Analyze images + documents
     if (mediaMessages.length > 0) {
-      console.log(`=== STEP 5.5: Analyzing ${mediaMessages.length} media messages ===`);
-      
-      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-      
-      // Process in parallel batches of 5 to avoid overwhelming the API
+      console.log(`=== STEP 5.5a: Analyzing ${mediaMessages.length} media messages ===`);
       for (let i = 0; i < mediaMessages.length; i += 5) {
         const batch = mediaMessages.slice(i, i + 5);
         const promises = batch.map(async (msg) => {
@@ -398,6 +460,31 @@ Deno.serve(async (req) => {
         await Promise.all(promises);
       }
       console.log(`Media analyzed: ${mediaAnalyzed}/${mediaMessages.length}`);
+    }
+
+    // Transcribe audios
+    if (audioMessages.length > 0) {
+      console.log(`=== STEP 5.5b: Transcribing ${audioMessages.length} audio messages ===`);
+      for (let i = 0; i < audioMessages.length; i += 3) {
+        const batch = audioMessages.slice(i, i + 3);
+        const promises = batch.map(async (msg) => {
+          if (!msg.uazapi_message_id) return;
+          try {
+            const transcription = await transcribeAudio(msg.uazapi_message_id);
+            if (transcription) {
+              await supabase
+                .from("whatsapp_messages")
+                .update({ content: `🎤 ${transcription}` })
+                .eq("id", msg.id);
+              audiosTranscribed++;
+            }
+          } catch (e) {
+            console.error(`Audio transcription error for ${msg.id}:`, e);
+          }
+        });
+        await Promise.all(promises);
+      }
+      console.log(`Audios transcribed: ${audiosTranscribed}/${audioMessages.length}`);
     }
 
     // =============================================
@@ -445,6 +532,8 @@ Deno.serve(async (req) => {
       contactsSaved,
       mediaAnalyzed,
       totalMediaFound: mediaMessages.length,
+      audiosTranscribed,
+      totalAudiosFound: audioMessages.length,
     };
 
     console.log(`=== DONE ===`, JSON.stringify(summary));
