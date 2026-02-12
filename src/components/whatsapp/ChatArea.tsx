@@ -51,7 +51,7 @@ export default function ChatArea({
   }, [selectedPhone, messages]);
 
   return (
-    <Card className={`flex flex-col ${!selectedPhone ? "hidden lg:flex" : "flex"}`}>
+    <Card className={`flex flex-col overflow-hidden ${!selectedPhone ? "hidden lg:flex" : "flex"}`}>
       <AnimatePresence mode="wait">
         {selectedPhone ? (
           <motion.div
@@ -93,7 +93,7 @@ export default function ChatArea({
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 min-h-0 p-4">
               <div className="space-y-3">
                 {messages.map((msg, i) => {
                   const showDate =
