@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { MessageCircle, Loader2 } from "lucide-react";
+import { MessageCircle, Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import ConversationList from "@/components/whatsapp/ConversationList";
 import ChatArea from "@/components/whatsapp/ChatArea";
@@ -38,6 +39,24 @@ export default function WhatsAppPage() {
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp");
+      if (error) throw new Error(error.message);
+      toast({
+        title: "Sincronização concluída",
+        description: `${data.totalImported || 0} mensagens importadas de ${data.conversations || 0} conversas`,
+      });
+      await fetchMessages();
+    } catch (e: any) {
+      toast({ title: "Erro na sincronização", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchMessages = async () => {
     const { data, error } = await supabase
@@ -209,18 +228,29 @@ export default function WhatsAppPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <motion.span
-            initial={{ rotate: -20, scale: 0 }}
-            animate={{ rotate: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 12 }}
-          >
-            <MessageCircle className="h-6 w-6 text-success" />
-          </motion.span>
-          WhatsApp
-        </h1>
-        <p className="text-muted-foreground text-sm">Histórico de mensagens com seus leads</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <motion.span
+              initial={{ rotate: -20, scale: 0 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 12 }}
+            >
+              <MessageCircle className="h-6 w-6 text-success" />
+            </motion.span>
+            WhatsApp
+          </h1>
+          <p className="text-muted-foreground text-sm">Histórico de mensagens com seus leads</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSync}
+          disabled={syncing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Sincronizando..." : "Sincronizar conversas"}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 h-[calc(100vh-200px)]">
