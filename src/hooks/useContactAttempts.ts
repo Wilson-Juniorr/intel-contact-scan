@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-const GAP_MS = 3 * 60 * 60 * 1000; // 3 hours
+// Each calendar day with at least 1 outbound message = 1 contact attempt
 
 export interface ContactAttemptStats {
   totalAttempts: number;
@@ -36,30 +36,30 @@ export function useContactAttempts(leadPhone: string | undefined) {
       return { totalAttempts: 0, lastAttemptAt: null, responseRate: 0, avgResponseTimeMin: null };
     }
 
-    // Group outbound messages into "attempt sessions" with 3h gap
-    const outboundTimes: Date[] = [];
+    // Group outbound messages by calendar day = 1 attempt per day
+    const outboundDays = new Set<string>();
+    const outboundByDay: Record<string, Date> = {};
+
     msgs.forEach((m) => {
-      if (m.direction === "outbound") outboundTimes.push(new Date(m.created_at));
+      if (m.direction === "outbound") {
+        const day = m.created_at.slice(0, 10); // YYYY-MM-DD
+        outboundDays.add(day);
+        const t = new Date(m.created_at);
+        if (!outboundByDay[day] || t > outboundByDay[day]) {
+          outboundByDay[day] = t;
+        }
+      }
     });
 
-    if (outboundTimes.length === 0) {
+    if (outboundDays.size === 0) {
       return { totalAttempts: 0, lastAttemptAt: null, responseRate: 0, avgResponseTimeMin: null };
     }
 
-    // Count sessions
-    const sessions: { start: Date; end: Date }[] = [];
-    let sessionStart = outboundTimes[0];
-    let sessionEnd = outboundTimes[0];
-
-    for (let i = 1; i < outboundTimes.length; i++) {
-      const diff = outboundTimes[i].getTime() - sessionEnd.getTime();
-      if (diff > GAP_MS) {
-        sessions.push({ start: sessionStart, end: sessionEnd });
-        sessionStart = outboundTimes[i];
-      }
-      sessionEnd = outboundTimes[i];
-    }
-    sessions.push({ start: sessionStart, end: sessionEnd });
+    const sortedDays = Array.from(outboundDays).sort();
+    const sessions = sortedDays.map((day) => ({
+      day,
+      lastMsg: outboundByDay[day],
+    }));
 
     // Calculate response rate: for each attempt session, check if there's an inbound after
     let responded = 0;
@@ -67,11 +67,11 @@ export function useContactAttempts(leadPhone: string | undefined) {
 
     for (const session of sessions) {
       const inboundAfter = msgs.find(
-        (m) => m.direction === "inbound" && new Date(m.created_at) > session.end
+        (m) => m.direction === "inbound" && new Date(m.created_at) > session.lastMsg
       );
       if (inboundAfter) {
         responded++;
-        const respTime = (new Date(inboundAfter.created_at).getTime() - session.end.getTime()) / 60000;
+        const respTime = (new Date(inboundAfter.created_at).getTime() - session.lastMsg.getTime()) / 60000;
         responseTimes.push(respTime);
       }
     }
@@ -83,7 +83,7 @@ export function useContactAttempts(leadPhone: string | undefined) {
 
     return {
       totalAttempts: sessions.length,
-      lastAttemptAt: sessions[sessions.length - 1].end.toISOString(),
+      lastAttemptAt: sessions[sessions.length - 1].lastMsg.toISOString(),
       responseRate: sessions.length > 0 ? Math.round((responded / sessions.length) * 100) : 0,
       avgResponseTimeMin,
     };
