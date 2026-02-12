@@ -6,7 +6,93 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function transcribeAudio(mediaUrl: string): Promise<string | null> {
+async function downloadAudioFromUazapi(messageId: string): Promise<{ base64: string; format: string } | null> {
+  try {
+    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
+      console.error("UaZapi credentials not configured");
+      return null;
+    }
+
+    const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
+    // UaZapi V2 download media endpoint
+    const downloadUrl = `${baseUrl}/chat/downloadMediaMessage`;
+    
+    console.log("Downloading media via UaZapi for message:", messageId);
+    
+    const resp = await fetch(downloadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        token: UAZAPI_TOKEN,
+      },
+      body: JSON.stringify({ messageId }),
+    });
+
+    if (!resp.ok) {
+      // Try alternative endpoint
+      console.log("Primary download failed, trying alternative endpoint...");
+      const altUrl = `${baseUrl}/chat/downloadBase64/${messageId}`;
+      const altResp = await fetch(altUrl, {
+        method: "GET",
+        headers: { token: UAZAPI_TOKEN },
+      });
+
+      if (!altResp.ok) {
+        console.error("All download attempts failed:", altResp.status);
+        return null;
+      }
+
+      const altData = await altResp.json();
+      const b64 = altData.base64 || altData.data || altData.result;
+      if (b64) {
+        return { base64: b64, format: "ogg" };
+      }
+      return null;
+    }
+
+    const contentType = resp.headers.get("content-type") || "";
+    
+    // If response is JSON with base64
+    if (contentType.includes("application/json")) {
+      const data = await resp.json();
+      const b64 = data.base64 || data.data || data.result;
+      if (b64) {
+        const fmt = data.mimetype?.includes("mp3") ? "mp3" : "ogg";
+        return { base64: b64, format: fmt };
+      }
+    }
+    
+    // If response is raw binary
+    const audioBuffer = await resp.arrayBuffer();
+    const audioBytes = new Uint8Array(audioBuffer);
+    
+    if (audioBytes.length < 100) {
+      console.error("Audio too small, likely not valid:", audioBytes.length);
+      return null;
+    }
+
+    // Chunked base64 conversion
+    const chunkSize = 8192;
+    let binary = "";
+    for (let i = 0; i < audioBytes.length; i += chunkSize) {
+      const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
+      for (let j = 0; j < chunk.length; j++) {
+        binary += String.fromCharCode(chunk[j]);
+      }
+    }
+    const audioBase64 = btoa(binary);
+    console.log("Audio downloaded, size:", audioBytes.length, "bytes");
+    
+    return { base64: audioBase64, format: "ogg" };
+  } catch (error) {
+    console.error("Audio download error:", error);
+    return null;
+  }
+}
+
+async function transcribeAudio(messageId: string, mediaUrl: string | null): Promise<string | null> {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -14,31 +100,40 @@ async function transcribeAudio(mediaUrl: string): Promise<string | null> {
       return null;
     }
 
-    // Download audio from UaZapi
-    console.log("Downloading audio from:", mediaUrl);
-    const audioResp = await fetch(mediaUrl);
-    if (!audioResp.ok) {
-      console.error("Failed to download audio:", audioResp.status);
+    // Try downloading via UaZapi first
+    let audioData = await downloadAudioFromUazapi(messageId);
+
+    // Fallback: try direct URL download
+    if (!audioData && mediaUrl) {
+      console.log("Trying direct URL download:", mediaUrl.slice(0, 80));
+      try {
+        const audioResp = await fetch(mediaUrl);
+        if (audioResp.ok) {
+          const buf = await audioResp.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          if (bytes.length > 100) {
+            const chunkSize = 8192;
+            let binary = "";
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+              for (let j = 0; j < chunk.length; j++) {
+                binary += String.fromCharCode(chunk[j]);
+              }
+            }
+            audioData = { base64: btoa(binary), format: "ogg" };
+          }
+        }
+      } catch (e) {
+        console.log("Direct URL download failed:", e);
+      }
+    }
+
+    if (!audioData) {
+      console.error("Could not download audio from any source");
       return null;
     }
 
-    const audioBuffer = await audioResp.arrayBuffer();
-    const audioBytes = new Uint8Array(audioBuffer);
-
-    // Convert to base64
-    let binary = "";
-    for (let i = 0; i < audioBytes.length; i++) {
-      binary += String.fromCharCode(audioBytes[i]);
-    }
-    const audioBase64 = btoa(binary);
-
-    console.log("Audio downloaded, size:", audioBytes.length, "bytes");
-
-    // Determine format from URL or default to ogg
-    let format = "ogg";
-    if (mediaUrl.includes(".mp3")) format = "mp3";
-    else if (mediaUrl.includes(".wav")) format = "wav";
-    else if (mediaUrl.includes(".m4a")) format = "m4a";
+    console.log("Audio ready for transcription, format:", audioData.format);
 
     // Transcribe using Gemini via Lovable AI Gateway
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -66,8 +161,8 @@ REGRAS:
               {
                 type: "input_audio",
                 input_audio: {
-                  data: audioBase64,
-                  format: format,
+                  data: audioData.base64,
+                  format: audioData.format,
                 },
               },
             ],
@@ -148,29 +243,52 @@ Deno.serve(async (req) => {
       if (!content && m.message?.conversation) content = m.message.conversation;
       if (!content && m.message?.extendedTextMessage?.text) content = m.message.extendedTextMessage.text;
 
-      if (m.type === "image" || m.isMedia === true && m.mimetype?.startsWith("image")) {
+      // Extract media URL from various UaZapi locations
+      const extractedMediaUrl = m.mediaUrl || m.url || m.content?.URL || null;
+
+      // Detect type - UaZapi can send "media" as generic type, so check chat metadata too
+      const chatLastMsgType = (body.chat?.wa_lastMessageType || "").toLowerCase();
+      const mimeType = (m.mimetype || m.content?.mimetype || "").toLowerCase();
+      const isPtt = m.content?.PTT === true || m.type === "ptt" || chatLastMsgType === "audiomessage";
+
+      if (m.type === "image" || chatLastMsgType === "imagemessage" || mimeType.startsWith("image")) {
         messageType = "image";
-        mediaUrl = m.mediaUrl || m.url || null;
+        mediaUrl = extractedMediaUrl;
         if (!content) content = m.caption || null;
-      } else if (m.type === "audio" || m.type === "ptt") {
+      } else if (m.type === "audio" || m.type === "ptt" || isPtt || chatLastMsgType === "audiomessage" || mimeType.startsWith("audio")) {
         messageType = "audio";
-        mediaUrl = m.mediaUrl || m.url || null;
-      } else if (m.type === "video") {
+        mediaUrl = extractedMediaUrl;
+      } else if (m.type === "video" || chatLastMsgType === "videomessage" || mimeType.startsWith("video")) {
         messageType = "video";
-        mediaUrl = m.mediaUrl || m.url || null;
-      } else if (m.type === "document") {
+        mediaUrl = extractedMediaUrl;
+      } else if (m.type === "document" || chatLastMsgType === "documentmessage") {
         messageType = "document";
-        mediaUrl = m.mediaUrl || m.url || null;
+        mediaUrl = extractedMediaUrl;
         if (!content) content = m.fileName || null;
-      } else if (m.type === "sticker") {
+      } else if (m.type === "sticker" || chatLastMsgType === "stickermessage") {
         messageType = "sticker";
+      } else if (m.type === "media" && extractedMediaUrl) {
+        // Generic "media" - try to infer from mime or URL
+        if (mimeType.startsWith("audio") || isPtt) {
+          messageType = "audio";
+        } else if (mimeType.startsWith("image")) {
+          messageType = "image";
+        } else if (mimeType.startsWith("video")) {
+          messageType = "video";
+        } else {
+          messageType = "document";
+        }
+        mediaUrl = extractedMediaUrl;
       } else {
         messageType = m.type || "text";
+        // Sanitize type to match constraint
+        const validTypes = ["text", "audio", "ptt", "image", "document", "video", "sticker", "media", "unknown"];
+        if (!validTypes.includes(messageType)) messageType = "unknown";
       }
 
       if (m.fromMe === true) isFromMe = true;
 
-      console.log("Parsed UaZapi format - phone:", phone, "fromMe:", isFromMe, "type:", messageType, "mediaUrl:", mediaUrl ? "yes" : "no");
+      console.log("Parsed UaZapi format - phone:", phone, "fromMe:", isFromMe, "type:", messageType, "mediaUrl:", mediaUrl ? mediaUrl.slice(0, 80) : "no");
     }
     // ===== Baileys/alternative format =====
     else {
@@ -328,10 +446,10 @@ Deno.serve(async (req) => {
     const messageId = savedMsg?.id;
 
     // === STEP 2: If audio, transcribe and update ===
-    if ((messageType === "audio" || messageType === "ptt") && mediaUrl) {
+    if ((messageType === "audio" || messageType === "ptt") && uazapiMessageId) {
       console.log("Audio message detected, starting transcription...");
       
-      const transcription = await transcribeAudio(mediaUrl);
+      const transcription = await transcribeAudio(uazapiMessageId, mediaUrl);
       
       if (transcription && messageId) {
         // Update message with transcription
