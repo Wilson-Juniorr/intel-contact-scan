@@ -14,6 +14,11 @@ function normalizePhone(phone: string): string {
   return phone.startsWith("55") ? phone : `55${phone}`;
 }
 
+interface ContactInfo {
+  name: string | null;
+  profilePicUrl: string | null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -49,63 +54,109 @@ Deno.serve(async (req) => {
     const h = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
 
     // =============================================
-    // STEP 1: Get ALL contacts and their names from every endpoint
+    // STEP 1: Build complete contact map from ALL sources
     // =============================================
-    console.log("=== STEP 1: Discovering contacts ===");
-    
-    const contactMap = new Map<string, string | null>(); // normalizedPhone -> name or null
+    console.log("=== STEP 1: Building contact map from all sources ===");
+    const contactMap = new Map<string, ContactInfo>();
 
-    const endpoints = ["/chat/list", "/contacts", "/contact/list"];
-
-    for (const ep of endpoints) {
-      try {
-        const resp = await fetch(`${baseUrl}${ep}`, { method: "GET", headers: h });
-        if (!resp.ok) { console.log(`${ep}: HTTP ${resp.status}`); continue; }
+    // SOURCE 1: GET /contacts (57 contacts with saved names)
+    try {
+      const resp = await fetch(`${baseUrl}/contacts`, { method: "GET", headers: h });
+      if (resp.ok) {
         const data = await resp.json();
-        const items = Array.isArray(data) ? data : (data.chats || data.contacts || data.data || data.list || []);
-        console.log(`${ep}: ${items.length} items`);
-        
+        const items = Array.isArray(data) ? data : [];
+        console.log(`GET /contacts: ${items.length} contacts`);
         for (const item of items) {
-          const jid = item.wa_chatid || item.jid || item.id || "";
+          const jid = item.jid || "";
           if (jid.includes("@g.us") || jid.includes("broadcast") || jid.includes("status")) continue;
-          
-          const phone = extractPhone(jid || item.phone || "");
+          const phone = extractPhone(jid);
           if (!phone || phone.length < 10) continue;
+          const normalized = normalizePhone(phone);
+          const name = item.contact_name || item.contact_FirstName || item.name || "";
+          const cleanName = name.trim() && name.trim() !== "." ? name.trim() : null;
+          contactMap.set(normalized, { name: cleanName, profilePicUrl: null });
+        }
+      }
+    } catch (e) { console.error("GET /contacts error:", e); }
+
+    // SOURCE 2: POST /chat/find with pagination (gets ALL chats including archived)
+    let chatPage = 1;
+    let totalChatsFromAPI = 0;
+    while (true) {
+      try {
+        const resp = await fetch(`${baseUrl}/chat/find`, {
+          method: "POST", headers: h,
+          body: JSON.stringify({ page: chatPage, limit: 500 }),
+        });
+        if (!resp.ok) { console.error(`/chat/find page ${chatPage}: HTTP ${resp.status}`); break; }
+        const data = await resp.json();
+        const chats = data.chats || [];
+        const pagination = data.pagination || {};
+        
+        if (chatPage === 1) {
+          totalChatsFromAPI = data.totalChatsStats?.total_chats?.total || pagination.totalRecords || 0;
+          console.log(`/chat/find: totalChats=${totalChatsFromAPI}, totalRecords=${pagination.totalRecords}`);
+        }
+        
+        console.log(`/chat/find page ${chatPage}: ${chats.length} chats`);
+        
+        for (const chat of chats) {
+          const chatId = chat.wa_chatid || "";
+          if (chatId.includes("@g.us") || chatId.includes("broadcast") || chatId.includes("status")) continue;
           
+          const phone = extractPhone(chatId || chat.phone || "");
+          if (!phone || phone.length < 10) continue;
           const normalized = normalizePhone(phone);
           
-          const name = item.wa_contactName || item.contact_name || item.name || 
-                       item.wa_name || item.pushName || item.notify || 
-                       item.lead_name || item.lead_fullName || "";
+          // Extract name from multiple fields (priority order)
+          const name = chat.wa_contactName || chat.wa_name || chat.name || 
+                       chat.lead_name || chat.lead_fullName || "";
+          const cleanName = name.trim() && name.trim() !== "." ? name.trim() : null;
           
-          const cleanName = (name && name.trim() && name.trim() !== ".") ? name.trim() : null;
+          // Extract profile picture
+          const picUrl = chat.image || chat.imagePreview || null;
           
-          if (!contactMap.has(normalized) || (cleanName && !contactMap.get(normalized))) {
-            contactMap.set(normalized, cleanName);
+          const existing = contactMap.get(normalized);
+          if (!existing) {
+            contactMap.set(normalized, { name: cleanName, profilePicUrl: picUrl || null });
+          } else {
+            // Prefer saved contact name, but fill in gaps
+            if (!existing.name && cleanName) existing.name = cleanName;
+            if (!existing.profilePicUrl && picUrl) existing.profilePicUrl = picUrl;
           }
         }
+        
+        if (chats.length === 0 || !pagination.hasNextPage) break;
+        chatPage++;
+        if (chatPage > 50) break; // safety
       } catch (e) {
-        console.error(`${ep} error:`, e);
+        console.error(`/chat/find page ${chatPage} error:`, e);
+        break;
       }
     }
 
-    console.log(`Contacts discovered: ${contactMap.size}, with names: ${Array.from(contactMap.values()).filter(Boolean).length}`);
+    console.log(`Contact map: ${contactMap.size} contacts, ${Array.from(contactMap.values()).filter(c => c.name).length} with names`);
 
     // =============================================
-    // STEP 2: Load leads and existing data
+    // STEP 2: Load leads and existing message IDs
     // =============================================
+    console.log("=== STEP 2: Loading existing data ===");
     const { data: leads } = await supabase.from("leads").select("id, phone, name");
     
+    // Enrich contact map with lead names
     if (leads) {
       for (const lead of leads) {
         const leadNorm = normalizePhone(lead.phone.replace(/\D/g, ""));
-        if ((!contactMap.has(leadNorm) || !contactMap.get(leadNorm)) && lead.name) {
-          contactMap.set(leadNorm, lead.name);
+        const existing = contactMap.get(leadNorm);
+        if (!existing) {
+          contactMap.set(leadNorm, { name: lead.name, profilePicUrl: null });
+        } else if (!existing.name && lead.name) {
+          existing.name = lead.name;
         }
       }
     }
 
-    // Load existing message IDs
+    // Load existing message IDs efficiently
     const existingIds = new Set<string>();
     let dbOffset = 0;
     while (true) {
@@ -119,36 +170,41 @@ Deno.serve(async (req) => {
       if (batch.length < 1000) break;
       dbOffset += 1000;
     }
-    console.log(`Existing message IDs: ${existingIds.size}`);
+    console.log(`Existing message IDs in DB: ${existingIds.size}`);
 
     // =============================================
-    // STEP 3: Save/update ALL contacts to whatsapp_contacts table
+    // STEP 3: Save ALL contacts to whatsapp_contacts
     // =============================================
-    console.log("=== STEP 3: Saving contacts ===");
-    
+    console.log("=== STEP 3: Saving all contacts ===");
     let contactsSaved = 0;
-    for (const [phone, name] of contactMap) {
+    const contactBatch: any[] = [];
+    for (const [phone, info] of contactMap) {
+      contactBatch.push({
+        user_id: userId,
+        phone,
+        contact_name: info.name,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    // Upsert in batches of 100
+    for (let i = 0; i < contactBatch.length; i += 100) {
+      const chunk = contactBatch.slice(i, i + 100);
       const { error } = await supabase
         .from("whatsapp_contacts")
-        .upsert(
-          { user_id: userId, phone, contact_name: name, updated_at: new Date().toISOString() },
-          { onConflict: "user_id,phone" }
-        );
-      if (!error) contactsSaved++;
+        .upsert(chunk, { onConflict: "user_id,phone" });
+      if (!error) contactsSaved += chunk.length;
+      else console.error("Contact upsert error:", error.message);
     }
     console.log(`Contacts saved/updated: ${contactsSaved}`);
 
     // =============================================
-    // STEP 4: Fetch ALL messages (global pagination, no limits)
+    // STEP 4: Fetch ALL messages (no limits)
     // =============================================
     console.log("=== STEP 4: Fetching ALL messages ===");
-
     const messagesToInsert: any[] = [];
     let totalFetched = 0;
     let totalSkipped = 0;
-    const conversationPhones = new Set<string>();
     const seenIds = new Set<string>();
-
     let offset = 0;
     const batchSize = 500;
     let consecutiveEmpty = 0;
@@ -156,8 +212,7 @@ Deno.serve(async (req) => {
     while (true) {
       try {
         const msgResp = await fetch(`${baseUrl}/message/find`, {
-          method: "POST",
-          headers: h,
+          method: "POST", headers: h,
           body: JSON.stringify({ count: batchSize, offset }),
         });
 
@@ -167,11 +222,11 @@ Deno.serve(async (req) => {
         }
 
         const msgData = await msgResp.json();
-        const messages = Array.isArray(msgData) ? msgData : (msgData.messages || msgData.data || []);
+        const messages = msgData.messages || msgData.data || [];
 
         if (messages.length === 0) {
           consecutiveEmpty++;
-          if (consecutiveEmpty >= 2) break;
+          if (consecutiveEmpty >= 3) break;
           offset += batchSize;
           continue;
         }
@@ -189,17 +244,19 @@ Deno.serve(async (req) => {
 
           const chatId = msg.chatid || msg.chat || "";
           if (chatId.includes("@g.us") || chatId.includes("broadcast")) continue;
-          
+
           const msgPhone = extractPhone(chatId);
           if (!msgPhone || msgPhone.length < 10) continue;
 
           const normalizedMsgPhone = normalizePhone(msgPhone);
           const isFromMe = msg.fromMe === true;
 
+          // Extract content
           let content: string | null = null;
           let messageType = "text";
 
-          if (msg.content?.text) content = msg.content.text;
+          if (msg.text) content = msg.text;
+          else if (msg.content?.text) content = msg.content.text;
           else if (typeof msg.content === "string") content = msg.content;
           else if (msg.content?.caption) content = msg.content.caption;
 
@@ -210,6 +267,7 @@ Deno.serve(async (req) => {
           else if (rawType.includes("document")) messageType = "document";
           else if (rawType.includes("sticker")) messageType = "sticker";
 
+          // Timestamp
           const ts = msg.messageTimestamp || msg.timestamp;
           let createdAt: string;
           if (ts) {
@@ -219,6 +277,7 @@ Deno.serve(async (req) => {
             createdAt = new Date().toISOString();
           }
 
+          // Match lead
           let leadId: string | null = null;
           if (leads) {
             for (const lead of leads) {
@@ -231,15 +290,16 @@ Deno.serve(async (req) => {
             }
           }
 
-          const mediaUrl = msg.fileURL || msg.mediaUrl || null;
-          const msgContactName = contactMap.get(normalizedMsgPhone) || 
-                                 msg.pushName || msg.notifyName || msg.notify || null;
+          const mediaUrl = msg.fileURL || msg.mediaUrl || msg.content?.URL || null;
+          const contactInfo = contactMap.get(normalizedMsgPhone);
+          const msgContactName = contactInfo?.name || 
+                                 msg.senderName || msg.pushName || msg.notifyName || null;
 
-          // Capture pushName
-          if (!contactMap.has(normalizedMsgPhone) || !contactMap.get(normalizedMsgPhone)) {
-            const pName = msg.pushName || msg.notifyName || msg.notify || "";
-            if (pName && pName.trim() && pName.trim() !== ".") {
-              contactMap.set(normalizedMsgPhone, pName.trim());
+          // Capture pushName/senderName for contacts we didn't have names for
+          if (contactInfo && !contactInfo.name) {
+            const pName = msg.senderName || msg.pushName || msg.notifyName || "";
+            if (pName.trim() && pName.trim() !== ".") {
+              contactInfo.name = pName.trim();
             }
           }
 
@@ -261,12 +321,13 @@ Deno.serve(async (req) => {
             existingIds.add(fullId);
             seenIds.add(fullId);
           }
-          conversationPhones.add(normalizedMsgPhone);
         }
 
         offset += batchSize;
-        if (offset > 100000) break; // Safety limit
-        if (messages.length < batchSize) break;
+        
+        // No artificial limit - fetch everything
+        if (!msgData.hasMore && messages.length < batchSize) break;
+        if (offset > 500000) break; // extreme safety only
       } catch (e) {
         console.error(`Error at offset ${offset}:`, e);
         break;
@@ -287,46 +348,55 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // STEP 6: Backfill names on messages + update contacts from pushNames
+    // STEP 6: Backfill names + update contacts with pushNames
     // =============================================
     let namesUpdated = 0;
-    for (const [phone, name] of contactMap) {
-      if (!name) continue;
-      
+    const contactUpdates: any[] = [];
+    
+    for (const [phone, info] of contactMap) {
+      if (!info.name) continue;
+
       // Update messages missing contact_name
       const { count } = await supabase
         .from("whatsapp_messages")
-        .update({ contact_name: name })
+        .update({ contact_name: info.name })
         .is("contact_name", null)
         .eq("phone", phone)
         .select("id", { count: "exact", head: true });
       if (count && count > 0) namesUpdated += count;
 
-      // Also update contacts table with any new pushNames
-      await supabase
-        .from("whatsapp_contacts")
-        .upsert(
-          { user_id: userId, phone, contact_name: name, updated_at: new Date().toISOString() },
-          { onConflict: "user_id,phone" }
-        );
+      // Queue contact update with any new names from pushNames
+      contactUpdates.push({
+        user_id: userId,
+        phone,
+        contact_name: info.name,
+        updated_at: new Date().toISOString(),
+      });
     }
 
-    console.log(`=== DONE: ${insertedCount} imported, ${totalSkipped} skipped, ${namesUpdated} names, ${contactsSaved} contacts ===`);
+    // Batch update contacts with new names
+    for (let i = 0; i < contactUpdates.length; i += 100) {
+      const chunk = contactUpdates.slice(i, i + 100);
+      await supabase.from("whatsapp_contacts").upsert(chunk, { onConflict: "user_id,phone" });
+    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        totalContacts: contactMap.size,
-        contactsWithNames: Array.from(contactMap.values()).filter(Boolean).length,
-        totalMessagesFetched: totalFetched,
-        totalImported: insertedCount,
-        totalSkipped,
-        namesUpdated,
-        conversations: conversationPhones.size,
-        contactsSaved,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const summary = {
+      success: true,
+      totalContacts: contactMap.size,
+      contactsWithNames: Array.from(contactMap.values()).filter(c => c.name).length,
+      totalChatsFromAPI,
+      totalMessagesFetched: totalFetched,
+      totalImported: insertedCount,
+      totalSkipped,
+      namesUpdated,
+      contactsSaved,
+    };
+
+    console.log(`=== DONE ===`, JSON.stringify(summary));
+
+    return new Response(JSON.stringify(summary), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: unknown) {
     console.error("Sync error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
