@@ -58,9 +58,9 @@ Deno.serve(async (req) => {
     const cleanPhone = phone.replace(/\D/g, "");
     const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
-    // Envia via UaZapi V2
+    // Envia via UaZapi V2 — endpoint correto: /send/text
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const uazapiResp = await fetch(`${baseUrl}/message/send-text`, {
+    const uazapiResp = await fetch(`${baseUrl}/send/text`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
