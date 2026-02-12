@@ -55,42 +55,54 @@ export default function WhatsAppPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch all messages
+  const fetchMessages = async () => {
+    const { data, error } = await supabase
+      .from("whatsapp_messages")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching messages:", error);
+    } else {
+      setMessages(data || []);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
-    const fetchMessages = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("whatsapp_messages")
-        .select("*")
-        .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-      } else {
-        setMessages(data || []);
-      }
-      setLoading(false);
-    };
-    fetchMessages();
+    setLoading(true);
+    fetchMessages().finally(() => setLoading(false));
 
     // Realtime subscription
     const channel = supabase
       .channel("whatsapp-realtime")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "whatsapp_messages" },
+        { event: "*", schema: "public", table: "whatsapp_messages" },
         (payload) => {
+          if (payload.eventType === "DELETE") return;
           const newMsg = payload.new as WhatsAppMessage;
           setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
+            const filtered = prev.filter((m) => m.id !== newMsg.id);
+            return [...filtered, newMsg].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    // Polling fallback every 5s
+    const pollInterval = setInterval(() => {
+      fetchMessages();
+    }, 5000);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [user]);
 
