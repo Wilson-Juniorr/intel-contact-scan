@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.send-whatsapp]
 verify_jwt = false
+
+[functions.test-uazapi]
+verify_jwt = false
