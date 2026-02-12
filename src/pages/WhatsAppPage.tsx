@@ -60,16 +60,32 @@ export default function WhatsAppPage() {
   };
 
   const fetchMessages = async () => {
-    const { data, error } = await supabase
-      .from("whatsapp_messages")
-      .select("*")
-      .order("created_at", { ascending: true });
+    // Paginate to get ALL messages (Supabase default limit is 1000)
+    const allMessages: WhatsAppMessage[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-    if (error) {
-      console.error("Error fetching messages:", error);
-    } else {
-      setMessages(data || []);
+      if (error) {
+        console.error("Error fetching messages:", error);
+        break;
+      }
+      
+      if (data && data.length > 0) {
+        allMessages.push(...data);
+      }
+      
+      if (!data || data.length < pageSize) break;
+      offset += pageSize;
     }
+    
+    setMessages(allMessages);
   };
 
   useEffect(() => {
