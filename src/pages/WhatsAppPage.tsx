@@ -72,6 +72,26 @@ export default function WhatsAppPage() {
       setLoading(false);
     };
     fetchMessages();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel("whatsapp-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "whatsapp_messages" },
+        (payload) => {
+          const newMsg = payload.new as WhatsAppMessage;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Scroll to bottom when opening conversation
