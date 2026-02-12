@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      follow_up_queue: {
+        Row: {
+          attempt_number: number
+          created_at: string
+          id: string
+          lead_id: string
+          max_attempts: number
+          message_content: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          created_at?: string
+          id?: string
+          lead_id: string
+          max_attempts?: number
+          message_content?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          created_at?: string
+          id?: string
+          lead_id?: string
+          max_attempts?: number
+          message_content?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interactions: {
         Row: {
           created_at: string
@@ -330,6 +377,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_messages: {
+        Row: {
+          content: string | null
+          created_at: string
+          direction: string
+          id: string
+          lead_id: string | null
+          media_url: string | null
+          message_type: string
+          phone: string
+          status: string | null
+          uazapi_message_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          direction: string
+          id?: string
+          lead_id?: string | null
+          media_url?: string | null
+          message_type?: string
+          phone: string
+          status?: string | null
+          uazapi_message_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          direction?: string
+          id?: string
+          lead_id?: string | null
+          media_url?: string | null
+          message_type?: string
+          phone?: string
+          status?: string | null
+          uazapi_message_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
