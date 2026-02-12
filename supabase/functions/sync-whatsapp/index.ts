@@ -6,33 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function tryEndpoints(baseUrl: string, headers: Record<string, string>, paths: string[], method = "GET", body?: string): Promise<{ data: any; path: string } | null> {
-  for (const path of paths) {
-    try {
-      const opts: RequestInit = { method, headers };
-      if (body && method === "POST") opts.body = body;
-      
-      const resp = await fetch(`${baseUrl}${path}`, opts);
-      console.log(`${method} ${path} => ${resp.status}`);
-      
-      if (resp.ok) {
-        const data = await resp.json();
-        console.log(`${path} response keys:`, JSON.stringify(Object.keys(data)).slice(0, 200));
-        if (Array.isArray(data)) {
-          console.log(`${path} returned array with ${data.length} items`);
-        }
-        return { data, path };
-      } else {
-        const errText = await resp.text();
-        console.log(`${path} error: ${errText.slice(0, 200)}`);
-      }
-    } catch (e) {
-      console.log(`${path} fetch error: ${e}`);
-    }
-  }
-  return null;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -43,12 +16,10 @@ Deno.serve(async (req) => {
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
     if (!UAZAPI_URL || !UAZAPI_TOKEN) throw new Error("UaZapi credentials not configured");
 
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -63,54 +34,63 @@ Deno.serve(async (req) => {
     );
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const userId = claimsData.claims.sub;
 
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
-    const apiHeaders = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
+    const h = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
 
-    // Step 1: Find the correct endpoint for listing chats
-    console.log("=== SYNC: Discovering chat endpoints ===");
-    console.log("Base URL:", baseUrl);
+    // Step 1: Get all contacts via GET /contacts
+    console.log("=== SYNC: Fetching contacts ===");
+    const contactsResp = await fetch(`${baseUrl}/contacts`, { method: "GET", headers: h });
     
-    const chatResult = await tryEndpoints(baseUrl, apiHeaders, [
-      "/chats",
-      "/v1/chats", 
-      "/chat/page?page=1&pageSize=100",
-      "/chat/list",
-      "/chat/all",
-      "/chat/page",
-      "/contacts",
-      "/contact/list",
-      "/contact/all",
-    ]);
-
-    let allChats: any[] = [];
-    
-    if (chatResult) {
-      console.log(`Chat endpoint found: ${chatResult.path}`);
-      const d = chatResult.data;
-      allChats = Array.isArray(d) ? d : (d.chats || d.data || d.contacts || d.records || d.result || []);
+    let contacts: any[] = [];
+    if (contactsResp.ok) {
+      const contactsData = await contactsResp.json();
+      contacts = Array.isArray(contactsData) ? contactsData : (contactsData.contacts || contactsData.data || []);
+      console.log(`Fetched ${contacts.length} contacts`);
     } else {
-      console.log("No chat list endpoint found, trying message search approach...");
-      
-      // Alternative: get messages from specific known phones from our DB
-      const { data: existingPhones } = await supabase
-        .from("whatsapp_messages")
-        .select("phone")
-        .order("created_at", { ascending: false });
-      
-      const uniquePhones = [...new Set((existingPhones || []).map(m => m.phone))];
-      console.log(`Will try to fetch messages for ${uniquePhones.length} known phones`);
-      
-      // Convert to chat-like objects
-      allChats = uniquePhones.map(p => ({ phone: p }));
+      console.error("Failed to fetch contacts:", contactsResp.status);
     }
 
-    console.log(`Total chats/contacts to process: ${allChats.length}`);
+    // Step 2: Fetch messages via POST /message/find with pagination
+    console.log("=== SYNC: Fetching messages ===");
+    
+    let allMessages: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const limit = 100;
+    
+    while (hasMore && offset < 2000) { // Safety limit: max 2000 messages
+      const msgResp = await fetch(`${baseUrl}/message/find`, {
+        method: "POST",
+        headers: h,
+        body: JSON.stringify({ 
+          phone: "", // empty = all conversations
+          count: limit,
+          offset: offset,
+        }),
+      });
+
+      if (!msgResp.ok) {
+        console.error(`/message/find returned ${msgResp.status}`);
+        break;
+      }
+
+      const msgData = await msgResp.json();
+      const messages = msgData.messages || msgData.data || [];
+      hasMore = msgData.hasMore === true;
+      
+      console.log(`Offset ${offset}: got ${messages.length} messages, hasMore: ${hasMore}`);
+      allMessages = [...allMessages, ...messages];
+      offset += limit;
+      
+      if (messages.length === 0) break;
+    }
+
+    console.log(`Total messages fetched: ${allMessages.length}`);
 
     // Get existing leads for matching
     const { data: leads } = await supabase.from("leads").select("id, phone, name");
@@ -123,21 +103,72 @@ Deno.serve(async (req) => {
     
     const existingIds = new Set((existingMsgs || []).map(m => m.uazapi_message_id));
 
+    // Build contact name map from UaZapi contacts
+    const contactMap = new Map<string, string>();
+    for (const c of contacts) {
+      const jid = c.jid || c.id || "";
+      const phone = jid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
+      const name = c.contact_name || c.name || c.pushName || c.notify || "";
+      if (phone && name) contactMap.set(phone, name);
+    }
+
     let totalImported = 0;
     let totalSkipped = 0;
-    const processedPhones: string[] = [];
+    const conversationPhones = new Set<string>();
+    const messagesToInsert: any[] = [];
 
-    // Step 2: For each chat, try to fetch message history
-    for (const chat of allChats) {
-      const rawPhone = chat.phone || chat.jid || chat.id || chat.number || "";
-      const phone = rawPhone.replace("@s.whatsapp.net", "").replace("@g.us", "").replace(/\D/g, "");
+    for (const msg of allMessages) {
+      const msgId = msg.messageid || msg.id || msg.key?.id || null;
+      const fullId = msg.id || (msg.owner && msgId ? `${msg.owner}:${msgId}` : msgId);
       
-      // Skip groups and invalid
-      if (rawPhone.includes("@g.us") || phone.includes("-") || !phone || phone.length < 10) {
+      // Skip duplicates
+      if (fullId && existingIds.has(fullId)) {
+        totalSkipped++;
         continue;
       }
 
+      // Extract phone from chatid
+      const chatId = msg.chatid || msg.chat || "";
+      const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "").replace(/\D/g, "");
+      
+      // Skip groups and invalid
+      if (chatId.includes("@g.us") || !phone || phone.length < 10) continue;
+      
       const normalizedPhone = phone.startsWith("55") ? phone : `55${phone}`;
+      const isFromMe = msg.fromMe === true;
+      
+      // Extract content based on messageType
+      let content: string | null = null;
+      let messageType = "text";
+      const msgType = (msg.messageType || "").toLowerCase();
+      
+      if (msg.content?.text) {
+        content = msg.content.text;
+      } else if (msg.content?.caption) {
+        content = msg.content.caption;
+      } else if (typeof msg.content === "string") {
+        content = msg.content;
+      }
+
+      if (msgType.includes("image")) messageType = "image";
+      else if (msgType.includes("audio") || msgType.includes("ptt")) messageType = "audio";
+      else if (msgType.includes("video")) messageType = "video";
+      else if (msgType.includes("document")) messageType = "document";
+      else if (msgType.includes("sticker")) messageType = "sticker";
+      else if (msgType.includes("conversation") || msgType.includes("text") || msgType.includes("extended")) messageType = "text";
+      else messageType = "text";
+
+      // Get timestamp
+      const timestamp = msg.messageTimestamp || msg.timestamp;
+      let createdAt: string;
+      if (timestamp) {
+        const ts = typeof timestamp === "number"
+          ? (timestamp > 1e12 ? timestamp : timestamp * 1000)
+          : new Date(timestamp).getTime();
+        createdAt = new Date(ts).toISOString();
+      } else {
+        createdAt = new Date().toISOString();
+      }
 
       // Match with lead
       let leadId: string | null = null;
@@ -152,110 +183,52 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Try to fetch messages for this chat
-      const msgResult = await tryEndpoints(baseUrl, apiHeaders, [
-        `/chat/messages/${phone}?count=100`,
-        `/chat/messages?phone=${phone}&count=100`,
-        `/message/list?phone=${phone}&count=100`,
-        `/messages/${phone}?count=100`,
-        `/v1/messages/${phone}`,
-      ]);
+      const mediaUrl = msg.fileURL || msg.mediaUrl || null;
 
-      // Also try POST variants
-      let chatMessages: any[] = [];
-      if (msgResult) {
-        const md = msgResult.data;
-        chatMessages = Array.isArray(md) ? md : (md.messages || md.data || md.records || md.result || []);
-        console.log(`Got ${chatMessages.length} messages for ${normalizedPhone} via ${msgResult.path}`);
+      messagesToInsert.push({
+        user_id: userId,
+        lead_id: leadId,
+        phone: normalizedPhone,
+        direction: isFromMe ? "outbound" : "inbound",
+        message_type: messageType,
+        content: content,
+        media_url: mediaUrl || null,
+        uazapi_message_id: fullId,
+        status: isFromMe ? "sent" : "received",
+        created_at: createdAt,
+      });
+
+      if (fullId) existingIds.add(fullId);
+      conversationPhones.add(normalizedPhone);
+    }
+
+    // Batch insert in chunks of 100
+    let insertedCount = 0;
+    for (let i = 0; i < messagesToInsert.length; i += 100) {
+      const chunk = messagesToInsert.slice(i, i + 100);
+      const { error: insertError } = await supabase
+        .from("whatsapp_messages")
+        .insert(chunk);
+
+      if (insertError) {
+        console.error(`Insert error at chunk ${i}:`, insertError.message);
       } else {
-        // Try POST
-        const postResult = await tryEndpoints(baseUrl, apiHeaders, [
-          `/chat/messages`,
-          `/message/list`,
-        ], "POST", JSON.stringify({ phone, count: 100 }));
-        
-        if (postResult) {
-          const md = postResult.data;
-          chatMessages = Array.isArray(md) ? md : (md.messages || md.data || md.records || md.result || []);
-          console.log(`Got ${chatMessages.length} messages for ${normalizedPhone} via POST ${postResult.path}`);
-        }
-      }
-
-      // Save messages
-      const messagesToInsert: any[] = [];
-      
-      for (const msg of chatMessages) {
-        const msgId = msg.id || msg.key?.id || msg.messageId || null;
-        
-        if (msgId && existingIds.has(msgId)) {
-          totalSkipped++;
-          continue;
-        }
-
-        const isFromMe = msg.fromMe === true || msg.key?.fromMe === true;
-        const content = msg.body || msg.text || msg.conversation || msg.message?.conversation || 
-                       msg.message?.extendedTextMessage?.text || msg.caption || msg.content || null;
-        const timestamp = msg.timestamp || msg.messageTimestamp || msg.t || msg.created_at;
-        
-        let createdAt: string;
-        if (timestamp) {
-          const ts = typeof timestamp === "number" 
-            ? (timestamp > 1e12 ? timestamp : timestamp * 1000) 
-            : new Date(timestamp).getTime();
-          createdAt = new Date(ts).toISOString();
-        } else {
-          createdAt = new Date().toISOString();
-        }
-
-        let messageType = "text";
-        const m = msg.message || msg;
-        if (m.imageMessage || msg.type === "image") messageType = "image";
-        else if (m.audioMessage || msg.type === "audio" || msg.type === "ptt") messageType = "audio";
-        else if (m.videoMessage || msg.type === "video") messageType = "video";
-        else if (m.documentMessage || msg.type === "document") messageType = "document";
-        else if (m.stickerMessage || msg.type === "sticker") messageType = "sticker";
-
-        messagesToInsert.push({
-          user_id: userId,
-          lead_id: leadId,
-          phone: normalizedPhone,
-          direction: isFromMe ? "outbound" : "inbound",
-          message_type: messageType,
-          content: content,
-          media_url: msg.mediaUrl || msg.url || null,
-          uazapi_message_id: msgId,
-          status: isFromMe ? "sent" : "received",
-          created_at: createdAt,
-        });
-
-        if (msgId) existingIds.add(msgId);
-      }
-
-      // Batch insert
-      if (messagesToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from("whatsapp_messages")
-          .insert(messagesToInsert);
-
-        if (insertError) {
-          console.error(`Insert error for ${normalizedPhone}:`, insertError.message);
-        } else {
-          totalImported += messagesToInsert.length;
-          processedPhones.push(normalizedPhone);
-        }
+        insertedCount += chunk.length;
       }
     }
 
-    console.log(`=== SYNC COMPLETE: ${totalImported} imported, ${totalSkipped} skipped, ${processedPhones.length} conversations ===`);
+    totalImported = insertedCount;
+
+    console.log(`=== SYNC COMPLETE: ${totalImported} imported, ${totalSkipped} duplicates skipped, ${conversationPhones.size} conversations ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        totalChats: allChats.length,
+        totalContacts: contacts.length,
+        totalMessagesFetched: allMessages.length,
         totalImported,
         totalSkipped,
-        conversations: processedPhones.length,
-        chatEndpoint: chatResult?.path || "fallback (existing phones)",
+        conversations: conversationPhones.size,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -263,8 +236,7 @@ Deno.serve(async (req) => {
     console.error("Sync error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
