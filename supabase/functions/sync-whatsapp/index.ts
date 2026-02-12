@@ -90,7 +90,8 @@ Deno.serve(async (req) => {
         });
         if (!resp.ok) { console.error(`/chat/find page ${chatPage}: HTTP ${resp.status}`); break; }
         const data = await resp.json();
-        const chats = data.chats || [];
+        // Handle multiple response structures
+        const chats = data.chats || data.data || data.records || (Array.isArray(data) ? data : []);
         const pagination = data.pagination || {};
         
         if (chatPage === 1) {
@@ -326,7 +327,8 @@ Deno.serve(async (req) => {
         offset += batchSize;
         
         // No artificial limit - fetch everything
-        if (!msgData.hasMore && messages.length < batchSize) break;
+        // API may return less than batchSize (e.g. max 200 per request) - only stop on truly empty
+        if (messages.length === 0) break;
         if (offset > 500000) break; // extreme safety only
       } catch (e) {
         console.error(`Error at offset ${offset}:`, e);
