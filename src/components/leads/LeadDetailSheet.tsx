@@ -3,6 +3,7 @@ import { useLeadsContext } from "@/contexts/LeadsContext";
 import { useLeadObservations, NOTE_CATEGORIES, DOC_CATEGORIES } from "@/hooks/useLeadObservations";
 import { useLeadMembers } from "@/hooks/useLeadMembers";
 import { supabase } from "@/integrations/supabase/client";
+import { useContactAttempts } from "@/hooks/useContactAttempts";
 import { Lead, FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,7 +22,7 @@ import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
   Maximize2, Minimize2, Pencil, Save, X, Loader2, FileUp,
   Upload, Download, Eye, Trash2, File, Image as ImageIcon,
-  FolderDown, Sparkles, Tag, Plus, Copy, Check,
+  FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -258,6 +259,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
   const obs = useLeadObservations(lead.id);
   const membersHook = useLeadMembers(lead.id);
   const interactions = getLeadInteractions(lead.id);
+  const { totalAttempts, responseRate, lastAttemptAt } = useContactAttempts(lead.phone);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
 
@@ -473,6 +475,37 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
           </div>
 
           <Separator />
+
+          {/* Follow-up Progress */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <PhoneCall className="h-3.5 w-3.5" /> Follow-up
+            </h3>
+            {(() => {
+              const goal = 6;
+              const progress = Math.min(totalAttempts, goal);
+              const pct = (progress / goal) * 100;
+              const isComplete = progress >= goal;
+              return (
+                <div className="space-y-2 p-2.5 rounded-lg border border-border bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">{progress}/{goal} dias</span>
+                    {responseRate > 0 && (
+                      <Badge variant="secondary" className="text-[10px]" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : "hsl(35, 85%, 50%)" }}>
+                        {responseRate}% resp.
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: isComplete ? "hsl(140, 70%, 40%)" : stageInfo?.color }} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isComplete ? "✅ Meta de 6 dias atingida" : `Faltam ${goal - progress} dia(s) de contato`}
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
 
           {/* AI Summary */}
           <div className="space-y-2">
@@ -709,6 +742,7 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 }) {
   const { getLeadInteractions } = useLeadsContext();
   const interactions = getLeadInteractions(lead.id);
+  const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
 
@@ -753,6 +787,39 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
               <Button asChild size="sm" className="w-full gap-2 bg-secondary hover:bg-secondary/90 text-secondary-foreground">
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="h-4 w-4" /> Abrir WhatsApp</a>
               </Button>
+            </div>
+
+            <Separator />
+
+            {/* Follow-up Progress */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+                <PhoneCall className="h-3.5 w-3.5" /> Follow-up
+              </h3>
+              {(() => {
+                const goal = 6;
+                const progress = Math.min(totalAttempts, goal);
+                const pct = (progress / goal) * 100;
+                const isComplete = progress >= goal;
+                return (
+                  <div className="space-y-2 p-2.5 rounded-lg border border-border bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">{progress}/{goal} dias</span>
+                      {responseRate > 0 && (
+                        <Badge variant="secondary" className="text-[10px]" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : "hsl(35, 85%, 50%)" }}>
+                          {responseRate}% resp.
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: isComplete ? "hsl(140, 70%, 40%)" : stageInfo?.color }} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {isComplete ? "✅ Meta de 6 dias atingida" : `Faltam ${goal - progress} dia(s) de contato`}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             <Separator />
