@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCheck } from "lucide-react";
+import { Clock, CheckCheck, Mic } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -23,6 +23,9 @@ interface Props {
 
 export default function ChatBubble({ msg, showDate, index }: Props) {
   const isOutbound = msg.direction === "outbound";
+  const isAudio = msg.message_type === "audio" || msg.message_type === "ptt";
+  const isTranscribed = isAudio && msg.content?.startsWith("🎤 ");
+  const transcriptionText = isTranscribed ? msg.content!.slice(3) : null;
 
   const bubbleClass = isOutbound
     ? msg.status === "failed"
@@ -61,7 +64,45 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
         }}
       >
         <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${bubbleClass}`}>
-          <p className="whitespace-pre-wrap break-words">{msg.content || "[Mídia]"}</p>
+          {/* Audio indicator */}
+          {isAudio && (
+            <div className="flex items-center gap-2 mb-1">
+              <motion.div
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                  isOutbound
+                    ? "bg-white/15 text-white/90"
+                    : "bg-foreground/10 text-foreground/70"
+                }`}
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+              >
+                <Mic className="h-3 w-3" />
+                <span>Áudio</span>
+                {isTranscribed && (
+                  <span className="opacity-70">• Transcrito</span>
+                )}
+                {!isTranscribed && !msg.content && (
+                  <motion.span
+                    className="opacity-60"
+                    animate={{ opacity: [0.4, 0.8, 0.4] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    • Transcrevendo...
+                  </motion.span>
+                )}
+              </motion.div>
+            </div>
+          )}
+
+          {/* Message content */}
+          {isAudio ? (
+            <p className="whitespace-pre-wrap break-words">
+              {transcriptionText || msg.content || "[Áudio]"}
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap break-words">{msg.content || "[Mídia]"}</p>
+          )}
+
           <div
             className={`flex items-center gap-1 mt-1 ${
               isOutbound ? "justify-end opacity-70" : "justify-end text-muted-foreground"
