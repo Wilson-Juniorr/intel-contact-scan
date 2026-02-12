@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function downloadAudioFromUazapi(messageId: string, chatId: string | null): Promise<{ base64: string; format: string } | null> {
+async function downloadAudioFromUazapi(messageId: string, chatId: string | null, rawMessage: any): Promise<{ base64: string; format: string } | null> {
   try {
     const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
@@ -18,55 +18,65 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null)
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
     const headers = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
 
-    // Try multiple messageId formats
-    const idVariants = [messageId];
-    // If messageId contains ":", try just the hash part
-    if (messageId.includes(":")) {
-      idVariants.push(messageId.split(":").pop()!);
-    }
-    // Try full WAid format if chatId available
-    if (chatId) {
-      const cleanChatId = chatId.includes("@") ? chatId : `${chatId}@s.whatsapp.net`;
-      idVariants.push(`true_${cleanChatId}_${messageId.includes(":") ? messageId.split(":").pop() : messageId}`);
-      idVariants.push(`false_${cleanChatId}_${messageId.includes(":") ? messageId.split(":").pop() : messageId}`);
+    // Extract the hash part of the messageId
+    const hashId = messageId.includes(":") ? messageId.split(":").pop()! : messageId;
+    const cleanChatId = chatId ? (chatId.includes("@") ? chatId : `${chatId}@s.whatsapp.net`) : null;
+
+    // === Strategy 1: Pass full message key object (UaZapi V2 format) ===
+    if (rawMessage) {
+      const keyObj = {
+        key: {
+          remoteJid: cleanChatId || rawMessage.chatid || rawMessage.key?.remoteJid,
+          fromMe: false,
+          id: hashId,
+        },
+        message: rawMessage.message || rawMessage.content || rawMessage,
+      };
+
+      for (const endpoint of ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage", "/message/download"]) {
+        try {
+          console.log(`Trying ${endpoint} with full key object, id: ${hashId}`);
+          const resp = await fetch(`${baseUrl}${endpoint}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(keyObj),
+          });
+          const result = await tryExtractAudio(resp, endpoint);
+          if (result) return result;
+        } catch (e) {
+          console.log(`${endpoint} with key object failed:`, e);
+        }
+      }
     }
 
-    console.log("Downloading media via UaZapi, trying ID variants:", JSON.stringify(idVariants));
+    // === Strategy 2: Try just messageId string (various formats) ===
+    const idVariants = [messageId, hashId];
+    if (cleanChatId) {
+      idVariants.push(`false_${cleanChatId}_${hashId}`);
+      idVariants.push(`true_${cleanChatId}_${hashId}`);
+    }
 
     for (const idVariant of idVariants) {
-      // Endpoint 1: POST /chat/downloadMediaMessage
-      try {
-        const resp = await fetch(`${baseUrl}/chat/downloadMediaMessage`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ messageId: idVariant }),
-        });
-        if (resp.ok) {
-          const contentType = resp.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            const data = await resp.json();
-            const b64 = data.base64 || data.data || data.result || data.media;
-            if (b64 && b64.length > 100) {
-              console.log("Downloaded via downloadMediaMessage with id:", idVariant);
-              const fmt = (data.mimetype || "").includes("mp3") ? "mp3" : "ogg";
-              return { base64: b64, format: fmt };
-            }
-          } else {
-            const buf = await resp.arrayBuffer();
-            const bytes = new Uint8Array(buf);
-            if (bytes.length > 500) {
-              const b64 = arrayBufferToBase64(bytes);
-              console.log("Downloaded binary via downloadMediaMessage, size:", bytes.length);
-              return { base64: b64, format: "ogg" };
-            }
-          }
+      for (const endpoint of ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage"]) {
+        try {
+          console.log(`Trying ${endpoint} with messageId: ${idVariant}`);
+          const resp = await fetch(`${baseUrl}${endpoint}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ messageId: idVariant }),
+          });
+          const result = await tryExtractAudio(resp, endpoint);
+          if (result) return result;
+        } catch (e) {
+          console.log(`${endpoint} failed for ${idVariant}:`, e);
         }
-      } catch (e) {
-        console.log("downloadMediaMessage failed for:", idVariant, e);
       }
+    }
 
-      // Endpoint 2: POST /chat/getLink
+    // === Strategy 3: Try /chat/getLink ===
+    for (const idVariant of idVariants) {
       try {
+        console.log(`Trying /chat/getLink with: ${idVariant}`);
         const resp = await fetch(`${baseUrl}/chat/getLink`, {
           method: "POST",
           headers,
@@ -76,7 +86,7 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null)
           const data = await resp.json();
           const link = data.url || data.link || data.result;
           if (link) {
-            console.log("Got decrypted link via getLink:", link.slice(0, 80));
+            console.log("Got decrypted link:", link.slice(0, 80));
             const audioResp = await fetch(link);
             if (audioResp.ok) {
               const buf = await audioResp.arrayBuffer();
@@ -92,12 +102,39 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null)
       }
     }
 
-    console.error("All UaZapi download attempts failed for all ID variants");
+    console.error("All UaZapi download attempts failed");
     return null;
   } catch (error) {
     console.error("Audio download error:", error);
     return null;
   }
+}
+
+async function tryExtractAudio(resp: Response, endpoint: string): Promise<{ base64: string; format: string } | null> {
+  if (!resp.ok) {
+    console.log(`${endpoint} returned status ${resp.status}`);
+    return null;
+  }
+  const contentType = resp.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await resp.json();
+    const b64 = data.base64 || data.data || data.result || data.media;
+    if (b64 && typeof b64 === "string" && b64.length > 100) {
+      console.log(`Downloaded via ${endpoint}, base64 length: ${b64.length}`);
+      const fmt = (data.mimetype || "").includes("mp3") ? "mp3" : "ogg";
+      return { base64: b64, format: fmt };
+    }
+    console.log(`${endpoint} JSON response has no usable base64:`, JSON.stringify(data).slice(0, 200));
+  } else {
+    const buf = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    if (bytes.length > 500) {
+      console.log(`Downloaded binary via ${endpoint}, size: ${bytes.length}`);
+      return { base64: arrayBufferToBase64(bytes), format: "ogg" };
+    }
+    console.log(`${endpoint} binary response too small: ${bytes.length}`);
+  }
+  return null;
 }
 
 function arrayBufferToBase64(bytes: Uint8Array): string {
@@ -112,7 +149,7 @@ function arrayBufferToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function transcribeAudio(messageId: string, mediaUrl: string | null, chatId: string | null): Promise<string | null> {
+async function transcribeAudio(messageId: string, mediaUrl: string | null, chatId: string | null, rawMessage: any): Promise<string | null> {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -121,10 +158,10 @@ async function transcribeAudio(messageId: string, mediaUrl: string | null, chatI
     }
 
     // Download via UaZapi ONLY (direct WhatsApp CDN URLs are encrypted and unusable)
-    const audioData = await downloadAudioFromUazapi(messageId, chatId);
+    const audioData = await downloadAudioFromUazapi(messageId, chatId, rawMessage);
 
     if (!audioData) {
-      console.error("Could not download audio via UaZapi - direct CDN URLs are encrypted and cannot be used");
+      console.error("Could not download audio via UaZapi");
       return null;
     }
 
@@ -443,7 +480,7 @@ Deno.serve(async (req) => {
       console.log("Audio message detected, starting transcription...");
       
       const chatId = body?.chat?.wa_chatid || body?.message?.chatid || null;
-      const transcription = await transcribeAudio(uazapiMessageId, mediaUrl, chatId);
+      const transcription = await transcribeAudio(uazapiMessageId, mediaUrl, chatId, body?.message || null);
       
       if (transcription && messageId) {
         // Update message with transcription
