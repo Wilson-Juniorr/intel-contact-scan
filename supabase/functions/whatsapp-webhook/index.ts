@@ -20,6 +20,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Validate webhook origin using UaZapi token
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+    const incomingToken = req.headers.get("token") || req.headers.get("x-token") || new URL(req.url).searchParams.get("token");
+    
+    if (UAZAPI_TOKEN && incomingToken && incomingToken !== UAZAPI_TOKEN) {
+      console.log("Invalid webhook token, rejecting");
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -154,7 +166,7 @@ Deno.serve(async (req) => {
     const { data: leads } = await supabase
       .from("leads")
       .select("id, user_id, phone")
-      .limit(100);
+      .limit(1000);
 
     if (leads) {
       for (const lead of leads) {
