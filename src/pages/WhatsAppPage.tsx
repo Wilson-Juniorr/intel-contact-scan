@@ -18,6 +18,7 @@ interface WhatsAppMessage {
   status: string | null;
   lead_id: string | null;
   created_at: string;
+  contact_name: string | null;
 }
 
 interface ConversationSummary {
@@ -121,7 +122,7 @@ export default function WhatsAppPage() {
         map.set(msg.phone, {
           phone: msg.phone,
           leadId: msg.lead_id || lead?.id || null,
-          leadName: lead?.name || null,
+          leadName: lead?.name || (msg as any).contact_name || null,
           lastMessage: msg.content,
           lastMessageAt: msg.created_at,
           messageCount: 1,
@@ -136,9 +137,9 @@ export default function WhatsAppPage() {
         if (msg.direction === "inbound" && msg.status !== "read") {
           existing.unreadCount++;
         }
-        if (!existing.leadName && lead?.name) {
-          existing.leadName = lead.name;
-          existing.leadId = lead.id;
+        if (!existing.leadName && (lead?.name || msg.contact_name)) {
+          existing.leadName = lead?.name || msg.contact_name || null;
+          existing.leadId = lead?.id || null;
         }
       }
     });
@@ -177,6 +178,7 @@ export default function WhatsAppPage() {
       status: "sending",
       lead_id: selectedConversation?.leadId || null,
       created_at: new Date().toISOString(),
+      contact_name: null,
     };
     setMessages((prev) => [...prev, optimisticMsg]);
     setNewMessage("");
