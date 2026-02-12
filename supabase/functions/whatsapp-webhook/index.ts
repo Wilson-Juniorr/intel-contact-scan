@@ -380,6 +380,12 @@ Deno.serve(async (req) => {
 
     const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
+    // Extract contact name from webhook payload
+    const contactName = body.chat?.wa_name || body.chat?.wa_contactName || 
+                        body.chat?.name || body.chat?.lead_name || body.chat?.lead_fullName ||
+                        body.message?.pushName || body.message?.notifyName || null;
+    const cleanContactName = contactName && contactName.trim() && contactName !== "." ? contactName.trim() : null;
+
     // === STEP 1: Save message immediately (for realtime) ===
     const { data: savedMsg, error: insertError } = await supabase
       .from("whatsapp_messages")
@@ -393,6 +399,7 @@ Deno.serve(async (req) => {
         media_url: mediaUrl,
         uazapi_message_id: uazapiMessageId,
         status: "received",
+        contact_name: cleanContactName,
       })
       .select("id")
       .single();
