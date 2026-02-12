@@ -17,12 +17,19 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null,
 
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
     const headers = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
+    const headersGet = { token: UAZAPI_TOKEN };
 
-    // Extract the hash part of the messageId
     const hashId = messageId.includes(":") ? messageId.split(":").pop()! : messageId;
     const cleanChatId = chatId ? (chatId.includes("@") ? chatId : `${chatId}@s.whatsapp.net`) : null;
 
-    // === Strategy 1: Pass full message key object (UaZapi V2 format) ===
+    // Build ID variants
+    const idVariants = [messageId, hashId];
+    if (cleanChatId) {
+      idVariants.push(`false_${cleanChatId}_${hashId}`);
+      idVariants.push(`true_${cleanChatId}_${hashId}`);
+    }
+
+    // === Strategy 1: POST with full message key object ===
     if (rawMessage) {
       const keyObj = {
         key: {
@@ -33,9 +40,10 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null,
         message: rawMessage.message || rawMessage.content || rawMessage,
       };
 
-      for (const endpoint of ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage", "/message/download"]) {
+      const postEndpoints = ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage", "/message/download", "/message/downloadMedia"];
+      for (const endpoint of postEndpoints) {
         try {
-          console.log(`Trying ${endpoint} with full key object, id: ${hashId}`);
+          console.log(`[S1-POST] ${endpoint} with key object, id: ${hashId}`);
           const resp = await fetch(`${baseUrl}${endpoint}`, {
             method: "POST",
             headers,
@@ -44,22 +52,17 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null,
           const result = await tryExtractAudio(resp, endpoint);
           if (result) return result;
         } catch (e) {
-          console.log(`${endpoint} with key object failed:`, e);
+          console.log(`${endpoint} POST key obj failed:`, e);
         }
       }
     }
 
-    // === Strategy 2: Try just messageId string (various formats) ===
-    const idVariants = [messageId, hashId];
-    if (cleanChatId) {
-      idVariants.push(`false_${cleanChatId}_${hashId}`);
-      idVariants.push(`true_${cleanChatId}_${hashId}`);
-    }
-
+    // === Strategy 2: POST with messageId string ===
+    const postEndpoints2 = ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage", "/message/downloadMedia"];
     for (const idVariant of idVariants) {
-      for (const endpoint of ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage"]) {
+      for (const endpoint of postEndpoints2) {
         try {
-          console.log(`Trying ${endpoint} with messageId: ${idVariant}`);
+          console.log(`[S2-POST] ${endpoint} msgId: ${idVariant}`);
           const resp = await fetch(`${baseUrl}${endpoint}`, {
             method: "POST",
             headers,
@@ -73,10 +76,25 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null,
       }
     }
 
-    // === Strategy 3: Try /chat/getLink ===
+    // === Strategy 3: GET with query param (some UaZapi versions use GET) ===
+    for (const idVariant of [hashId, messageId]) {
+      for (const endpoint of ["/chat/downloadMediaMessage", "/chat/getBase64FromMediaMessage", "/message/downloadMedia"]) {
+        try {
+          const url = `${baseUrl}${endpoint}?messageId=${encodeURIComponent(idVariant)}`;
+          console.log(`[S3-GET] ${url}`);
+          const resp = await fetch(url, { method: "GET", headers: headersGet });
+          const result = await tryExtractAudio(resp, `GET ${endpoint}`);
+          if (result) return result;
+        } catch (e) {
+          console.log(`GET ${endpoint} failed:`, e);
+        }
+      }
+    }
+
+    // === Strategy 4: /chat/getLink ===
     for (const idVariant of idVariants) {
       try {
-        console.log(`Trying /chat/getLink with: ${idVariant}`);
+        console.log(`[S4] /chat/getLink with: ${idVariant}`);
         const resp = await fetch(`${baseUrl}/chat/getLink`, {
           method: "POST",
           headers,
@@ -99,6 +117,32 @@ async function downloadAudioFromUazapi(messageId: string, chatId: string | null,
         }
       } catch (e) {
         console.log("getLink failed for:", idVariant, e);
+      }
+    }
+
+    // === Strategy 5: GET /chat/getLink ===
+    for (const idVariant of [hashId, messageId]) {
+      try {
+        const url = `${baseUrl}/chat/getLink?messageId=${encodeURIComponent(idVariant)}`;
+        console.log(`[S5-GET] ${url}`);
+        const resp = await fetch(url, { method: "GET", headers: headersGet });
+        if (resp.ok) {
+          const data = await resp.json();
+          const link = data.url || data.link || data.result;
+          if (link) {
+            console.log("Got link via GET:", link.slice(0, 80));
+            const audioResp = await fetch(link);
+            if (audioResp.ok) {
+              const buf = await audioResp.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              if (bytes.length > 500) {
+                return { base64: arrayBufferToBase64(bytes), format: "ogg" };
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log("GET getLink failed:", e);
       }
     }
 
