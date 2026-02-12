@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function downloadAudioFromUazapi(messageId: string): Promise<{ base64: string; format: string } | null> {
+async function downloadAudioFromUazapi(messageId: string, chatId: string | null): Promise<{ base64: string; format: string } | null> {
   try {
     const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
@@ -16,83 +16,103 @@ async function downloadAudioFromUazapi(messageId: string): Promise<{ base64: str
     }
 
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
-    // UaZapi V2 download media endpoint
-    const downloadUrl = `${baseUrl}/chat/downloadMediaMessage`;
-    
-    console.log("Downloading media via UaZapi for message:", messageId);
-    
-    const resp = await fetch(downloadUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        token: UAZAPI_TOKEN,
-      },
-      body: JSON.stringify({ messageId }),
-    });
+    const headers = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
 
-    if (!resp.ok) {
-      // Try alternative endpoint
-      console.log("Primary download failed, trying alternative endpoint...");
-      const altUrl = `${baseUrl}/chat/downloadBase64/${messageId}`;
-      const altResp = await fetch(altUrl, {
-        method: "GET",
-        headers: { token: UAZAPI_TOKEN },
-      });
-
-      if (!altResp.ok) {
-        console.error("All download attempts failed:", altResp.status);
-        return null;
-      }
-
-      const altData = await altResp.json();
-      const b64 = altData.base64 || altData.data || altData.result;
-      if (b64) {
-        return { base64: b64, format: "ogg" };
-      }
-      return null;
+    // Try multiple messageId formats
+    const idVariants = [messageId];
+    // If messageId contains ":", try just the hash part
+    if (messageId.includes(":")) {
+      idVariants.push(messageId.split(":").pop()!);
+    }
+    // Try full WAid format if chatId available
+    if (chatId) {
+      const cleanChatId = chatId.includes("@") ? chatId : `${chatId}@s.whatsapp.net`;
+      idVariants.push(`true_${cleanChatId}_${messageId.includes(":") ? messageId.split(":").pop() : messageId}`);
+      idVariants.push(`false_${cleanChatId}_${messageId.includes(":") ? messageId.split(":").pop() : messageId}`);
     }
 
-    const contentType = resp.headers.get("content-type") || "";
-    
-    // If response is JSON with base64
-    if (contentType.includes("application/json")) {
-      const data = await resp.json();
-      const b64 = data.base64 || data.data || data.result;
-      if (b64) {
-        const fmt = data.mimetype?.includes("mp3") ? "mp3" : "ogg";
-        return { base64: b64, format: fmt };
+    console.log("Downloading media via UaZapi, trying ID variants:", JSON.stringify(idVariants));
+
+    for (const idVariant of idVariants) {
+      // Endpoint 1: POST /chat/downloadMediaMessage
+      try {
+        const resp = await fetch(`${baseUrl}/chat/downloadMediaMessage`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ messageId: idVariant }),
+        });
+        if (resp.ok) {
+          const contentType = resp.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const data = await resp.json();
+            const b64 = data.base64 || data.data || data.result || data.media;
+            if (b64 && b64.length > 100) {
+              console.log("Downloaded via downloadMediaMessage with id:", idVariant);
+              const fmt = (data.mimetype || "").includes("mp3") ? "mp3" : "ogg";
+              return { base64: b64, format: fmt };
+            }
+          } else {
+            const buf = await resp.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            if (bytes.length > 500) {
+              const b64 = arrayBufferToBase64(bytes);
+              console.log("Downloaded binary via downloadMediaMessage, size:", bytes.length);
+              return { base64: b64, format: "ogg" };
+            }
+          }
+        }
+      } catch (e) {
+        console.log("downloadMediaMessage failed for:", idVariant, e);
       }
-    }
-    
-    // If response is raw binary
-    const audioBuffer = await resp.arrayBuffer();
-    const audioBytes = new Uint8Array(audioBuffer);
-    
-    if (audioBytes.length < 100) {
-      console.error("Audio too small, likely not valid:", audioBytes.length);
-      return null;
+
+      // Endpoint 2: POST /chat/getLink
+      try {
+        const resp = await fetch(`${baseUrl}/chat/getLink`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ messageId: idVariant }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const link = data.url || data.link || data.result;
+          if (link) {
+            console.log("Got decrypted link via getLink:", link.slice(0, 80));
+            const audioResp = await fetch(link);
+            if (audioResp.ok) {
+              const buf = await audioResp.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              if (bytes.length > 500) {
+                return { base64: arrayBufferToBase64(bytes), format: "ogg" };
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log("getLink failed for:", idVariant, e);
+      }
     }
 
-    // Chunked base64 conversion
-    const chunkSize = 8192;
-    let binary = "";
-    for (let i = 0; i < audioBytes.length; i += chunkSize) {
-      const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
-      for (let j = 0; j < chunk.length; j++) {
-        binary += String.fromCharCode(chunk[j]);
-      }
-    }
-    const audioBase64 = btoa(binary);
-    console.log("Audio downloaded, size:", audioBytes.length, "bytes");
-    
-    return { base64: audioBase64, format: "ogg" };
+    console.error("All UaZapi download attempts failed for all ID variants");
+    return null;
   } catch (error) {
     console.error("Audio download error:", error);
     return null;
   }
 }
 
-async function transcribeAudio(messageId: string, mediaUrl: string | null): Promise<string | null> {
+function arrayBufferToBase64(bytes: Uint8Array): string {
+  const chunkSize = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+  }
+  return btoa(binary);
+}
+
+async function transcribeAudio(messageId: string, mediaUrl: string | null, chatId: string | null): Promise<string | null> {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -100,36 +120,11 @@ async function transcribeAudio(messageId: string, mediaUrl: string | null): Prom
       return null;
     }
 
-    // Try downloading via UaZapi first
-    let audioData = await downloadAudioFromUazapi(messageId);
-
-    // Fallback: try direct URL download
-    if (!audioData && mediaUrl) {
-      console.log("Trying direct URL download:", mediaUrl.slice(0, 80));
-      try {
-        const audioResp = await fetch(mediaUrl);
-        if (audioResp.ok) {
-          const buf = await audioResp.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          if (bytes.length > 100) {
-            const chunkSize = 8192;
-            let binary = "";
-            for (let i = 0; i < bytes.length; i += chunkSize) {
-              const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-              for (let j = 0; j < chunk.length; j++) {
-                binary += String.fromCharCode(chunk[j]);
-              }
-            }
-            audioData = { base64: btoa(binary), format: "ogg" };
-          }
-        }
-      } catch (e) {
-        console.log("Direct URL download failed:", e);
-      }
-    }
+    // Download via UaZapi ONLY (direct WhatsApp CDN URLs are encrypted and unusable)
+    const audioData = await downloadAudioFromUazapi(messageId, chatId);
 
     if (!audioData) {
-      console.error("Could not download audio from any source");
+      console.error("Could not download audio via UaZapi - direct CDN URLs are encrypted and cannot be used");
       return null;
     }
 
@@ -447,7 +442,8 @@ Deno.serve(async (req) => {
     if ((messageType === "audio" || messageType === "ptt") && uazapiMessageId) {
       console.log("Audio message detected, starting transcription...");
       
-      const transcription = await transcribeAudio(uazapiMessageId, mediaUrl);
+      const chatId = body?.chat?.wa_chatid || body?.message?.chatid || null;
+      const transcription = await transcribeAudio(uazapiMessageId, mediaUrl, chatId);
       
       if (transcription && messageId) {
         // Update message with transcription
