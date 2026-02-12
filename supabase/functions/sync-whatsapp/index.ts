@@ -29,20 +29,18 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(
-      authHeader.replace("Bearer ", "")
-    );
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
 
     const baseUrl = UAZAPI_URL.replace(/\/+$/, "");
     const h = { "Content-Type": "application/json", token: UAZAPI_TOKEN };
 
-    // Step 1: Get all contacts via GET /contacts
+    // Step 1: Get all contacts
     console.log("=== SYNC: Fetching contacts ===");
     const contactsResp = await fetch(`${baseUrl}/contacts`, { method: "GET", headers: h });
     
@@ -55,156 +53,174 @@ Deno.serve(async (req) => {
       console.error("Failed to fetch contacts:", contactsResp.status);
     }
 
-    // Step 2: Fetch messages via POST /message/find with pagination
-    console.log("=== SYNC: Fetching messages ===");
-    
-    let allMessages: any[] = [];
-    let hasMore = true;
-    let offset = 0;
-    const limit = 100;
-    
-    while (hasMore && offset < 10000) { // Safety limit: max 10000 messages
-      const msgResp = await fetch(`${baseUrl}/message/find`, {
-        method: "POST",
-        headers: h,
-        body: JSON.stringify({ 
-          phone: "", // empty = all conversations
-          count: limit,
-          offset: offset,
-        }),
-      });
-
-      if (!msgResp.ok) {
-        console.error(`/message/find returned ${msgResp.status}`);
-        break;
-      }
-
-      const msgData = await msgResp.json();
-      const messages = msgData.messages || msgData.data || [];
-      hasMore = msgData.hasMore === true;
-      
-      console.log(`Offset ${offset}: got ${messages.length} messages, hasMore: ${hasMore}`);
-      allMessages = [...allMessages, ...messages];
-      offset += limit;
-      
-      if (messages.length === 0) break;
-    }
-
-    console.log(`Total messages fetched: ${allMessages.length}`);
-
-    // Get existing leads for matching
-    const { data: leads } = await supabase.from("leads").select("id, phone, name");
-    
-    // Get existing uazapi message IDs to avoid duplicates
-    const { data: existingMsgs } = await supabase
-      .from("whatsapp_messages")
-      .select("uazapi_message_id")
-      .not("uazapi_message_id", "is", null);
-    
-    const existingIds = new Set((existingMsgs || []).map(m => m.uazapi_message_id));
-
-    // Build contact name map from UaZapi contacts
+    // Build contact name map + phone list
     const contactMap = new Map<string, string>();
+    const contactPhones: string[] = [];
     for (const c of contacts) {
       const jid = c.jid || c.id || "";
       const phone = jid.replace("@s.whatsapp.net", "").replace(/\D/g, "");
       const name = c.contact_name || c.name || c.pushName || c.notify || "";
-      if (phone && name) contactMap.set(phone, name);
+      if (phone && phone.length >= 10) {
+        if (name) contactMap.set(phone, name);
+        contactPhones.push(phone);
+      }
     }
+    console.log(`Contact map has ${contactMap.size} names, ${contactPhones.length} phones`);
 
+    // Get existing leads for matching
+    const { data: leads } = await supabase.from("leads").select("id, phone, name");
+    
+    // Get ALL existing uazapi message IDs to avoid duplicates
+    const existingIds = new Set<string>();
+    let offset = 0;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("whatsapp_messages")
+        .select("uazapi_message_id")
+        .not("uazapi_message_id", "is", null)
+        .range(offset, offset + 999);
+      if (!batch || batch.length === 0) break;
+      batch.forEach(m => existingIds.add(m.uazapi_message_id!));
+      if (batch.length < 1000) break;
+      offset += 1000;
+    }
+    console.log(`Existing messages in DB: ${existingIds.size}`);
+
+    // Step 2: Fetch messages PER CONTACT to get complete history
+    console.log("=== SYNC: Fetching messages per contact ===");
+    
+    let totalFetched = 0;
     let totalImported = 0;
     let totalSkipped = 0;
     const conversationPhones = new Set<string>();
     const messagesToInsert: any[] = [];
 
-    for (const msg of allMessages) {
-      const msgId = msg.messageid || msg.id || msg.key?.id || null;
-      const fullId = msg.id || (msg.owner && msgId ? `${msg.owner}:${msgId}` : msgId);
-      
-      // Skip duplicates
-      if (fullId && existingIds.has(fullId)) {
-        totalSkipped++;
-        continue;
-      }
+    // Also fetch with empty phone to catch any conversations not in contacts
+    const phonesToFetch = [...new Set([...contactPhones, ""])];
 
-      // Extract phone from chatid
-      const chatId = msg.chatid || msg.chat || "";
-      const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "").replace(/\D/g, "");
-      
-      // Skip groups and invalid
-      if (chatId.includes("@g.us") || !phone || phone.length < 10) continue;
-      
-      const normalizedPhone = phone.startsWith("55") ? phone : `55${phone}`;
-      const isFromMe = msg.fromMe === true;
-      
-      // Extract content based on messageType
-      let content: string | null = null;
-      let messageType = "text";
-      const msgType = (msg.messageType || "").toLowerCase();
-      
-      if (msg.content?.text) {
-        content = msg.content.text;
-      } else if (msg.content?.caption) {
-        content = msg.content.caption;
-      } else if (typeof msg.content === "string") {
-        content = msg.content;
-      }
+    for (const fetchPhone of phonesToFetch) {
+      let phoneOffset = 0;
+      const limit = 100;
+      let phoneMessages = 0;
 
-      if (msgType.includes("image")) messageType = "image";
-      else if (msgType.includes("audio") || msgType.includes("ptt")) messageType = "audio";
-      else if (msgType.includes("video")) messageType = "video";
-      else if (msgType.includes("document")) messageType = "document";
-      else if (msgType.includes("sticker")) messageType = "sticker";
-      else if (msgType.includes("conversation") || msgType.includes("text") || msgType.includes("extended")) messageType = "text";
-      else messageType = "text";
+      while (phoneOffset < 50000) {
+        try {
+          const msgResp = await fetch(`${baseUrl}/message/find`, {
+            method: "POST",
+            headers: h,
+            body: JSON.stringify({ 
+              phone: fetchPhone ? `${fetchPhone}@s.whatsapp.net` : "",
+              count: limit,
+              offset: phoneOffset,
+            }),
+          });
 
-      // Get timestamp
-      const timestamp = msg.messageTimestamp || msg.timestamp;
-      let createdAt: string;
-      if (timestamp) {
-        const ts = typeof timestamp === "number"
-          ? (timestamp > 1e12 ? timestamp : timestamp * 1000)
-          : new Date(timestamp).getTime();
-        createdAt = new Date(ts).toISOString();
-      } else {
-        createdAt = new Date().toISOString();
-      }
-
-      // Match with lead
-      let leadId: string | null = null;
-      if (leads) {
-        for (const lead of leads) {
-          const leadClean = lead.phone.replace(/\D/g, "");
-          const leadNormalized = leadClean.startsWith("55") ? leadClean : `55${leadClean}`;
-          if (leadNormalized === normalizedPhone || leadClean === phone) {
-            leadId = lead.id;
+          if (!msgResp.ok) {
+            console.error(`/message/find for ${fetchPhone || 'all'} returned ${msgResp.status}`);
             break;
           }
+
+          const msgData = await msgResp.json();
+          const messages = Array.isArray(msgData) ? msgData : (msgData.messages || msgData.data || []);
+          
+          if (messages.length === 0) break;
+
+          phoneMessages += messages.length;
+
+          for (const msg of messages) {
+            const msgId = msg.messageid || msg.id || msg.key?.id || null;
+            const fullId = msg.id || (msg.owner && msgId ? `${msg.owner}:${msgId}` : msgId);
+            
+            if (fullId && existingIds.has(fullId)) {
+              totalSkipped++;
+              continue;
+            }
+
+            const chatId = msg.chatid || msg.chat || "";
+            const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "").replace(/\D/g, "");
+            
+            if (chatId.includes("@g.us") || !phone || phone.length < 10) continue;
+            
+            const normalizedPhone = phone.startsWith("55") ? phone : `55${phone}`;
+            const isFromMe = msg.fromMe === true;
+            
+            let content: string | null = null;
+            let messageType = "text";
+            const msgType = (msg.messageType || "").toLowerCase();
+            
+            if (msg.content?.text) content = msg.content.text;
+            else if (msg.content?.caption) content = msg.content.caption;
+            else if (typeof msg.content === "string") content = msg.content;
+
+            if (msgType.includes("image")) messageType = "image";
+            else if (msgType.includes("audio") || msgType.includes("ptt")) messageType = "audio";
+            else if (msgType.includes("video")) messageType = "video";
+            else if (msgType.includes("document")) messageType = "document";
+            else if (msgType.includes("sticker")) messageType = "sticker";
+            else messageType = "text";
+
+            const timestamp = msg.messageTimestamp || msg.timestamp;
+            let createdAt: string;
+            if (timestamp) {
+              const ts = typeof timestamp === "number"
+                ? (timestamp > 1e12 ? timestamp : timestamp * 1000)
+                : new Date(timestamp).getTime();
+              createdAt = new Date(ts).toISOString();
+            } else {
+              createdAt = new Date().toISOString();
+            }
+
+            let leadId: string | null = null;
+            if (leads) {
+              for (const lead of leads) {
+                const leadClean = lead.phone.replace(/\D/g, "");
+                const leadNormalized = leadClean.startsWith("55") ? leadClean : `55${leadClean}`;
+                if (leadNormalized === normalizedPhone || leadClean === phone) {
+                  leadId = lead.id;
+                  break;
+                }
+              }
+            }
+
+            const mediaUrl = msg.fileURL || msg.mediaUrl || null;
+            const contactName = contactMap.get(phone) || contactMap.get(normalizedPhone) || 
+                               msg.pushName || msg.notifyName || null;
+
+            messagesToInsert.push({
+              user_id: userId,
+              lead_id: leadId,
+              phone: normalizedPhone,
+              direction: isFromMe ? "outbound" : "inbound",
+              message_type: messageType,
+              content,
+              media_url: mediaUrl || null,
+              uazapi_message_id: fullId,
+              status: isFromMe ? "sent" : "received",
+              created_at: createdAt,
+              contact_name: contactName,
+            });
+
+            if (fullId) existingIds.add(fullId);
+            conversationPhones.add(normalizedPhone);
+          }
+
+          totalFetched += messages.length;
+          phoneOffset += limit;
+
+          if (messages.length < limit) break;
+          if (msgData.hasMore === false) break;
+        } catch (e) {
+          console.error(`Error fetching messages for ${fetchPhone}:`, e);
+          break;
         }
       }
 
-      const mediaUrl = msg.fileURL || msg.mediaUrl || null;
-
-      // Get contact name from UaZapi contacts
-      const contactName = contactMap.get(phone) || contactMap.get(normalizedPhone) || null;
-
-      messagesToInsert.push({
-        user_id: userId,
-        lead_id: leadId,
-        phone: normalizedPhone,
-        direction: isFromMe ? "outbound" : "inbound",
-        message_type: messageType,
-        content: content,
-        media_url: mediaUrl || null,
-        uazapi_message_id: fullId,
-        status: isFromMe ? "sent" : "received",
-        created_at: createdAt,
-        contact_name: contactName,
-      });
-
-      if (fullId) existingIds.add(fullId);
-      conversationPhones.add(normalizedPhone);
+      if (phoneMessages > 0 && fetchPhone) {
+        console.log(`  ${fetchPhone}: ${phoneMessages} messages`);
+      }
     }
+
+    console.log(`Total messages fetched: ${totalFetched}`);
 
     // Batch insert in chunks of 100
     let insertedCount = 0;
@@ -220,18 +236,31 @@ Deno.serve(async (req) => {
         insertedCount += chunk.length;
       }
     }
-
     totalImported = insertedCount;
 
-    console.log(`=== SYNC COMPLETE: ${totalImported} imported, ${totalSkipped} duplicates skipped, ${conversationPhones.size} conversations ===`);
+    // Step 3: Update existing messages that have null contact_name
+    let namesUpdated = 0;
+    for (const [phone, name] of contactMap) {
+      const normalizedPhone = phone.startsWith("55") ? phone : `55${phone}`;
+      const { count } = await supabase
+        .from("whatsapp_messages")
+        .update({ contact_name: name })
+        .is("contact_name", null)
+        .eq("phone", normalizedPhone)
+        .select("id", { count: "exact", head: true });
+      if (count && count > 0) namesUpdated += count;
+    }
+
+    console.log(`=== SYNC COMPLETE: ${totalImported} imported, ${totalSkipped} duplicates skipped, ${conversationPhones.size} new conversations, ${namesUpdated} names updated ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
         totalContacts: contacts.length,
-        totalMessagesFetched: allMessages.length,
+        totalMessagesFetched: totalFetched,
         totalImported,
         totalSkipped,
+        namesUpdated,
         conversations: conversationPhones.size,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
