@@ -11,6 +11,7 @@ import LeadsPage from "@/pages/LeadsPage";
 import FunnelPage from "@/pages/FunnelPage";
 import AssistantPage from "@/pages/AssistantPage";
 import AuthPage from "@/pages/AuthPage";
+import WhatsAppPage from "@/pages/WhatsAppPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ function ProtectedRoutes() {
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/funnel" element={<FunnelPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
+          <Route path="/whatsapp" element={<WhatsAppPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
