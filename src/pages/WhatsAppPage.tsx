@@ -49,7 +49,7 @@ export default function WhatsAppPage() {
       if (error) throw new Error(error.message);
       toast({
         title: "Sincronização concluída",
-        description: `${data.totalImported || 0} novas mensagens, ${data.namesUpdated || 0} nomes atualizados, ${data.totalContacts || 0} contatos`,
+        description: `${data.totalImported || 0} novas mensagens importadas, ${data.totalSkipped || 0} duplicadas ignoradas, ${data.contactsWithNames || 0}/${data.totalContacts || 0} contatos com nome, ${data.namesUpdated || 0} nomes atualizados`,
       });
       await fetchMessages();
     } catch (e: any) {
