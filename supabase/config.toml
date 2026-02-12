@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.follow-up-message]
 verify_jwt = false
+
+[functions.send-whatsapp]
+verify_jwt = false
