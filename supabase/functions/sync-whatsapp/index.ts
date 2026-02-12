@@ -324,11 +324,10 @@ Deno.serve(async (req) => {
           }
         }
 
-        offset += batchSize;
+        // Increment by actual messages returned, not batchSize — API caps at ~200
+        offset += messages.length;
         
-        // No artificial limit - fetch everything
-        // API may return less than batchSize (e.g. max 200 per request) - only stop on truly empty
-        if (messages.length === 0) break;
+        console.log(`Batch: ${messages.length} msgs, offset now: ${offset}, total: ${totalFetched}`);
         if (offset > 500000) break; // extreme safety only
       } catch (e) {
         console.error(`Error at offset ${offset}:`, e);
