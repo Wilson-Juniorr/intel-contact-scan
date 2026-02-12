@@ -41,6 +41,22 @@ const CRM_TOOLS = [
   {
     type: "function",
     function: {
+      name: "get_whatsapp_history",
+      description: "Busca o histórico completo de conversas do WhatsApp de um contato/lead. Inclui textos, transcrições de áudio (🎤) e descrições de imagem. Use para entender o contexto da conversa antes de sugerir follow-ups ou ações.",
+      parameters: {
+        type: "object",
+        properties: {
+          phone: { type: "string", description: "Número de telefone (com ou sem 55)" },
+          lead_name: { type: "string", description: "Nome do lead/contato para buscar o telefone" },
+          limit: { type: "number", description: "Quantidade de mensagens (padrão: 50, máx: 200)" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "move_lead_stage",
       description: "Move um lead para uma nova etapa do funil. SÓ use após confirmação do usuário via search_lead.",
       parameters: {
@@ -164,6 +180,72 @@ async function executeTool(supabase: any, userId: string, toolCall: any, fileInf
       case "search_lead": {
         return await searchLeads(supabase, params.lead_name);
       }
+      case "get_whatsapp_history": {
+        let phone = params.phone?.replace(/\D/g, "") || "";
+        
+        // If no phone, search by lead name
+        if (!phone && params.lead_name) {
+          const { data: leads } = await supabase
+            .from("leads")
+            .select("phone, name")
+            .ilike("name", `%${params.lead_name}%`)
+            .limit(1);
+          if (leads?.length) {
+            phone = leads[0].phone.replace(/\D/g, "");
+          }
+          
+          // Also check whatsapp_contacts
+          if (!phone) {
+            const { data: contacts } = await supabase
+              .from("whatsapp_contacts")
+              .select("phone, contact_name")
+              .ilike("contact_name", `%${params.lead_name}%`)
+              .limit(1);
+            if (contacts?.length) phone = contacts[0].phone;
+          }
+        }
+        
+        if (!phone) return { error: `Contato não encontrado: ${params.lead_name || params.phone}` };
+        
+        // Normalize phone
+        const normalizedPhone = phone.startsWith("55") ? phone : `55${phone}`;
+        const limit = Math.min(params.limit || 50, 200);
+        
+        const { data: msgs } = await supabase
+          .from("whatsapp_messages")
+          .select("direction, message_type, content, created_at, contact_name")
+          .eq("phone", normalizedPhone)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        
+        if (!msgs?.length) {
+          // Try without 55 prefix
+          const { data: msgs2 } = await supabase
+            .from("whatsapp_messages")
+            .select("direction, message_type, content, created_at, contact_name")
+            .eq("phone", phone)
+            .order("created_at", { ascending: false })
+            .limit(limit);
+          
+          if (!msgs2?.length) return { found: 0, message: `Nenhuma mensagem encontrada para ${normalizedPhone}` };
+          msgs?.push(...(msgs2 || []));
+        }
+        
+        // Format messages chronologically
+        const formatted = (msgs || []).reverse().map((m: any) => {
+          const dir = m.direction === "outbound" ? "→ EU" : "← CLIENTE";
+          const type = m.message_type !== "text" ? ` [${m.message_type}]` : "";
+          const time = new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+          return `${time} ${dir}${type}: ${m.content || "[Mídia sem texto]"}`;
+        });
+        
+        return {
+          found: formatted.length,
+          phone: normalizedPhone,
+          contactName: msgs?.[0]?.contact_name || null,
+          messages: formatted,
+        };
+      }
       case "move_lead_stage": {
         const update: any = { stage: params.new_stage };
         if (params.lost_reason) update.lost_reason = params.lost_reason;
@@ -203,7 +285,7 @@ async function executeTool(supabase: any, userId: string, toolCall: any, fileInf
           category: params.category,
         });
         if (error) return { error: error.message };
-        return { success: true, message: `Documento "${fileInfo.file_name}" atribuído ao lead "${lead.name}" (${params.category})` };
+        return { success: true, message: `Documento atribuído ao lead (${params.category})` };
       }
       default:
         return { error: `Ferramenta desconhecida: ${fnName}` };
@@ -242,25 +324,31 @@ serve(async (req) => {
 
     const systemContent = `Você é um assistente especialista em planos de saúde no Brasil. Seu nome é CRM Saúde IA.
 
-Você tem ACESSO TOTAL aos dados do CRM e pode EXECUTAR AÇÕES diretamente no sistema.
+Você tem ACESSO TOTAL aos dados do CRM E às conversas do WhatsApp. Pode EXECUTAR AÇÕES diretamente.
 
 ## AÇÕES DISPONÍVEIS:
 - **search_lead**: Buscar lead pelo nome (SEMPRE use primeiro!)
+- **get_whatsapp_history**: Buscar histórico de conversa WhatsApp de um contato (inclui textos, transcrições de áudio 🎤 e legendas de imagem). USE SEMPRE que o usuário perguntar sobre um contato, pedir sugestão de follow-up, ou quiser entender o contexto de uma conversa.
 - **move_lead_stage**: Mover lead de etapa no funil
 - **add_interaction**: Registrar ligação, mensagem, reunião, email ou anotação
 - **create_reminder**: Criar lembrete/follow-up agendado
 - **add_note**: Adicionar observação/nota a um lead
 - **assign_document**: Atribuir documento enviado a um lead
 
+## INTELIGÊNCIA WHATSAPP:
+- Você tem acesso ao histórico COMPLETO de conversas WhatsApp
+- Transcrições de áudio aparecem com prefixo 🎤
+- Ao sugerir follow-ups, SEMPRE busque o histórico primeiro para entender contexto
+- Analise o tom, interesse e objeções do cliente nas mensagens
+- Sugira abordagens personalizadas baseadas no que o cliente disse
+
 ## REGRAS OBRIGATÓRIAS DE CONFIRMAÇÃO:
 1. ANTES de qualquer ação, SEMPRE use search_lead primeiro para buscar o lead
-2. Apresente os dados do lead encontrado ao usuário em formato organizado:
-   - Nome completo, Telefone, Tipo (PF/PME/Adesão), Etapa atual, Operadora
+2. Apresente os dados do lead encontrado ao usuário em formato organizado
 3. Se encontrar MAIS DE UM lead, liste TODOS e pergunte qual é o correto
 4. PEÇA CONFIRMAÇÃO explícita: "Confirma que deseja [ação] para este lead?"
-5. SÓ execute a ação (move_lead_stage, add_interaction, etc.) DEPOIS que o usuário confirmar
-6. Use o lead_id (UUID) retornado pelo search_lead para executar as ações
-7. Se o usuário enviar um arquivo, pergunte a qual lead pertence e a categoria, mostre os dados e confirme
+5. SÓ execute a ação DEPOIS que o usuário confirmar
+6. Se o usuário enviar um arquivo, pergunte a qual lead pertence e a categoria
 
 ## CONHECIMENTOS:
 - Operadoras (Unimed, Amil, Bradesco Saúde, SulAmérica, Hapvida, Porto Seguro, etc.)
