@@ -49,7 +49,7 @@ export default function WhatsAppPage() {
       if (error) throw new Error(error.message);
       toast({
         title: "Sincronização concluída",
-        description: `${data.totalImported || 0} mensagens importadas de ${data.conversations || 0} conversas`,
+        description: `${data.totalImported || 0} novas mensagens, ${data.namesUpdated || 0} nomes atualizados, ${data.totalContacts || 0} contatos`,
       });
       await fetchMessages();
     } catch (e: any) {
@@ -82,25 +82,31 @@ export default function WhatsAppPage() {
       .channel("whatsapp-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "whatsapp_messages" },
+        { event: "INSERT", schema: "public", table: "whatsapp_messages" },
         (payload) => {
-          if (payload.eventType === "DELETE") return;
           const newMsg = payload.new as WhatsAppMessage;
           setMessages((prev) => {
-            const filtered = prev.filter((m) => m.id !== newMsg.id);
-            return [...filtered, newMsg].sort(
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
           });
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "whatsapp_messages" },
+        (payload) => {
+          const updated = payload.new as WhatsAppMessage;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === updated.id ? updated : m))
+          );
+        }
+      )
       .subscribe();
-
-    const pollInterval = setInterval(fetchMessages, 3000);
 
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(pollInterval);
     };
   }, [user]);
 
