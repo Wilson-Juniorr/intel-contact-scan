@@ -320,7 +320,7 @@ export default function WhatsAppPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] h-[calc(100vh-180px)] rounded-lg overflow-hidden border border-[#2a3942] shadow-xl">
         <ConversationList
           conversations={filteredConversations}
           searchTerm={searchTerm}
