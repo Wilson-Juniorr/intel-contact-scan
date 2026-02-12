@@ -341,11 +341,63 @@ Deno.serve(async (req) => {
     // STEP 5: Insert new messages
     // =============================================
     let insertedCount = 0;
+    const insertedMessages: { id: string; message_type: string; uazapi_message_id: string | null }[] = [];
+    
     for (let i = 0; i < messagesToInsert.length; i += 200) {
       const chunk = messagesToInsert.slice(i, i + 200);
-      const { error } = await supabase.from("whatsapp_messages").insert(chunk);
+      const { data: inserted, error } = await supabase
+        .from("whatsapp_messages")
+        .insert(chunk)
+        .select("id, message_type, uazapi_message_id");
       if (error) console.error(`Insert error chunk ${i}:`, error.message);
-      else insertedCount += chunk.length;
+      else {
+        insertedCount += (inserted?.length || chunk.length);
+        if (inserted) insertedMessages.push(...inserted);
+      }
+    }
+
+    // =============================================
+    // STEP 5.5: Analyze media (images + documents) via AI
+    // =============================================
+    const mediaMessages = insertedMessages.filter(
+      m => m.message_type === "image" || m.message_type === "document"
+    );
+    let mediaAnalyzed = 0;
+    
+    if (mediaMessages.length > 0) {
+      console.log(`=== STEP 5.5: Analyzing ${mediaMessages.length} media messages ===`);
+      
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+      
+      // Process in parallel batches of 5 to avoid overwhelming the API
+      for (let i = 0; i < mediaMessages.length; i += 5) {
+        const batch = mediaMessages.slice(i, i + 5);
+        const promises = batch.map(async (msg) => {
+          try {
+            const resp = await fetch(`${SUPABASE_URL}/functions/v1/analyze-media`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                message_id: msg.id,
+                uazapi_message_id: msg.uazapi_message_id,
+                message_type: msg.message_type,
+              }),
+            });
+            if (resp.ok) {
+              const result = await resp.json();
+              if (result.analyzed) mediaAnalyzed++;
+            }
+          } catch (e) {
+            console.error(`Media analysis error for ${msg.id}:`, e);
+          }
+        });
+        await Promise.all(promises);
+      }
+      console.log(`Media analyzed: ${mediaAnalyzed}/${mediaMessages.length}`);
     }
 
     // =============================================
@@ -391,6 +443,8 @@ Deno.serve(async (req) => {
       totalSkipped,
       namesUpdated,
       contactsSaved,
+      mediaAnalyzed,
+      totalMediaFound: mediaMessages.length,
     };
 
     console.log(`=== DONE ===`, JSON.stringify(summary));
