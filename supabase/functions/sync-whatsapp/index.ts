@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     let offset = 0;
     const limit = 100;
     
-    while (hasMore && offset < 2000) { // Safety limit: max 2000 messages
+    while (hasMore && offset < 10000) { // Safety limit: max 10000 messages
       const msgResp = await fetch(`${baseUrl}/message/find`, {
         method: "POST",
         headers: h,
@@ -185,6 +185,9 @@ Deno.serve(async (req) => {
 
       const mediaUrl = msg.fileURL || msg.mediaUrl || null;
 
+      // Get contact name from UaZapi contacts
+      const contactName = contactMap.get(phone) || contactMap.get(normalizedPhone) || null;
+
       messagesToInsert.push({
         user_id: userId,
         lead_id: leadId,
@@ -196,6 +199,7 @@ Deno.serve(async (req) => {
         uazapi_message_id: fullId,
         status: isFromMe ? "sent" : "received",
         created_at: createdAt,
+        contact_name: contactName,
       });
 
       if (fullId) existingIds.add(fullId);

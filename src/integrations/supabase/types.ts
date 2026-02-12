@@ -386,6 +386,7 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          contact_name: string | null
           content: string | null
           created_at: string
           direction: string
@@ -399,6 +400,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          contact_name?: string | null
           content?: string | null
           created_at?: string
           direction: string
@@ -412,6 +414,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          contact_name?: string | null
           content?: string | null
           created_at?: string
           direction?: string
