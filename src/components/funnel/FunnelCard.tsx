@@ -1,7 +1,8 @@
-import { Phone, MessageCircle, Mail, User, Clock, ClipboardList } from "lucide-react";
+import { Phone, MessageCircle, Mail, User, Clock, ClipboardList, PhoneCall } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { useContactAttempts } from "@/hooks/useContactAttempts";
 
 interface Props {
   lead: any;
@@ -12,6 +13,7 @@ interface Props {
 
 export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
+  const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
 
   const timeSince = lead.last_contact_at
     ? formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: false, locale: ptBR })
@@ -61,6 +63,19 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
           <User className="h-3.5 w-3.5 shrink-0" style={{ color: stageColor }} />
           <span className="truncate">{lead.name}</span>
         </div>
+
+        {/* Contact attempts */}
+        {totalAttempts > 0 && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <PhoneCall className="h-3 w-3" style={{ color: stageColor }} />
+              {totalAttempts} tentativa{totalAttempts > 1 ? "s" : ""}
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : responseRate > 0 ? "hsl(35, 85%, 50%)" : undefined }}>
+              {responseRate}% resp.
+            </span>
+          </div>
+        )}
 
         {/* Time */}
         {timeSince && (
