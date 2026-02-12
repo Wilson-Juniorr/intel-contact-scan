@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json();
-    console.log("Webhook RAW payload:", JSON.stringify(body).slice(0, 1000));
+    console.log("Webhook RAW payload:", JSON.stringify(body).slice(0, 2000));
 
     let phone: string | null = null;
     let content: string | null = null;
@@ -47,61 +47,79 @@ Deno.serve(async (req) => {
     let uazapiMessageId: string | null = null;
     let isFromMe = false;
 
-    // Try to extract message data from various UaZapi payload formats
-    let msg: any = null;
+    // ===== UaZapi real format =====
+    // { EventType: "messages", chat: { phone, wa_chatid, owner, ... }, message: { ... } }
+    if (body.EventType === "messages" && body.chat) {
+      phone = body.chat.phone?.replace(/\D/g, "") || null;
+      isFromMe = body.fromMe === true || body.message?.fromMe === true;
+      uazapiMessageId = body.message?.id || body.message?.key?.id || null;
 
-    if (body.data?.key?.remoteJid) {
-      msg = body.data;
-    } else if (Array.isArray(body.data) && body.data.length > 0) {
-      msg = body.data[0];
-    } else if (body.key?.remoteJid) {
-      msg = body;
-    } else if (body.remoteJid || body.from) {
-      phone = (body.remoteJid || body.from || "").replace("@s.whatsapp.net", "").replace("@g.us", "");
-      isFromMe = body.fromMe === true;
-      content = body.body || body.text || body.caption || body.content || null;
-      uazapiMessageId = body.id || body.messageId || null;
-      messageType = body.type || "text";
-    }
+      // Extract content from UaZapi message object
+      const m = body.message || {};
+      content = m.body || m.text || m.conversation || m.caption || null;
+      if (!content && m.message?.conversation) content = m.message.conversation;
+      if (!content && m.message?.extendedTextMessage?.text) content = m.message.extendedTextMessage.text;
 
-    if (msg && !phone) {
-      const remoteJid = msg.key?.remoteJid || msg.remoteJid || "";
-      phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-      isFromMe = msg.key?.fromMe === true || msg.fromMe === true;
-      uazapiMessageId = msg.key?.id || msg.id || null;
-
-      const m = msg.message || msg;
-      if (m.conversation) {
-        content = m.conversation;
-        messageType = "text";
-      } else if (m.extendedTextMessage?.text) {
-        content = m.extendedTextMessage.text;
-        messageType = "text";
-      } else if (m.imageMessage) {
-        content = m.imageMessage.caption || null;
-        mediaUrl = m.imageMessage.url || null;
+      // Determine message type
+      if (m.type === "image" || m.isMedia === true && m.mimetype?.startsWith("image")) {
         messageType = "image";
-      } else if (m.audioMessage) {
-        content = null;
-        mediaUrl = m.audioMessage.url || null;
+        mediaUrl = m.mediaUrl || m.url || null;
+        if (!content) content = m.caption || null;
+      } else if (m.type === "audio" || m.type === "ptt") {
         messageType = "audio";
-      } else if (m.videoMessage) {
-        content = m.videoMessage.caption || null;
-        mediaUrl = m.videoMessage.url || null;
+        mediaUrl = m.mediaUrl || m.url || null;
+      } else if (m.type === "video") {
         messageType = "video";
-      } else if (m.documentMessage) {
-        content = m.documentMessage.fileName || null;
-        mediaUrl = m.documentMessage.url || null;
+        mediaUrl = m.mediaUrl || m.url || null;
+      } else if (m.type === "document") {
         messageType = "document";
-      } else if (m.stickerMessage) {
-        content = null;
+        mediaUrl = m.mediaUrl || m.url || null;
+        if (!content) content = m.fileName || null;
+      } else if (m.type === "sticker") {
         messageType = "sticker";
-      } else if (m.body || m.text) {
-        content = m.body || m.text;
-        messageType = "text";
       } else {
-        content = JSON.stringify(m).slice(0, 200);
-        messageType = "unknown";
+        messageType = m.type || "text";
+      }
+
+      // Check fromMe from message object
+      if (m.fromMe === true) isFromMe = true;
+
+      console.log("Parsed UaZapi format - phone:", phone, "fromMe:", isFromMe, "content:", content?.slice(0, 50));
+    }
+    // ===== Baileys/alternative format =====
+    else {
+      let msg: any = null;
+
+      if (body.data?.key?.remoteJid) {
+        msg = body.data;
+      } else if (Array.isArray(body.data) && body.data.length > 0) {
+        msg = body.data[0];
+      } else if (body.key?.remoteJid) {
+        msg = body;
+      } else if (body.remoteJid || body.from) {
+        phone = (body.remoteJid || body.from || "").replace("@s.whatsapp.net", "").replace("@g.us", "");
+        isFromMe = body.fromMe === true;
+        content = body.body || body.text || body.caption || body.content || null;
+        uazapiMessageId = body.id || body.messageId || null;
+        messageType = body.type || "text";
+      }
+
+      if (msg && !phone) {
+        const remoteJid = msg.key?.remoteJid || msg.remoteJid || "";
+        phone = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+        isFromMe = msg.key?.fromMe === true || msg.fromMe === true;
+        uazapiMessageId = msg.key?.id || msg.id || null;
+
+        const m = msg.message || msg;
+        if (m.conversation) { content = m.conversation; messageType = "text"; }
+        else if (m.extendedTextMessage?.text) { content = m.extendedTextMessage.text; messageType = "text"; }
+        else if (m.imageMessage) { content = m.imageMessage.caption || null; mediaUrl = m.imageMessage.url || null; messageType = "image"; }
+        else if (m.audioMessage) { mediaUrl = m.audioMessage.url || null; messageType = "audio"; }
+        else if (m.videoMessage) { content = m.videoMessage.caption || null; mediaUrl = m.videoMessage.url || null; messageType = "video"; }
+        else if (m.documentMessage) { content = m.documentMessage.fileName || null; mediaUrl = m.documentMessage.url || null; messageType = "document"; }
+        else if (m.stickerMessage) { messageType = "sticker"; }
+        else if (m.body || m.text) { content = m.body || m.text; messageType = "text"; }
+        else { content = JSON.stringify(m).slice(0, 200); messageType = "unknown"; }
       }
     }
 
