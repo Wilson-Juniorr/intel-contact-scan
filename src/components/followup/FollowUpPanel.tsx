@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const FOLLOW_UP_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`;
 
@@ -53,6 +54,7 @@ export function FollowUpPanel() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [contexts, setContexts] = useState<Record<string, string>>({});
+  const [sendingFor, setSendingFor] = useState<string | null>(null);
 
   const excludedStages = ["implantado", "declinado", "cancelado"];
 
@@ -97,10 +99,34 @@ export function FollowUpPanel() {
     setGeneratingFor(null);
   };
 
-  const sendToWhatsApp = (lead: any, message: string) => {
-    const phone = lead.phone.replace(/\D/g, "");
-    const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/55${phone}?text=${encoded}`, "_blank");
+  const sendToWhatsApp = async (lead: any, message: string) => {
+    setSendingFor(lead.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
+        return;
+      }
+
+      const resp = await supabase.functions.invoke("send-whatsapp", {
+        body: { phone: lead.phone, message, lead_id: lead.id },
+      });
+
+      if (resp.error) throw new Error(resp.error.message);
+
+      toast({ title: "✅ Enviado!", description: `Mensagem enviada para ${lead.name} via WhatsApp` });
+      // Limpa a mensagem após envio
+      setMessages((prev) => {
+        const copy = { ...prev };
+        delete copy[lead.id];
+        return copy;
+      });
+      setEditingId(null);
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingFor(null);
+    }
   };
 
   const copyMessage = (id: string, message: string) => {
@@ -240,9 +266,14 @@ export function FollowUpPanel() {
                         size="sm"
                         className="text-xs gap-1.5 bg-[hsl(142,70%,40%)] hover:bg-[hsl(142,70%,35%)] text-white"
                         onClick={() => sendToWhatsApp(il.lead, msg)}
+                        disabled={sendingFor === il.lead.id}
                       >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        WhatsApp
+                        {sendingFor === il.lead.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        {sendingFor === il.lead.id ? "Enviando..." : "Enviar WhatsApp"}
                       </Button>
                       <Button
                         size="sm"
