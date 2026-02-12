@@ -64,18 +64,32 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
           <span className="truncate">{lead.name}</span>
         </div>
 
-        {/* Contact attempts */}
-        {totalAttempts > 0 && (
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <PhoneCall className="h-3 w-3" style={{ color: stageColor }} />
-              {totalAttempts} tentativa{totalAttempts > 1 ? "s" : ""}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : responseRate > 0 ? "hsl(35, 85%, 50%)" : undefined }}>
-              {responseRate}% resp.
-            </span>
-          </div>
-        )}
+        {/* Follow-up progress */}
+        {(() => {
+          const goal = 6;
+          const progress = Math.min(totalAttempts, goal);
+          const pct = (progress / goal) * 100;
+          const isComplete = progress >= goal;
+          const barColor = isComplete ? "hsl(140, 70%, 40%)" : stageColor;
+          return (
+            <div className="mt-1.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <PhoneCall className="h-3 w-3" style={{ color: stageColor }} />
+                  {progress}/{goal} dias
+                </span>
+                {responseRate > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : "hsl(35, 85%, 50%)" }}>
+                    {responseRate}% resp.
+                  </span>
+                )}
+              </div>
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Time */}
         {timeSince && (
