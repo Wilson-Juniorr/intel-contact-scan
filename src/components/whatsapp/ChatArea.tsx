@@ -1,10 +1,8 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, MessageCircle, Send, Loader2, User } from "lucide-react";
+import { ArrowLeft, Send, Loader2, User, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
 
@@ -51,7 +49,7 @@ export default function ChatArea({
   }, [selectedPhone, messages]);
 
   return (
-    <Card className={`flex flex-col overflow-hidden ${!selectedPhone ? "hidden lg:flex" : "flex"}`}>
+    <div className={`flex flex-col overflow-hidden bg-[#0b141a] ${!selectedPhone ? "hidden lg:flex" : "flex"}`}>
       <AnimatePresence mode="wait">
         {selectedPhone ? (
           <motion.div
@@ -60,31 +58,26 @@ export default function ChatArea({
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
             {/* Header */}
-            <div className="p-3 border-b border-border flex items-center gap-3">
+            <div className="bg-[#202c33] px-3 py-2 flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-8 w-8"
+                className="lg:hidden h-8 w-8 text-[#aebac1] hover:bg-[#2a3942]"
                 onClick={onBack}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-              <motion.div
-                className="h-9 w-9 rounded-full bg-success/10 flex items-center justify-center"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 15 }}
-              >
-                <User className="h-4 w-4 text-success" />
-              </motion.div>
-              <div>
-                <p className="font-semibold text-sm">
+              <div className="h-10 w-10 rounded-full bg-[#6b7b8d] flex items-center justify-center">
+                <User className="h-5 w-5 text-[#cfd9df]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[#e9edef] text-[15px] font-medium truncate">
                   {selectedName || formatPhone(selectedPhone)}
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-[#8696a0]">
                   {selectedName
                     ? formatPhone(selectedPhone)
                     : `${messages.length} mensagens`}
@@ -92,9 +85,15 @@ export default function ChatArea({
               </div>
             </div>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 min-h-0 p-4">
-              <div className="space-y-3">
+            {/* Messages area with WhatsApp wallpaper pattern */}
+            <div
+              className="flex-1 min-h-0 overflow-y-auto px-[6%] py-2"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.6'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                backgroundColor: "#0b141a",
+              }}
+            >
+              <div className="space-y-1 max-w-[920px] mx-auto">
                 {messages.map((msg, i) => {
                   const showDate =
                     i === 0 ||
@@ -107,66 +106,64 @@ export default function ChatArea({
                 })}
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
 
-            {/* Input */}
-            <motion.div
-              className="p-3 border-t border-border"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.2 }}
-            >
-              <div className="flex items-end gap-2">
-                <Textarea
-                  placeholder="Digite uma mensagem..."
-                  value={newMessage}
-                  onChange={(e) => onNewMessageChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      onSend();
-                    }
-                  }}
-                  className="min-h-[40px] max-h-[120px] resize-none text-sm"
-                  rows={1}
-                />
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }}>
-                  <Button
-                    size="icon"
-                    className="h-10 w-10 shrink-0 bg-success hover:bg-success/90"
-                    onClick={onSend}
-                    disabled={!newMessage.trim() || sending}
-                  >
-                    {sending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </motion.div>
-              </div>
-            </motion.div>
+            {/* Input area */}
+            <div className="bg-[#202c33] px-4 py-2.5 flex items-end gap-2">
+              <Textarea
+                placeholder="Mensagem"
+                value={newMessage}
+                onChange={(e) => onNewMessageChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSend();
+                  }
+                }}
+                className="min-h-[42px] max-h-[120px] resize-none text-[14px] bg-[#2a3942] border-0 text-[#e9edef] placeholder:text-[#8696a0] rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0"
+                rows={1}
+              />
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }}>
+                <Button
+                  size="icon"
+                  className="h-[42px] w-[42px] shrink-0 rounded-full bg-[#00a884] hover:bg-[#06cf9c] border-0"
+                  onClick={onSend}
+                  disabled={!newMessage.trim() || sending}
+                >
+                  {sending ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#111b21]" />
+                  ) : (
+                    <Send className="h-5 w-5 text-[#111b21]" />
+                  )}
+                </Button>
+              </motion.div>
+            </div>
           </motion.div>
         ) : (
           <motion.div
             key="empty"
-            className="flex-1 flex items-center justify-center text-muted-foreground"
+            className="flex-1 flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="text-center space-y-3">
+            <div className="text-center space-y-4">
               <motion.div
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
-                <MessageCircle className="h-16 w-16 mx-auto opacity-20" />
+                <MessageCircle className="h-20 w-20 mx-auto text-[#2a3942]" />
               </motion.div>
-              <p className="text-sm">Selecione uma conversa para visualizar</p>
+              <div>
+                <p className="text-[#e9edef] text-xl font-light">WhatsApp Web</p>
+                <p className="text-[#8696a0] text-sm mt-1">
+                  Selecione uma conversa para começar
+                </p>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </Card>
+    </div>
   );
 }
