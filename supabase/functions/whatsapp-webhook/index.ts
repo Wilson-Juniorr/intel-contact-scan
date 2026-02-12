@@ -6,12 +6,103 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function transcribeAudio(mediaUrl: string): Promise<string | null> {
+  try {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY not configured, skipping transcription");
+      return null;
+    }
+
+    // Download audio from UaZapi
+    console.log("Downloading audio from:", mediaUrl);
+    const audioResp = await fetch(mediaUrl);
+    if (!audioResp.ok) {
+      console.error("Failed to download audio:", audioResp.status);
+      return null;
+    }
+
+    const audioBuffer = await audioResp.arrayBuffer();
+    const audioBytes = new Uint8Array(audioBuffer);
+
+    // Convert to base64
+    let binary = "";
+    for (let i = 0; i < audioBytes.length; i++) {
+      binary += String.fromCharCode(audioBytes[i]);
+    }
+    const audioBase64 = btoa(binary);
+
+    console.log("Audio downloaded, size:", audioBytes.length, "bytes");
+
+    // Determine format from URL or default to ogg
+    let format = "ogg";
+    if (mediaUrl.includes(".mp3")) format = "mp3";
+    else if (mediaUrl.includes(".wav")) format = "wav";
+    else if (mediaUrl.includes(".m4a")) format = "m4a";
+
+    // Transcribe using Gemini via Lovable AI Gateway
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: `Você é um transcritor de áudio. Transcreva o áudio a seguir em português brasileiro.
+REGRAS:
+- Retorne APENAS a transcrição do áudio, sem explicações
+- Se não conseguir transcrever, retorne "[Áudio não compreendido]"
+- Mantenha pontuação e formatação natural
+- Não adicione aspas ao redor da transcrição`,
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Transcreva este áudio:" },
+              {
+                type: "input_audio",
+                input_audio: {
+                  data: audioBase64,
+                  format: format,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Transcription API error:", response.status, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const transcription = data.choices?.[0]?.message?.content?.trim();
+
+    if (transcription) {
+      console.log("Transcription result:", transcription.slice(0, 100));
+      return transcription;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Transcription error:", error);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Accept GET for webhook verification (some providers send GET to verify URL)
+  // Accept GET for webhook verification
   if (req.method === "GET") {
     return new Response(JSON.stringify({ status: "ok", message: "Webhook is active" }), {
       status: 200,
@@ -20,7 +111,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate webhook origin using UaZapi token
     const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
     const incomingToken = req.headers.get("token") || req.headers.get("x-token") || new URL(req.url).searchParams.get("token");
     
@@ -48,19 +138,16 @@ Deno.serve(async (req) => {
     let isFromMe = false;
 
     // ===== UaZapi real format =====
-    // { EventType: "messages", chat: { phone, wa_chatid, owner, ... }, message: { ... } }
     if (body.EventType === "messages" && body.chat) {
       phone = body.chat.phone?.replace(/\D/g, "") || null;
       isFromMe = body.fromMe === true || body.message?.fromMe === true;
       uazapiMessageId = body.message?.id || body.message?.key?.id || null;
 
-      // Extract content from UaZapi message object
       const m = body.message || {};
       content = m.body || m.text || m.conversation || m.caption || null;
       if (!content && m.message?.conversation) content = m.message.conversation;
       if (!content && m.message?.extendedTextMessage?.text) content = m.message.extendedTextMessage.text;
 
-      // Determine message type
       if (m.type === "image" || m.isMedia === true && m.mimetype?.startsWith("image")) {
         messageType = "image";
         mediaUrl = m.mediaUrl || m.url || null;
@@ -81,10 +168,9 @@ Deno.serve(async (req) => {
         messageType = m.type || "text";
       }
 
-      // Check fromMe from message object
       if (m.fromMe === true) isFromMe = true;
 
-      console.log("Parsed UaZapi format - phone:", phone, "fromMe:", isFromMe, "content:", content?.slice(0, 50));
+      console.log("Parsed UaZapi format - phone:", phone, "fromMe:", isFromMe, "type:", messageType, "mediaUrl:", mediaUrl ? "yes" : "no");
     }
     // ===== Baileys/alternative format =====
     else {
@@ -131,7 +217,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Skip group messages
     if (phone.includes("-")) {
       console.log("Group message, ignoring");
       return new Response(JSON.stringify({ status: "ignored", reason: "group message" }), {
@@ -140,7 +225,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Skip outbound messages (already saved by send-whatsapp)
     if (isFromMe) {
       console.log("Outbound message from webhook, ignoring (already tracked)");
       return new Response(JSON.stringify({ status: "ignored", reason: "outbound" }), {
@@ -149,7 +233,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check for duplicate message
     if (uazapiMessageId) {
       const { data: existing } = await supabase
         .from("whatsapp_messages")
@@ -166,7 +249,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Find matching lead by phone number
+    // Find matching lead
     const cleanPhone = phone.replace(/\D/g, "");
     const phoneVariants = [cleanPhone];
     if (cleanPhone.startsWith("55")) {
@@ -178,7 +261,6 @@ Deno.serve(async (req) => {
     let leadId: string | null = null;
     let userId: string | null = null;
 
-    // Search for lead matching this phone
     const { data: leads } = await supabase
       .from("leads")
       .select("id, user_id, phone")
@@ -196,7 +278,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // If no lead found, try to find any user that has sent messages to this phone
     if (!userId) {
       const { data: prevMsg } = await supabase
         .from("whatsapp_messages")
@@ -220,25 +301,53 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Normalize phone for storage
     const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
 
-    // Save inbound message
-    const { error: insertError } = await supabase.from("whatsapp_messages").insert({
-      user_id: userId,
-      lead_id: leadId,
-      phone: normalizedPhone,
-      direction: "inbound",
-      message_type: messageType,
-      content: content,
-      media_url: mediaUrl,
-      uazapi_message_id: uazapiMessageId,
-      status: "received",
-    });
+    // === STEP 1: Save message immediately (for realtime) ===
+    const { data: savedMsg, error: insertError } = await supabase
+      .from("whatsapp_messages")
+      .insert({
+        user_id: userId,
+        lead_id: leadId,
+        phone: normalizedPhone,
+        direction: "inbound",
+        message_type: messageType,
+        content: content,
+        media_url: mediaUrl,
+        uazapi_message_id: uazapiMessageId,
+        status: "received",
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       console.error("DB insert error:", JSON.stringify(insertError));
       throw new Error(`Failed to save message: ${insertError.message}`);
+    }
+
+    const messageId = savedMsg?.id;
+
+    // === STEP 2: If audio, transcribe and update ===
+    if ((messageType === "audio" || messageType === "ptt") && mediaUrl) {
+      console.log("Audio message detected, starting transcription...");
+      
+      const transcription = await transcribeAudio(mediaUrl);
+      
+      if (transcription && messageId) {
+        // Update message with transcription
+        const { error: updateError } = await supabase
+          .from("whatsapp_messages")
+          .update({ content: `🎤 ${transcription}` })
+          .eq("id", messageId);
+
+        if (updateError) {
+          console.error("Failed to update transcription:", updateError);
+        } else {
+          console.log("Transcription saved for message:", messageId);
+          // Update content for interaction log below
+          content = `🎤 ${transcription}`;
+        }
+      }
     }
 
     // Update lead last_contact_at
@@ -259,10 +368,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log("Inbound message saved successfully for phone:", normalizedPhone);
+    console.log("Inbound message saved successfully for phone:", normalizedPhone, "type:", messageType);
 
     return new Response(
-      JSON.stringify({ status: "ok", saved: true, lead_id: leadId }),
+      JSON.stringify({ status: "ok", saved: true, lead_id: leadId, transcribed: messageType === "audio" || messageType === "ptt" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
