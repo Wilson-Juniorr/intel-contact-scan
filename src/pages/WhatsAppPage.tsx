@@ -21,6 +21,11 @@ interface WhatsAppMessage {
   contact_name: string | null;
 }
 
+interface WhatsAppContact {
+  phone: string;
+  contact_name: string | null;
+}
+
 interface ConversationSummary {
   phone: string;
   leadId: string | null;
@@ -35,6 +40,7 @@ export default function WhatsAppPage() {
   const { leads } = useLeadsContext();
   const { user } = useAuth();
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+  const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
@@ -49,9 +55,9 @@ export default function WhatsAppPage() {
       if (error) throw new Error(error.message);
       toast({
         title: "Sincronização concluída",
-        description: `${data.totalImported || 0} novas mensagens importadas, ${data.totalSkipped || 0} duplicadas ignoradas, ${data.contactsWithNames || 0}/${data.totalContacts || 0} contatos com nome, ${data.namesUpdated || 0} nomes atualizados`,
+        description: `${data.totalImported || 0} novas mensagens, ${data.contactsSaved || 0} contatos salvos, ${data.contactsWithNames || 0} com nome`,
       });
-      await fetchMessages();
+      await Promise.all([fetchMessages(), fetchContacts()]);
     } catch (e: any) {
       toast({ title: "Erro na sincronização", description: e.message, variant: "destructive" });
     } finally {
@@ -60,7 +66,6 @@ export default function WhatsAppPage() {
   };
 
   const fetchMessages = async () => {
-    // Paginate to get ALL messages (Supabase default limit is 1000)
     const allMessages: WhatsAppMessage[] = [];
     let offset = 0;
     const pageSize = 1000;
@@ -72,15 +77,8 @@ export default function WhatsAppPage() {
         .order("created_at", { ascending: true })
         .range(offset, offset + pageSize - 1);
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        break;
-      }
-      
-      if (data && data.length > 0) {
-        allMessages.push(...data);
-      }
-      
+      if (error) { console.error("Error fetching messages:", error); break; }
+      if (data && data.length > 0) allMessages.push(...data);
       if (!data || data.length < pageSize) break;
       offset += pageSize;
     }
@@ -88,11 +86,22 @@ export default function WhatsAppPage() {
     setMessages(allMessages);
   };
 
+  const fetchContacts = async () => {
+    const { data, error } = await supabase
+      .from("whatsapp_contacts")
+      .select("phone, contact_name")
+      .order("contact_name", { ascending: true });
+    
+    if (!error && data) {
+      setContacts(data);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
 
     setLoading(true);
-    fetchMessages().finally(() => setLoading(false));
+    Promise.all([fetchMessages(), fetchContacts()]).finally(() => setLoading(false));
 
     const channel = supabase
       .channel("whatsapp-realtime")
@@ -126,10 +135,30 @@ export default function WhatsAppPage() {
     };
   }, [user]);
 
-  // Build conversation summaries
+  // Build conversation summaries - include ALL contacts
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
 
+    // First, add all contacts (even without messages)
+    for (const contact of contacts) {
+      const lead = leads.find((l) => {
+        const cleanLeadPhone = l.phone.replace(/\D/g, "");
+        const normalizedLeadPhone = cleanLeadPhone.startsWith("55") ? cleanLeadPhone : `55${cleanLeadPhone}`;
+        return normalizedLeadPhone === contact.phone || cleanLeadPhone === contact.phone;
+      });
+
+      map.set(contact.phone, {
+        phone: contact.phone,
+        leadId: lead?.id || null,
+        leadName: lead?.name || contact.contact_name || null,
+        lastMessage: null,
+        lastMessageAt: new Date(0).toISOString(),
+        messageCount: 0,
+        unreadCount: 0,
+      });
+    }
+
+    // Then process messages
     messages.forEach((msg) => {
       const existing = map.get(msg.phone);
       const lead = leads.find((l) => {
@@ -144,7 +173,7 @@ export default function WhatsAppPage() {
         map.set(msg.phone, {
           phone: msg.phone,
           leadId: msg.lead_id || lead?.id || null,
-          leadName: lead?.name || (msg as any).contact_name || null,
+          leadName: lead?.name || msg.contact_name || null,
           lastMessage: msg.content,
           lastMessageAt: msg.created_at,
           messageCount: 1,
@@ -166,10 +195,22 @@ export default function WhatsAppPage() {
       }
     });
 
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-    );
-  }, [messages, leads]);
+    // Sort: contacts with messages first (by last message), then contacts without messages (alphabetical)
+    return Array.from(map.values()).sort((a, b) => {
+      const aHasMessages = a.messageCount > 0;
+      const bHasMessages = b.messageCount > 0;
+      
+      if (aHasMessages && !bHasMessages) return -1;
+      if (!aHasMessages && bHasMessages) return 1;
+      
+      if (aHasMessages && bHasMessages) {
+        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+      }
+      
+      // Both without messages - sort by name
+      return (a.leadName || a.phone).localeCompare(b.leadName || b.phone);
+    });
+  }, [messages, leads, contacts]);
 
   const filteredConversations = useMemo(() => {
     if (!searchTerm.trim()) return conversations;
@@ -264,7 +305,9 @@ export default function WhatsAppPage() {
             </motion.span>
             WhatsApp
           </h1>
-          <p className="text-muted-foreground text-sm">Histórico de mensagens com seus leads</p>
+          <p className="text-muted-foreground text-sm">
+            {contacts.length} contatos · {messages.length} mensagens
+          </p>
         </div>
         <Button
           variant="outline"
