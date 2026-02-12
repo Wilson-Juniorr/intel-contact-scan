@@ -135,7 +135,10 @@ async function transcribeAudio(messageId: string, mediaUrl: string | null): Prom
 
     console.log("Audio ready for transcription, format:", audioData.format);
 
-    // Transcribe using Gemini via Lovable AI Gateway
+    // Transcribe using Gemini via Lovable AI Gateway (multimodal data URI format)
+    const mimeType = audioData.format === "mp3" ? "audio/mpeg" : "audio/ogg";
+    const dataUri = `data:${mimeType};base64,${audioData.base64}`;
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -143,26 +146,21 @@ async function transcribeAudio(messageId: string, mediaUrl: string | null): Prom
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
-          {
-            role: "system",
-            content: `Você é um transcritor de áudio. Transcreva o áudio a seguir em português brasileiro.
-REGRAS:
-- Retorne APENAS a transcrição do áudio, sem explicações
-- Se não conseguir transcrever, retorne "[Áudio não compreendido]"
-- Mantenha pontuação e formatação natural
-- Não adicione aspas ao redor da transcrição`,
-          },
           {
             role: "user",
             content: [
-              { type: "text", text: "Transcreva este áudio:" },
               {
-                type: "input_audio",
-                input_audio: {
-                  data: audioData.base64,
-                  format: audioData.format,
+                type: "text",
+                text: `Transcreva este áudio de voz em português brasileiro com precisão. 
+Retorne APENAS o texto transcrito, sem aspas, sem explicações, sem prefixos.
+Se o áudio estiver inaudível, retorne "[Áudio não compreendido]".`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: dataUri,
                 },
               },
             ],
