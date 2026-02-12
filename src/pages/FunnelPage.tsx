@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
@@ -8,16 +8,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Search, X, CalendarIcon, Filter } from "lucide-react";
+import { Search, X, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function FunnelPage() {
   const { leads, moveStage } = useLeadsContext();
+  const queryClient = useQueryClient();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FunnelStage | null>(null);
+  const autoRetrabalhoRan = useRef(false);
+
+  // Run auto-retrabalho check on page load
+  useEffect(() => {
+    if (autoRetrabalhoRan.current) return;
+    autoRetrabalhoRan.current = true;
+
+    supabase.functions.invoke("auto-retrabalho").then(({ data, error }) => {
+      if (error || !data) return;
+      if (data.moved > 0) {
+        const names = data.leads.map((l: any) => l.name).join(", ");
+        toast({
+          title: `⚠️ ${data.moved} lead(s) movido(s) para Retrabalho`,
+          description: `${names} — 6 dias de tentativa sem resposta.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["leads"] });
+      }
+    });
+  }, []);
 
   // Filters
   const [search, setSearch] = useState("");
