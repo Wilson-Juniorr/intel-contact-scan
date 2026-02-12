@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LeadObservationsPanel } from "@/components/leads/LeadObservationsPanel";
+import { LeadConversationTab } from "@/components/leads/LeadConversationTab";
 import { MemberSection } from "@/components/leads/MemberSection";
 import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
@@ -418,7 +419,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
         {/* ═══ COLUMN 1: Info + Contact ═══ */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -642,6 +643,14 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
             </div>
           </div>
         </div>
+
+        {/* ═══ COLUMN 4: WhatsApp Conversation ═══ */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5" /> Conversa
+          </h3>
+          <LeadConversationTab leadPhone={lead.phone} leadName={lead.name} />
+        </div>
       </div>
 
       {/* Preview Dialog */}
@@ -713,16 +722,20 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <Tabs defaultValue="info" className="mt-4">
-      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-2"} h-9`}>
+      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-3"} h-9`}>
         <TabsTrigger value="info" className="text-xs gap-1">
-          <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Informações"}
+          <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Info"}
         </TabsTrigger>
         {!isEditing && (
           <TabsTrigger value="observations" className="text-xs gap-1">
-            <StickyNote className="h-3 w-3" /> Observações
+            <StickyNote className="h-3 w-3" /> Notas
           </TabsTrigger>
         )}
-      </TabsList>
+        {!isEditing && (
+          <TabsTrigger value="conversation" className="text-xs gap-1">
+            <MessageCircle className="h-3 w-3" /> Conversa
+          </TabsTrigger>
+        )}</TabsList>
 
       <TabsContent value="info">
         {isEditing ? (
@@ -786,6 +799,11 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
       {!isEditing && (
         <TabsContent value="observations" className="mt-3">
           <LeadObservationsPanel lead={lead} />
+        </TabsContent>
+      )}
+      {!isEditing && (
+        <TabsContent value="conversation" className="mt-3">
+          <LeadConversationTab leadPhone={lead.phone} leadName={lead.name} compact />
         </TabsContent>
       )}
     </Tabs>
