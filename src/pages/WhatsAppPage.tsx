@@ -96,9 +96,7 @@ export default function WhatsAppPage() {
       });
 
     // Polling fallback every 5s
-    const pollInterval = setInterval(() => {
-      fetchMessages();
-    }, 5000);
+    const pollInterval = setInterval(fetchMessages, 3000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -177,38 +175,47 @@ export default function WhatsAppPage() {
 
   const selectedConversation = conversations.find((c) => c.phone === selectedPhone);
 
-  // Send message
+  // Send message — optimistic UI
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedPhone) return;
+    const messageText = newMessage.trim();
+    const tempId = crypto.randomUUID();
+
+    // Optimistic: show message instantly
+    const optimisticMsg: WhatsAppMessage = {
+      id: tempId,
+      phone: selectedPhone,
+      direction: "outbound",
+      message_type: "text",
+      content: messageText,
+      status: "sending",
+      lead_id: selectedConversation?.leadId || null,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setNewMessage("");
     setSending(true);
+
     try {
-      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+      const { error } = await supabase.functions.invoke("send-whatsapp", {
         body: {
           phone: selectedPhone,
-          message: newMessage.trim(),
+          message: messageText,
           lead_id: selectedConversation?.leadId || null,
         },
       });
 
       if (error) throw new Error(error.message);
 
-      // Add to local messages
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          phone: selectedPhone,
-          direction: "outbound",
-          message_type: "text",
-          content: newMessage.trim(),
-          status: "sent",
-          lead_id: selectedConversation?.leadId || null,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      setNewMessage("");
-      toast({ title: "✅ Mensagem enviada!" });
+      // Update status to sent
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "sent" } : m))
+      );
     } catch (e: any) {
+      // Mark as failed
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
+      );
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
     } finally {
       setSending(false);
@@ -369,7 +376,11 @@ export default function WhatsAppPage() {
                           <div
                             className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
                               isOutbound
-                                ? "bg-[hsl(142,70%,40%)] text-white rounded-br-md"
+                                ? msg.status === "failed"
+                                  ? "bg-destructive text-destructive-foreground rounded-br-md"
+                                  : msg.status === "sending"
+                                    ? "bg-[hsl(142,70%,40%)]/80 text-white rounded-br-md"
+                                    : "bg-[hsl(142,70%,40%)] text-white rounded-br-md"
                                 : "bg-muted text-foreground rounded-bl-md"
                             }`}
                           >
@@ -382,7 +393,15 @@ export default function WhatsAppPage() {
                               <span className="text-[10px]">
                                 {format(new Date(msg.created_at), "HH:mm")}
                               </span>
-                              {isOutbound && <CheckCheck className="h-3 w-3" />}
+                              {isOutbound && msg.status === "sending" && (
+                                <Clock className="h-3 w-3" />
+                              )}
+                              {isOutbound && msg.status === "failed" && (
+                                <span className="text-[10px]">✕</span>
+                              )}
+                              {isOutbound && msg.status !== "sending" && msg.status !== "failed" && (
+                                <CheckCheck className="h-3 w-3" />
+                              )}
                             </div>
                           </div>
                         </div>
