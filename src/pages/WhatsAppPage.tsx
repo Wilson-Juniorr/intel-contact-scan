@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLeadsContext } from "@/contexts/LeadsContext";
+import type { Lead } from "@/types/lead";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MessageCircle, Loader2, RefreshCw } from "lucide-react";
@@ -37,7 +38,7 @@ interface ConversationSummary {
 }
 
 export default function WhatsAppPage() {
-  const { leads } = useLeadsContext();
+  const { leads, addInteraction } = useLeadsContext();
   const { user } = useAuth();
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
@@ -227,6 +228,11 @@ export default function WhatsAppPage() {
 
   const selectedConversation = conversations.find((c) => c.phone === selectedPhone);
 
+  // Get lead details for template variables
+  const selectedLead = selectedConversation?.leadId
+    ? leads.find((l) => l.id === selectedConversation.leadId)
+    : null;
+
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedPhone) return;
     const messageText = newMessage.trim();
@@ -261,6 +267,15 @@ export default function WhatsAppPage() {
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, status: "sent" } : m))
       );
+
+      // Register interaction if linked to a lead
+      if (selectedConversation?.leadId) {
+        addInteraction({
+          lead_id: selectedConversation.leadId,
+          type: "whatsapp",
+          description: `Mensagem enviada: ${messageText.slice(0, 100)}${messageText.length > 100 ? "..." : ""}`,
+        }).catch(() => {}); // Non-blocking
+      }
     } catch (e: any) {
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
@@ -340,6 +355,9 @@ export default function WhatsAppPage() {
           onSend={handleSend}
           onBack={() => setSelectedPhone(null)}
           formatPhone={formatPhone}
+          leadStage={selectedLead?.stage}
+          leadOperator={selectedLead?.operator || undefined}
+          leadLives={selectedLead?.lives || undefined}
         />
       </div>
     </motion.div>
