@@ -784,6 +784,7 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
           <LeadEditForm lead={lead} onSaved={onStopEdit} onCancel={onStopEdit} />
         ) : (
           <div className="space-y-5 mt-3">
+            <LeadMemoryCard leadId={lead.id} leadName={lead.name} />
             <Button variant="outline" size="sm" onClick={onStartEdit} className="w-full gap-1.5 h-8 text-xs">
               <Pencil className="h-3 w-3" /> Editar dados do lead
             </Button>
