@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Mail, User, PhoneCall } from "lucide-react";
+import { Phone, MessageCircle, Mail, User, PhoneCall, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -9,9 +9,10 @@ interface Props {
   stageColor: string;
   onDragStart: () => void;
   onClick: () => void;
+  onDelete?: (id: string) => void;
 }
 
-export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
+export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete }: Props) {
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
   const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
 
@@ -127,17 +128,24 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
         <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} />
         <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} />
         <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} disabled={!lead.email} />
+        <div className="ml-auto">
+          <ActionBtn
+            icon={<Trash2 className="h-3.5 w-3.5" />}
+            onClick={() => onDelete?.(lead.id)}
+            className="text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+          />
+        </div>
       </div>
     </motion.div>
   );
 }
 
 function ActionBtn({
-  icon, href, onClick, disabled = false,
+  icon, href, onClick, disabled = false, className,
 }: {
-  icon: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean;
+  icon: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean; className?: string;
 }) {
-  const cls = `p-1.5 rounded-md transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
+  const cls = `p-1.5 rounded-md transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : className || "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
 
   if (href && !disabled) {
     return (
