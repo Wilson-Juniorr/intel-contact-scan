@@ -65,9 +65,12 @@ export function useLeadsDB() {
       notes?: string;
       stage: string;
     }) => {
+      // Normalize phone with 55 prefix
+      const rawDigits = lead.phone.replace(/\D/g, "");
+      const normalizedPhone = rawDigits.startsWith("55") ? rawDigits : `55${rawDigits}`;
       const { data, error } = await supabase
         .from("leads")
-        .insert({ ...lead, user_id: user!.id })
+        .insert({ ...lead, phone: normalizedPhone, user_id: user!.id })
         .select()
         .single();
       if (error) throw error;
