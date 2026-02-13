@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, Target, MessageCircle, CalendarPlus,
   Loader2, Sparkles, Copy, Check, Trash2, Pencil, Brain, Lightbulb,
+  Shield, Zap, Clock, Activity, Eye, AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,6 +46,14 @@ export function PlaybookTab({ lead }: Props) {
   const [analysis, setAnalysis] = useState("");
   const [strategy, setStrategy] = useState("");
   const [strategyReason, setStrategyReason] = useState("");
+  const [goal, setGoal] = useState("");
+  const [silenceStage, setSilenceStage] = useState("");
+  const [pressureLevel, setPressureLevel] = useState("");
+  const [flowPattern, setFlowPattern] = useState("");
+  const [behavior, setBehavior] = useState<any>(null);
+  const [guardrails, setGuardrails] = useState<any>(null);
+  const [urgencyFlag, setUrgencyFlag] = useState(false);
+  const [riskFlags, setRiskFlags] = useState<string[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -81,6 +90,14 @@ export function PlaybookTab({ lead }: Props) {
     setAnalysis("");
     setStrategy("");
     setStrategyReason("");
+    setGoal("");
+    setSilenceStage("");
+    setPressureLevel("");
+    setFlowPattern("");
+    setBehavior(null);
+    setGuardrails(null);
+    setUrgencyFlag(false);
+    setRiskFlags([]);
     setCopiedIdx(null);
     setEditingIdx(null);
     try {
@@ -102,6 +119,14 @@ export function PlaybookTab({ lead }: Props) {
       setAnalysis(data.analysis || "");
       setStrategy(data.strategy || "");
       setStrategyReason(data.strategy_reason || "");
+      setGoal(data.goal || "");
+      setSilenceStage(data.silence_stage || "");
+      setPressureLevel(data.pressure_level || "");
+      setFlowPattern(data.flow_pattern || "");
+      setBehavior(data.behavior || null);
+      setGuardrails(data.guardrails || null);
+      setUrgencyFlag(data.urgency_flag || false);
+      setRiskFlags(Array.isArray(data.risk_flags) ? data.risk_flags : []);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -205,25 +230,67 @@ export function PlaybookTab({ lead }: Props) {
           {suggestedMsgs.length > 0 ? "Regenerar follow-up estratégico" : "Gerar follow-up estratégico"}
         </Button>
 
-        {/* Analysis & Strategy */}
+        {/* Analysis & Strategy — Brain Pro V2 */}
         {analysis && (
-          <div className="rounded-lg border border-border bg-muted/20 p-2.5 space-y-1.5">
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Brain className="h-3 w-3 text-primary shrink-0" />
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Análise</span>
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Brain Pro V2</span>
               {strat && (
                 <Badge className={`${strat.color} text-[9px] gap-0.5`}>
                   <span>{strat.emoji}</span> {strat.label}
                 </Badge>
               )}
+              {urgencyFlag && (
+                <Badge variant="destructive" className="text-[8px] gap-0.5">
+                  <Zap className="h-2 w-2" /> Urgência
+                </Badge>
+              )}
             </div>
             <p className="text-[11px] text-foreground/80 leading-relaxed">{analysis}</p>
-            {strategyReason && (
+            {goal && (
               <div className="flex items-start gap-1 text-[9px] text-muted-foreground">
                 <Lightbulb className="h-2.5 w-2.5 shrink-0 mt-0.5" />
-                <span>{strategyReason}</span>
+                <span><strong>Objetivo:</strong> {goal}</span>
               </div>
             )}
+
+            {/* Chips */}
+            {silenceStage && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge variant="outline" className="text-[8px] gap-0.5"><Clock className="h-2 w-2" /> {silenceStage === "early" ? "Silêncio inicial" : silenceStage === "mid" ? "Silêncio médio" : "Silêncio longo"}</Badge>
+                <Badge variant="outline" className="text-[8px] gap-0.5"><Activity className="h-2 w-2" /> {pressureLevel === "soft" ? "Pressão leve" : pressureLevel === "medium" ? "Pressão média" : "Pressão direta"}</Badge>
+                <Badge variant="outline" className="text-[8px]">{flowPattern === "super_short" ? "Flow curto" : flowPattern === "validate_tension_direct" ? "Validar→CTA" : "Flow padrão"}</Badge>
+              </div>
+            )}
+
+            {/* Behavior */}
+            {behavior && behavior.confidence !== "low" && (
+              <div className="text-[9px] text-muted-foreground flex gap-2 flex-wrap">
+                <Eye className="h-2.5 w-2.5 shrink-0" />
+                {behavior.decision_style && <span>🧠 {({analytical:"Analítico",practical:"Prático",emotional:"Emocional",skeptical:"Cético"} as any)[behavior.decision_style]}</span>}
+                {behavior.likely_objection && <span>🛡️ {({price:"Preço",trust:"Confiança",indecision:"Indecisão",comparison:"Comparação"} as any)[behavior.likely_objection]}</span>}
+                {behavior.energy_level && <span>⚡ {({high:"Alta",medium:"Média",low:"Baixa"} as any)[behavior.energy_level]}</span>}
+              </div>
+            )}
+
+            {/* Guardrails */}
+            {guardrails && (guardrails.must_confirm_network || guardrails.avoid_discount_promises || guardrails.competitor_mode) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Shield className="h-2.5 w-2.5 text-warning" />
+                {guardrails.must_confirm_network && <Badge variant="outline" className="text-[8px] border-warning/40">🏥 Confirmar rede</Badge>}
+                {guardrails.avoid_discount_promises && <Badge variant="outline" className="text-[8px] border-warning/40">💰 Sem desconto</Badge>}
+                {guardrails.competitor_mode && <Badge variant="outline" className="text-[8px] border-warning/40">🤝 Consultivo</Badge>}
+              </div>
+            )}
+
+            {/* Risk flags */}
+            {riskFlags.length > 0 && riskFlags.map((flag, i) => (
+              <div key={i} className="flex items-start gap-1 text-[9px] text-destructive/80">
+                <AlertTriangle className="h-2.5 w-2.5 shrink-0 mt-0.5" />
+                <span>{flag}</span>
+              </div>
+            ))}
           </div>
         )}
 
