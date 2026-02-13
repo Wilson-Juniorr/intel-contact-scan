@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { FileText, ChevronDown } from "lucide-react";
 import { getTemplatesForStage, fillTemplateVariables, type MessageTemplate } from "@/data/whatsappTemplates";
@@ -64,8 +63,7 @@ export default function TemplateSelector({ leadStage, leadName, leadOperator, le
             </p>
           )}
         </div>
-        <ScrollArea className="max-h-[300px]">
-          <div className="p-1">
+        <div className="p-1 max-h-[280px] overflow-y-auto">
             {templates.map((t) => (
               <button
                 key={t.id}
@@ -91,8 +89,7 @@ export default function TemplateSelector({ leadStage, leadName, leadOperator, le
                 </p>
               </button>
             ))}
-          </div>
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
