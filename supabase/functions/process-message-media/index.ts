@@ -460,6 +460,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       processed: true,
       extractedText: extractedText ? extractedText.slice(0, 200) : null,
+      semanticSummary: semanticSummary ? semanticSummary.slice(0, 300) : null,
+      entities: entities || {},
       storagePath,
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
