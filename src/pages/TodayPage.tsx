@@ -119,15 +119,24 @@ export default function TodayPage() {
       }
 
       const allResults = new Map<string, NBAResult>();
-      for (const batch of batches) {
+      for (let i = 0; i < batches.length; i++) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 3000)); // delay between batches
         const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/next-best-action`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ leadIds: batch }),
+          body: JSON.stringify({ leadIds: batches[i] }),
         });
+        if (resp.status === 429) {
+          toast({ title: "Limite de requisições atingido", description: "Aguarde alguns minutos e tente novamente. Se persistir, considere fazer upgrade do plano.", variant: "destructive" });
+          break;
+        }
+        if (resp.status === 402) {
+          toast({ title: "Créditos insuficientes", description: "Adicione créditos ao seu workspace para continuar usando IA.", variant: "destructive" });
+          break;
+        }
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({ error: "Erro" }));
           throw new Error(err.error || "Erro ao gerar sugestões");
