@@ -24,9 +24,10 @@ import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
   Maximize2, Minimize2, Pencil, Save, X, Loader2, FileUp,
   Upload, Download, Eye, Trash2, File, Image as ImageIcon,
-  FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall, BookOpen,
+  FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall, BookOpen, Target,
 } from "lucide-react";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
+import { ClosingTimeline } from "@/components/closing/ClosingTimeline";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
@@ -760,7 +761,7 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <Tabs defaultValue="info" className="mt-4">
-      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-5"} h-9`}>
+      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-6"} h-9`}>
         <TabsTrigger value="info" className="text-xs gap-1">
           <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Info"}
         </TabsTrigger>
@@ -777,6 +778,11 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
         {!isEditing && (
           <TabsTrigger value="followup" className="text-xs gap-1">
             <PhoneCall className="h-3 w-3" /> Follow-Up
+          </TabsTrigger>
+        )}
+        {!isEditing && (
+          <TabsTrigger value="closing" className="text-xs gap-1">
+            <Target className="h-3 w-3" /> Fechamento
           </TabsTrigger>
         )}
         {!isEditing && (
@@ -891,6 +897,11 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
       {!isEditing && (
         <TabsContent value="followup" className="mt-3">
           <FollowUpPanel singleLeadId={lead.id} />
+        </TabsContent>
+      )}
+      {!isEditing && (
+        <TabsContent value="closing" className="mt-3">
+          <ClosingTimeline leadId={lead.id} leadStage={lead.stage} />
         </TabsContent>
       )}
       {!isEditing && (

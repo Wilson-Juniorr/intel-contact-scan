@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -134,6 +135,17 @@ export default function FunnelPage() {
     }
 
     moveStage(leadId, stage);
+
+    // Auto-start closing sequence when moving to cotacao_enviada
+    if (stage === "cotacao_enviada") {
+      try {
+        await supabase.functions.invoke("closing-engine", {
+          body: { action: "create", lead_id: leadId },
+        });
+      } catch (err) {
+        console.error("Auto-start closing sequence error:", err);
+      }
+    }
   }, [leads, moveStage]);
 
   const handleDrop = (stage: FunnelStage) => {

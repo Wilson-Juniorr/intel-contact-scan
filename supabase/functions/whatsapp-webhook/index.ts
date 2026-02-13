@@ -694,6 +694,23 @@ Deno.serve(async (req) => {
         console.log(`Lead ${leadId} auto-moved to contato_realizado (client responded)`);
       }
 
+      // 2) INBOUND message → pause active closing sequence (client responded!)
+      if (!isFromMe) {
+        const { data: activeSeq } = await supabase
+          .from("closing_sequences")
+          .select("id")
+          .eq("lead_id", leadId)
+          .eq("status", "active")
+          .maybeSingle();
+        if (activeSeq) {
+          await supabase
+            .from("closing_sequences")
+            .update({ status: "paused", paused_at: new Date().toISOString() })
+            .eq("id", activeSeq.id);
+          console.log(`Closing sequence ${activeSeq.id} paused (client responded)`);
+        }
+      }
+
       // 2) OUTBOUND message → check if 6+ unique outbound days with zero inbound → retrabalho
       if (isFromMe && currentStage && !excludedFromAuto.includes(currentStage)) {
         const cleanLeadPhone = normalizedPhone;
