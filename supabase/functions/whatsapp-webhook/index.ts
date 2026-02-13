@@ -559,6 +559,13 @@ Deno.serve(async (req) => {
           .update({ lead_id: leadId })
           .eq("phone", normalizedAutoPhone)
           .eq("user_id", userId);
+        // Initialize lead_memory
+        await supabase.from("lead_memory").insert({
+          user_id: userId,
+          lead_id: leadId,
+          summary: null,
+          structured_json: {},
+        });
         // Log
         await supabase.from("action_log").insert({
           user_id: userId,
