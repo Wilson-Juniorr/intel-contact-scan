@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -89,15 +90,38 @@ export default function FunnelPage() {
     setDragOverStage(null);
   };
 
-  const tryMoveStage = useCallback((leadId: string, stage: FunnelStage) => {
+  // Auto-extract quote data state
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [extractedQuoteData, setExtractedQuoteData] = useState<{ min_value: number | null; operadora: string | null; plan_name: string | null; confidence: number } | null>(null);
+
+  const tryMoveStage = useCallback(async (leadId: string, stage: FunnelStage) => {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.stage === stage) return;
 
-    // Check if quote_min_value is needed
+    // Check if quote_min_value is needed — auto-extract from history
     if (STAGES_REQUIRE_QUOTE.includes(stage) && !lead.quote_min_value) {
       setPendingMove({ leadId, stage });
       setQuoteDialogMode("quote");
+      setExtractedQuoteData(null);
+      setQuoteLoading(true);
       setQuoteDialogOpen(true);
+
+      // Fire async extraction from lead history
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const resp = await supabase.functions.invoke("extract-quote-data", {
+            body: { lead_id: leadId },
+          });
+          if (resp.data) {
+            setExtractedQuoteData(resp.data);
+          }
+        }
+      } catch (err) {
+        console.error("Auto-extract quote error:", err);
+      } finally {
+        setQuoteLoading(false);
+      }
       return;
     }
 
@@ -125,19 +149,21 @@ export default function FunnelPage() {
     try {
       const updates: Record<string, unknown> = {};
 
-      if (data.min_value !== undefined) {
+      if (data.min_value !== undefined && data.min_value > 0) {
         updates.quote_min_value = data.min_value;
         updates.last_quote_sent_at = new Date().toISOString();
-        if (data.operadora) updates.quote_operadora = data.operadora;
-        if (data.plan_name) updates.quote_plan_name = data.plan_name;
       }
+      if (data.operadora) updates.quote_operadora = data.operadora;
+      if (data.plan_name) updates.quote_plan_name = data.plan_name;
       if (data.approved_value !== undefined) {
         updates.approved_value = data.approved_value;
       }
 
-      await updateLead(pendingMove.leadId, updates);
+      if (Object.keys(updates).length > 0) {
+        await updateLead(pendingMove.leadId, updates);
+      }
       await moveStage(pendingMove.leadId, pendingMove.stage);
-      toast.success("Cotação registrada e etapa atualizada!");
+      toast.success("Etapa atualizada!");
     } catch {
       toast.error("Erro ao atualizar lead");
     }
@@ -247,7 +273,8 @@ export default function FunnelPage() {
           setQuoteDialogOpen(open);
           if (!open) setPendingMove(null);
         }}
-        quoteData={null}
+        quoteData={extractedQuoteData}
+        loading={quoteLoading}
         mode={quoteDialogMode}
         onConfirm={handleQuoteConfirm}
       />
