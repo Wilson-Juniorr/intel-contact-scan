@@ -71,6 +71,46 @@ export function useLeadsDB() {
         .select()
         .single();
       if (error) throw error;
+
+      // Auto-link existing WhatsApp messages & contacts to this new lead
+      const digits = data.phone.replace(/\D/g, "");
+      const normalized = digits.startsWith("55") ? digits : `55${digits}`;
+
+      // Link messages
+      await supabase
+        .from("whatsapp_messages")
+        .update({ lead_id: data.id })
+        .eq("phone", normalized)
+        .eq("user_id", user!.id)
+        .is("lead_id", null);
+
+      // Link contact
+      await supabase
+        .from("whatsapp_contacts")
+        .update({ lead_id: data.id })
+        .eq("phone", normalized)
+        .eq("user_id", user!.id);
+
+      // Initialize lead_memory
+      await supabase.from("lead_memory").upsert({
+        user_id: user!.id,
+        lead_id: data.id,
+        summary: null,
+        structured_json: {},
+      }, { onConflict: "lead_id" });
+
+      // Update last_contact_at from most recent message
+      const { data: lastMsg } = await supabase
+        .from("whatsapp_messages")
+        .select("created_at")
+        .eq("lead_id", data.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastMsg) {
+        await supabase.from("leads").update({ last_contact_at: lastMsg.created_at }).eq("id", data.id);
+      }
+
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
