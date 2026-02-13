@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, Target, MessageCircle, CalendarPlus,
-  Loader2, Sparkles, Copy, Check, Trash2, Pencil, Brain, Lightbulb,
+  Loader2, Sparkles, Copy, Check, Trash2, Pencil, Brain, Lightbulb, RefreshCw,
   Shield, Zap, Clock, Activity, Eye, AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -42,6 +42,7 @@ export function PlaybookTab({ lead }: Props) {
   const [newTaskDue, setNewTaskDue] = useState("");
   const [saving, setSaving] = useState(false);
   const [generatingMsg, setGeneratingMsg] = useState(false);
+  const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
   const [suggestedMsgs, setSuggestedMsgs] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState("");
   const [strategy, setStrategy] = useState("");
@@ -134,6 +135,40 @@ export function PlaybookTab({ lead }: Props) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setGeneratingMsg(false);
+    }
+  };
+
+  const handleRegenerateSingle = async (idx: number) => {
+    setRegeneratingIdx(idx);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Não autenticado");
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          leadId: lead.id,
+          userContext: playbook ? `Objetivo do playbook: ${playbook.objective}` : undefined,
+          regenerateIndex: idx,
+          existingMessages: suggestedMsgs,
+          existingAnalysis: analysis,
+        }),
+      });
+      if (!resp.ok) throw new Error("Erro ao regenerar mensagem");
+      const data = await resp.json();
+      if (data.message) {
+        const copy = [...suggestedMsgs];
+        copy[idx] = data.message;
+        setSuggestedMsgs(copy);
+        toast({ title: `Mensagem ${idx + 1} regenerada! ✨` });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setRegeneratingIdx(null);
     }
   };
 
@@ -340,6 +375,12 @@ export function PlaybookTab({ lead }: Props) {
                     setTimeout(() => setCopiedIdx(null), 2000);
                   }}>
                     {copiedIdx === idx ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-0.5 px-1"
+                    onClick={() => handleRegenerateSingle(idx)}
+                    disabled={regeneratingIdx === idx}>
+                    {regeneratingIdx === idx ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
+                    Regenerar
                   </Button>
                 </div>
               </div>
