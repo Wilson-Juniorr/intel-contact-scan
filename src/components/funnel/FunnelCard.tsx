@@ -1,8 +1,10 @@
-import { Phone, MessageCircle, Mail, User, PhoneCall, Trash2 } from "lucide-react";
+import { Phone, MessageCircle, Mail, User, PhoneCall, Trash2, ArrowRightLeft } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { useContactAttempts } from "@/hooks/useContactAttempts";
+import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Props {
   lead: any;
@@ -10,9 +12,10 @@ interface Props {
   onDragStart: () => void;
   onClick: () => void;
   onDelete?: (id: string) => void;
+  onMoveStage?: (id: string, stage: FunnelStage) => void;
 }
 
-export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete }: Props) {
+export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, onMoveStage }: Props) {
   const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
   const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
 
@@ -128,6 +131,34 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete }:
         <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} />
         <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} />
         <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} disabled={!lead.email} />
+        
+        {/* Stage change dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
+              title="Mover etapa"
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48 max-h-64 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {FUNNEL_STAGES.map((s) => (
+              <DropdownMenuItem
+                key={s.key}
+                disabled={s.key === lead.stage}
+                onClick={() => onMoveStage?.(lead.id, s.key)}
+                className="text-xs gap-2"
+              >
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                {s.label}
+                {s.key === lead.stage && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <div className="ml-auto">
           <ActionBtn
             icon={<Trash2 className="h-3.5 w-3.5" />}
