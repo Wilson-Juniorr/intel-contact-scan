@@ -15,6 +15,16 @@ const stageLabels: Record<string, string> = {
   declinado: "Declinado", cancelado: "Cancelado",
 };
 
+interface Timeline {
+  days_since_first_contact: number;
+  days_in_current_stage: number;
+  days_since_last_contact: number;
+  total_interactions: number;
+  outbound_attempts: number;
+  inbound_responses: number;
+  avg_response_time_days: number | null;
+}
+
 interface LeadContext {
   name: string;
   firstName: string;
@@ -37,6 +47,7 @@ interface LeadContext {
   waitingReply: boolean;
   lastClientMessage: string | null;
   lastClientMessageDaysAgo: number | null;
+  timeline: Timeline;
 }
 
 function buildContextSummary(ctx: LeadContext): string {
@@ -53,6 +64,11 @@ function buildContextSummary(ctx: LeadContext): string {
   if (ctx.approvedValue) lines.push(`Valor aprovado: R$${ctx.approvedValue}`);
   if (ctx.followUpsSent > 0) lines.push(`Follow-ups já enviados: ${ctx.followUpsSent}`);
   if (ctx.notes) lines.push(`Notas: ${ctx.notes}`);
+
+  // Timeline
+  const tl = ctx.timeline;
+  lines.push(`\nTIMELINE: ${tl.days_since_first_contact}d desde 1º contato | ${tl.days_in_current_stage}d na etapa atual | ${tl.days_since_last_contact}d sem contato`);
+  lines.push(`Interações: ${tl.total_interactions} total | ${tl.outbound_attempts} enviadas | ${tl.inbound_responses} recebidas${tl.avg_response_time_days !== null ? ` | Tempo médio resposta: ${tl.avg_response_time_days}d` : ""}`);
   
   if (ctx.memorySummary) lines.push(`\nMEMÓRIA:\n${ctx.memorySummary}`);
   
@@ -144,6 +160,45 @@ serve(async (req) => {
       lastClientMessageDaysAgo = Math.floor((Date.now() - new Date(lastInbound.created_at).getTime()) / (1000 * 60 * 60 * 24));
     }
 
+    // Build timeline
+    const allMsgs = sortedMsgs;
+    const outboundMsgs = allMsgs.filter((m: any) => m.direction === "outbound");
+    const inboundMsgs = allMsgs.filter((m: any) => m.direction === "inbound");
+    
+    const firstContactDate = lead.created_at;
+    const daysSinceFirst = Math.floor((Date.now() - new Date(firstContactDate).getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceLastContact = idleDays;
+    
+    // Days in current stage: use updated_at as proxy (stage changes update this)
+    const daysInStage = Math.floor((Date.now() - new Date(lead.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Avg response time: for each outbound, find next inbound and measure gap
+    let totalResponseDays = 0;
+    let responseCount = 0;
+    const chronoMsgs = allMsgs.slice().sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    for (let i = 0; i < chronoMsgs.length; i++) {
+      if (chronoMsgs[i].direction === "outbound") {
+        const nextInbound = chronoMsgs.slice(i + 1).find((m: any) => m.direction === "inbound");
+        if (nextInbound) {
+          const gap = (new Date(nextInbound.created_at).getTime() - new Date(chronoMsgs[i].created_at).getTime()) / (1000 * 60 * 60 * 24);
+          if (gap < 30) { // ignore gaps > 30d as outliers
+            totalResponseDays += gap;
+            responseCount++;
+          }
+        }
+      }
+    }
+
+    const timeline: Timeline = {
+      days_since_first_contact: daysSinceFirst,
+      days_in_current_stage: daysInStage,
+      days_since_last_contact: daysSinceLastContact,
+      total_interactions: allMsgs.length + (interactionsRes.data || []).length,
+      outbound_attempts: outboundMsgs.length,
+      inbound_responses: inboundMsgs.length,
+      avg_response_time_days: responseCount > 0 ? Math.round((totalResponseDays / responseCount) * 10) / 10 : null,
+    };
+
     const recentMessages = (whatsappMsgs || []).reverse()
       .map((m: any) => {
         const dir = m.direction === "outbound" ? "EU" : "CLIENTE";
@@ -177,6 +232,7 @@ serve(async (req) => {
       waitingReply: !!waitingReply,
       lastClientMessage,
       lastClientMessageDaysAgo,
+      timeline,
     };
 
     const contextSummary = buildContextSummary(ctx);
@@ -254,8 +310,19 @@ urgency_flag=true APENAS se existir dado real:
 - prazo de implantação/carência  
 Se NÃO existir dado real → urgency_flag=false. Tom sempre leve, nunca inventar urgência.
 
-═══ F) RISK FLAGS ═══
+═══ F) TIMELINE INTELLIGENCE ═══
+O contexto inclui TIMELINE com métricas temporais do lead. Use-as para adaptar:
+- Lead com >30d desde 1º contato: é lead longo. Evite pressão excessiva, priorize valor e paciência.
+- Lead com >10d na mesma etapa: está travado. Considere mudança de abordagem.
+- Avg response time alto (>3d): cliente é lento para responder. Normal para ele, não force.
+- Avg response time baixo (<1d): cliente costuma responder rápido. Se parou, algo mudou.
+- Muitas outbound vs poucas inbound: excesso de tentativas, risco de irritação.
+- Se outbound > 2x inbound: reduza intensidade e mude ângulo.
+
+═══ G) RISK FLAGS ═══
 Retorne alertas se:
+- Lead pode estar irritado com excesso de follow-up (outbound >> inbound)
+- Lead longo (>30d) com muitas tentativas sem avanço
 - Lead pode estar irritado com excesso de follow-up
 - Informação contraditória detectada
 - Guardrail pode ser difícil de respeitar
@@ -346,6 +413,7 @@ NÃO retorne nada além do JSON.`,
       urgency_flag: result.urgency_flag || false,
       messages: messagesArray,
       risk_flags: Array.isArray(result.risk_flags) ? result.risk_flags : [],
+      timeline,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

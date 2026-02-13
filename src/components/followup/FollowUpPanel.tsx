@@ -63,6 +63,16 @@ const stagePriority: Record<string, number> = {
   em_emissao: 7, aguardando_implantacao: 8, retrabalho: 9,
 };
 
+interface Timeline {
+  days_since_first_contact: number;
+  days_in_current_stage: number;
+  days_since_last_contact: number;
+  total_interactions: number;
+  outbound_attempts: number;
+  inbound_responses: number;
+  avg_response_time_days: number | null;
+}
+
 interface FollowUpResult {
   analysis: string;
   strategy: string;
@@ -85,6 +95,7 @@ interface FollowUpResult {
   urgency_flag: boolean;
   messages: string[];
   risk_flags: string[];
+  timeline: Timeline | null;
 }
 
 interface FollowUpPanelProps {
@@ -184,6 +195,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
           urgency_flag: data.urgency_flag || false,
           messages: Array.isArray(data.messages) ? data.messages : [data.message],
           risk_flags: Array.isArray(data.risk_flags) ? data.risk_flags : [],
+          timeline: data.timeline || null,
         },
       }));
       setEditingMsg(null);
@@ -424,6 +436,27 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                       <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                         <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
                         <span><strong>Objetivo:</strong> {result.goal}</span>
+                      </div>
+                    )}
+
+                    {/* Timeline */}
+                    {result.timeline && (
+                      <div className="rounded border border-border/60 bg-background/50 p-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Timeline do lead</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                          <span>📅 {result.timeline.days_since_first_contact}d desde 1º contato</span>
+                          <span>📌 {result.timeline.days_in_current_stage}d na etapa atual</span>
+                          <span>🔇 {result.timeline.days_since_last_contact}d sem contato</span>
+                          <span>📊 {result.timeline.total_interactions} interações</span>
+                          <span>📤 {result.timeline.outbound_attempts} enviadas</span>
+                          <span>📥 {result.timeline.inbound_responses} recebidas</span>
+                        </div>
+                        {result.timeline.avg_response_time_days !== null && (
+                          <p className="text-[10px] text-muted-foreground">⏱️ Tempo médio de resposta: {result.timeline.avg_response_time_days}d</p>
+                        )}
                       </div>
                     )}
 
