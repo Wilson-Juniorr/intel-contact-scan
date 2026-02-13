@@ -760,36 +760,39 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
   };
 
   return (
-    <Tabs defaultValue="info" className="mt-4">
-      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-6"} h-9`}>
-        <TabsTrigger value="info" className="text-xs gap-1">
-          <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Info"}
-        </TabsTrigger>
-        {!isEditing && (
-          <TabsTrigger value="playbook" className="text-xs gap-1">
-            <BookOpen className="h-3 w-3" /> Playbook
+    <Tabs defaultValue="info" className="mt-4 flex flex-col flex-1 min-h-0">
+      <div className="overflow-x-auto -mx-1 px-1 pb-1">
+        <TabsList className={`inline-flex ${isEditing ? "w-auto" : "w-auto"} h-9 gap-0.5`}>
+          <TabsTrigger value="info" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+            <Info className="h-3 w-3 shrink-0" /> {isEditing ? "Editando" : "Info"}
           </TabsTrigger>
-        )}
-        {!isEditing && (
-          <TabsTrigger value="observations" className="text-xs gap-1">
-            <StickyNote className="h-3 w-3" /> Notas
-          </TabsTrigger>
-        )}
-        {!isEditing && (
-          <TabsTrigger value="followup" className="text-xs gap-1">
-            <PhoneCall className="h-3 w-3" /> Follow-Up
-          </TabsTrigger>
-        )}
-        {!isEditing && (
-          <TabsTrigger value="closing" className="text-xs gap-1">
-            <Target className="h-3 w-3" /> Fechamento
-          </TabsTrigger>
-        )}
-        {!isEditing && (
-          <TabsTrigger value="conversation" className="text-xs gap-1">
-            <MessageCircle className="h-3 w-3" /> Conversa
-          </TabsTrigger>
-        )}</TabsList>
+          {!isEditing && (
+            <TabsTrigger value="playbook" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+              <BookOpen className="h-3 w-3 shrink-0" /> Playbook
+            </TabsTrigger>
+          )}
+          {!isEditing && (
+            <TabsTrigger value="observations" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+              <StickyNote className="h-3 w-3 shrink-0" /> Notas
+            </TabsTrigger>
+          )}
+          {!isEditing && (
+            <TabsTrigger value="followup" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+              <PhoneCall className="h-3 w-3 shrink-0" /> Follow-Up
+            </TabsTrigger>
+          )}
+          {!isEditing && (
+            <TabsTrigger value="closing" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+              <Target className="h-3 w-3 shrink-0" /> Fechamento
+            </TabsTrigger>
+          )}
+          {!isEditing && (
+            <TabsTrigger value="conversation" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
+              <MessageCircle className="h-3 w-3 shrink-0" /> Conversa
+            </TabsTrigger>
+          )}
+        </TabsList>
+      </div>
 
       <TabsContent value="info">
         {isEditing ? (
@@ -905,8 +908,8 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
         </TabsContent>
       )}
       {!isEditing && (
-        <TabsContent value="conversation" className="mt-3">
-          <LeadConversationTab leadPhone={lead.phone} leadName={lead.name} compact />
+        <TabsContent value="conversation" className="mt-3 flex-1 min-h-0">
+          <LeadConversationTab leadPhone={lead.phone} leadName={lead.name} compact={false} />
         </TabsContent>
       )}
     </Tabs>
