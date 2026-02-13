@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.rewrite-message]
 verify_jwt = false
+
+[functions.process-message-media]
+verify_jwt = false
+
+[functions.update-lead-memory]
+verify_jwt = false

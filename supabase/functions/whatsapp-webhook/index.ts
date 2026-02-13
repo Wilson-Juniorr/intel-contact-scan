@@ -448,55 +448,35 @@ Deno.serve(async (req) => {
 
     const messageId = savedMsg?.id;
 
-    // === STEP 2: If audio, transcribe and update ===
-    if ((messageType === "audio" || messageType === "ptt") && uazapiMessageId) {
-      console.log("Audio message detected, starting transcription...");
+    // === STEP 2: Process media (audio/image/document) via unified pipeline ===
+    const mediaTypes = ["audio", "ptt", "image", "document"];
+    if (mediaTypes.includes(messageType) && messageId) {
+      console.log(`Media message detected (${messageType}), triggering process-message-media...`);
       
-      const transcription = await transcribeAudio(uazapiMessageId);
+      // Mark as pending
+      await supabase.from("whatsapp_messages").update({ processing_status: "pending" }).eq("id", messageId);
       
-      if (transcription && messageId) {
-        // Update message with transcription
-        const { error: updateError } = await supabase
-          .from("whatsapp_messages")
-          .update({ content: `🎤 ${transcription}` })
-          .eq("id", messageId);
-
-        if (updateError) {
-          console.error("Failed to update transcription:", updateError);
-        } else {
-          console.log("Transcription saved for message:", messageId);
-          // Update content for interaction log below
-          content = `🎤 ${transcription}`;
-        }
-      }
-    }
-
-    // === STEP 3: If image or document, analyze with AI ===
-    if ((messageType === "image" || messageType === "document") && uazapiMessageId && messageId) {
-      console.log(`${messageType} message detected, starting AI analysis...`);
       try {
-        const analyzeResp = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-media`,
+        const processResp = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/process-message-media`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message_id: messageId,
-              uazapi_message_id: uazapiMessageId,
-              message_type: messageType,
-            }),
+            body: JSON.stringify({ messageId }),
           }
         );
-        const analyzeResult = await analyzeResp.json();
-        if (analyzeResult.analyzed) {
-          console.log("Media analyzed successfully");
-          if (analyzeResult.description) {
-            const prefix = messageType === "document" ? "📄" : "🖼️";
-            content = content ? `${content}\n${prefix} ${analyzeResult.description}` : `${prefix} ${analyzeResult.description}`;
-          }
+        const processResult = await processResp.json();
+        if (processResult.processed && processResult.extractedText) {
+          console.log("Media processed successfully");
+          const { data: updatedMsg } = await supabase
+            .from("whatsapp_messages")
+            .select("content")
+            .eq("id", messageId)
+            .single();
+          if (updatedMsg?.content) content = updatedMsg.content;
         }
       } catch (e) {
-        console.error("Media analysis error (non-blocking):", e);
+        console.error("Media processing error (non-blocking):", e);
       }
     }
 

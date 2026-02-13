@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LeadObservationsPanel } from "@/components/leads/LeadObservationsPanel";
 import { LeadConversationTab } from "@/components/leads/LeadConversationTab";
+import { LeadMemoryCard } from "@/components/leads/LeadMemoryCard";
 import { MemberSection } from "@/components/leads/MemberSection";
 import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
@@ -678,8 +679,9 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
           </div>
         </div>
 
-        {/* ═══ COLUMN 4: WhatsApp Conversation ═══ */}
+        {/* ═══ COLUMN 4: WhatsApp Conversation + Memory ═══ */}
         <div className="space-y-3">
+          <LeadMemoryCard leadId={lead.id} leadName={lead.name} />
           <h3 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
             <MessageCircle className="h-3.5 w-3.5" /> Conversa
           </h3>
