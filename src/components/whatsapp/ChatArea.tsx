@@ -1,11 +1,12 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Loader2, User, MessageCircle } from "lucide-react";
+import { ArrowLeft, Send, Loader2, User, MessageCircle, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
 import TemplateSelector from "./TemplateSelector";
+import AIRewriteModal from "./AIRewriteModal";
 
 interface WhatsAppMessage {
   id: string;
@@ -32,6 +33,8 @@ interface Props {
   leadStage?: string;
   leadOperator?: string;
   leadLives?: number;
+  leadId?: string | null;
+  leadType?: string;
 }
 
 export default function ChatArea({
@@ -47,8 +50,11 @@ export default function ChatArea({
   leadStage,
   leadOperator,
   leadLives,
+  leadId,
+  leadType,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showAIRewrite, setShowAIRewrite] = useState(false);
 
   useEffect(() => {
     if (selectedPhone) {
@@ -125,6 +131,20 @@ export default function ChatArea({
                 leadLives={leadLives}
                 onSelect={(text) => onNewMessageChange(text)}
               />
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-[42px] w-[42px] shrink-0 rounded-full transition-colors ${
+                  newMessage.trim()
+                    ? "text-amber-400 hover:text-amber-300 hover:bg-[#2a3942]"
+                    : "text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                }`}
+                title="Melhorar com IA"
+                onClick={() => setShowAIRewrite(true)}
+                disabled={!newMessage.trim()}
+              >
+                <Sparkles className="h-5 w-5" />
+              </Button>
               <Textarea
                 placeholder="Mensagem"
                 value={newMessage}
@@ -179,6 +199,19 @@ export default function ChatArea({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AIRewriteModal
+        open={showAIRewrite}
+        onClose={() => setShowAIRewrite(false)}
+        currentText={newMessage}
+        onSelectVariant={(text) => onNewMessageChange(text)}
+        leadId={leadId}
+        leadName={selectedName}
+        leadStage={leadStage}
+        leadType={leadType}
+        leadOperator={leadOperator}
+        leadLives={leadLives}
+      />
     </div>
   );
 }
