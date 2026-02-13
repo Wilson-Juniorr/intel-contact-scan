@@ -47,9 +47,8 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
       onConfirm({ approved_value: val });
     } else {
       const val = parseFloat(minValue);
-      if (!val || val <= 0) return;
       onConfirm({
-        min_value: val,
+        min_value: val > 0 ? val : undefined,
         operadora: operadora || undefined,
         plan_name: planName || undefined,
       });
@@ -157,7 +156,7 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
 
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button size="sm" onClick={handleSubmit} disabled={loading || !minValue || parseFloat(minValue) <= 0}>
+          <Button size="sm" onClick={handleSubmit} disabled={loading}>
             Confirmar Cotação
           </Button>
         </DialogFooter>
