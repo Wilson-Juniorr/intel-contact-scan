@@ -20,6 +20,7 @@ interface Props {
   onDragLeave: () => void;
   onDrop: () => void;
   onLeadClick: (id: string) => void;
+  onDeleteLead: (id: string) => void;
 }
 
 export function FunnelColumn({
@@ -33,6 +34,7 @@ export function FunnelColumn({
   onDragLeave,
   onDrop,
   onLeadClick,
+  onDeleteLead,
 }: Props) {
   const totalValue = leads.reduce((sum, l) => {
     if (l.approved_value) return sum + Number(l.approved_value);
@@ -90,6 +92,7 @@ export function FunnelColumn({
               stageColor={stage.color}
               onDragStart={() => onDragStart(lead.id)}
               onClick={() => onLeadClick(lead.id)}
+              onDelete={onDeleteLead}
             />
           ))}
         </AnimatePresence>

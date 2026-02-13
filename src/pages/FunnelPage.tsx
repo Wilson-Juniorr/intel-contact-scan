@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { FunnelColumn } from "@/components/funnel/FunnelColumn";
 import { BootstrapWhatsAppDialog } from "@/components/leads/BootstrapWhatsAppDialog";
@@ -23,12 +24,13 @@ const STAGES_REQUIRE_QUOTE: FunnelStage[] = ["cotacao_enviada"];
 const STAGES_REQUIRE_APPROVED: FunnelStage[] = ["cotacao_aprovada", "documentacao_completa", "em_emissao"];
 
 export default function FunnelPage() {
-  const { leads, moveStage, updateLead } = useLeadsContext();
+  const { leads, moveStage, updateLead, deleteLeads } = useLeadsContext();
   const queryClient = useQueryClient();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FunnelStage | null>(null);
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
 
   // Quote dialog state
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
@@ -230,6 +232,7 @@ export default function FunnelPage() {
               onDragLeave={handleDragLeave}
               onDrop={() => handleDrop(stage.key)}
               onLeadClick={(id) => setSelectedLeadId(id)}
+              onDeleteLead={(id) => setDeleteLeadId(id)}
             />
           );
         })}
@@ -248,6 +251,36 @@ export default function FunnelPage() {
         mode={quoteDialogMode}
         onConfirm={handleQuoteConfirm}
       />
+
+      <AlertDialog open={!!deleteLeadId} onOpenChange={(open) => { if (!open) setDeleteLeadId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir negócio</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir "{leads.find(l => l.id === deleteLeadId)?.name}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (deleteLeadId) {
+                  try {
+                    await deleteLeads([deleteLeadId]);
+                    toast.success("Negócio excluído!");
+                  } catch {
+                    toast.error("Erro ao excluir negócio");
+                  }
+                }
+                setDeleteLeadId(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
