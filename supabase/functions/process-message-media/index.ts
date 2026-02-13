@@ -34,6 +34,111 @@ async function downloadFromUazapi(messageId: string): Promise<{ base64: string; 
   return null;
 }
 
+interface ClassificationResult {
+  message_category: string;
+  business_relevance_score: number;
+  intent: string;
+  classification_confidence: string;
+}
+
+function classifyTextMessage(content: string | null): ClassificationResult {
+  if (!content || content.trim().length === 0) {
+    return { message_category: "unknown", business_relevance_score: 0, intent: "none", classification_confidence: "low" };
+  }
+  const t = content.toLowerCase().trim();
+
+  // Greeting / small talk patterns
+  const greetingPatterns = [
+    /^(bom dia|boa tarde|boa noite|oi|olá|ola|hey|eai|e ai|fala)/,
+    /(bom dia|boa tarde|boa noite|feliz|abençoado|abençoada|blessed|sexta|segunda|terça|quarta|quinta|sábado|domingo)/,
+    /(bença|deus|amém|gratidão|paz|🙏|😊|🌅|🌞|☀️|🙌|❤️|💛)/,
+  ];
+  const memePatterns = [
+    /(kkkk|hahah|kkk|rsrs|😂|🤣|😅|😆)/,
+    /^(sticker|figurinha)/,
+  ];
+  const healthPatterns = [
+    /(plano|saúde|saude|operadora|unimed|amil|bradesco|sulamerica|sul ?américa|hapvida|notredame|intermédica|intermedica|golden|cross|coparticipação|coparticipacao|carência|carencia|enfermaria|apartamento|rede credenciada|hospital|clínica|clinica)/,
+    /(cotação|cotacao|proposta|orçamento|orcamento|reajuste|mensalidade|fatura|boleto|implantação|implantacao|vigência|vigencia)/,
+    /(cpf|rg|contrato|documentação|documentacao|carteirinha|ans|beneficiário|beneficiario|titular|dependente)/,
+  ];
+  const quotePatterns = [
+    /(cotação|cotacao|proposta|orçamento|orcamento|valor|preço|preco|R\$|reais|mensalidade|tabela)/,
+  ];
+  const docPatterns = [
+    /(cpf|rg|cnh|documento|certidão|certidao|comprovante|contrato|declaração|declaracao)/,
+  ];
+
+  // Check patterns
+  const isGreeting = greetingPatterns.some(p => p.test(t));
+  const isMeme = memePatterns.some(p => p.test(t));
+  const isHealth = healthPatterns.some(p => p.test(t));
+  const isQuote = quotePatterns.some(p => p.test(t));
+  const isDoc = docPatterns.some(p => p.test(t));
+
+  // Short messages that are purely greetings
+  if (t.length < 60 && isGreeting && !isHealth && !isQuote && !isDoc) {
+    return { message_category: "greeting", business_relevance_score: 0.1, intent: "greeting", classification_confidence: "high" };
+  }
+  if (isMeme && !isHealth) {
+    return { message_category: "meme_sticker", business_relevance_score: 0.05, intent: "none", classification_confidence: "high" };
+  }
+  if (isQuote) {
+    return { message_category: "quote", business_relevance_score: 0.95, intent: "quote_followup", classification_confidence: "medium" };
+  }
+  if (isDoc) {
+    return { message_category: "documents", business_relevance_score: 0.9, intent: "ask_docs", classification_confidence: "medium" };
+  }
+  if (isHealth) {
+    return { message_category: "health_content", business_relevance_score: 0.85, intent: "qualify", classification_confidence: "medium" };
+  }
+  // Default: moderate relevance for unrecognized content
+  return { message_category: "small_talk", business_relevance_score: 0.3, intent: "none", classification_confidence: "low" };
+}
+
+async function classifyWithAI(extractedText: string, mediaType: string): Promise<ClassificationResult> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return classifyTextMessage(extractedText);
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{
+          role: "user",
+          content: `Classifique esta mensagem de WhatsApp (tipo: ${mediaType}). Retorne APENAS um JSON:
+{"message_category":"health_content|quote|documents|admin|greeting|small_talk|meme_sticker|unknown","business_relevance_score":0.0-1.0,"intent":"qualify|quote_followup|ask_docs|schedule_call|greeting|nudge|none","confidence":"low|medium|high"}
+
+Regras:
+- Imagens de bom dia, motivacionais, memes, stickers = greeting ou meme_sticker, relevância < 0.2
+- Cotações, propostas, tabelas de preços = quote, relevância > 0.8
+- Documentos pessoais (CPF, RG, contrato) = documents, relevância > 0.8
+- Conteúdo sobre planos de saúde = health_content, relevância > 0.7
+- Conversa casual sem relação com negócio = small_talk, relevância < 0.3
+
+Texto/conteúdo extraído:
+"${extractedText.slice(0, 500)}"`,
+        }],
+      }),
+    });
+    if (!resp.ok) { await resp.text(); return classifyTextMessage(extractedText); }
+    const data = await resp.json();
+    const raw = data.choices?.[0]?.message?.content?.trim() || "";
+    const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      message_category: parsed.message_category || "unknown",
+      business_relevance_score: Math.min(1, Math.max(0, Number(parsed.business_relevance_score) || 0)),
+      intent: parsed.intent || "none",
+      classification_confidence: parsed.confidence || "low",
+    };
+  } catch {
+    return classifyTextMessage(extractedText);
+  }
+}
+
 async function extractTextWithAI(base64: string, mimetype: string, type: "audio" | "image" | "document"): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return null;
@@ -44,7 +149,11 @@ async function extractTextWithAI(base64: string, mimetype: string, type: "audio"
   if (type === "audio") {
     prompt = `Transcreva este áudio de voz em português brasileiro com precisão. Retorne APENAS o texto transcrito, sem aspas, sem explicações. Se inaudível, retorne '[Áudio não compreendido]'.`;
   } else if (type === "image") {
-    prompt = `Analise esta imagem em detalhes. Se for uma proposta de plano de saúde, extraia:
+    prompt = `Analise esta imagem. PRIMEIRO determine se é conteúdo de negócio (proposta, cotação, tabela de preços, documento) ou conteúdo social (bom dia, meme, motivacional, sticker, foto pessoal).
+
+Se for conteúdo social/greeting/meme: retorne apenas "[SOCIAL] breve descrição" (ex: "[SOCIAL] Imagem motivacional de bom dia")
+
+Se for proposta de plano de saúde, extraia:
 - Operadora e nome do plano
 - Valores mensais
 - Tipo de acomodação
@@ -52,7 +161,7 @@ async function extractTextWithAI(base64: string, mimetype: string, type: "audio"
 - Coparticipação
 - Rede credenciada mencionada
 
-Se for outro tipo de imagem (print de conversa, tabela de preços, etc.), descreva o conteúdo relevante.
+Se for outro conteúdo de negócio (print de conversa, tabela de preços, etc.), descreva o conteúdo relevante.
 Retorne uma descrição concisa e estruturada. Sem saudações.`;
   } else {
     prompt = `Analise este documento em detalhes. Se for uma proposta de plano de saúde, extraia:
@@ -208,11 +317,35 @@ Deno.serve(async (req) => {
 
     const extractedText = await extractTextWithAI(media.base64, mime, type);
 
+    // Classify the message content
+    const textForClassification = extractedText || msg.content || "";
+    let classification: ClassificationResult;
+    if (extractedText && (type === "image" || type === "document")) {
+      // Use AI classification for media with extracted text
+      classification = await classifyWithAI(extractedText, type);
+    } else {
+      classification = classifyTextMessage(textForClassification);
+    }
+
+    // Auto-detect social content from extraction prefix
+    if (extractedText?.startsWith("[SOCIAL]")) {
+      classification = {
+        message_category: "greeting",
+        business_relevance_score: 0.1,
+        intent: "greeting",
+        classification_confidence: "high",
+      };
+    }
+
     // Update message
     const prefix = type === "audio" ? "🎤" : type === "image" ? "🖼️" : "📄";
     const updateData: any = {
       processing_status: extractedText ? "done" : "failed",
       processing_error: extractedText ? null : "extraction_failed",
+      message_category: classification.message_category,
+      business_relevance_score: classification.business_relevance_score,
+      intent: classification.intent,
+      classification_confidence: classification.classification_confidence,
     };
 
     if (storagePath) updateData.media_storage_path = storagePath;
@@ -220,13 +353,10 @@ Deno.serve(async (req) => {
     if (extractedText) {
       updateData.extracted_text = extractedText;
 
-      // Also update content with prefixed text (backwards-compatible with existing UI)
       const existingContent = msg.content || "";
       if (type === "audio") {
-        // For audio, replace content entirely with transcription
         updateData.content = `${prefix} ${extractedText}`;
       } else {
-        // For image/doc, append to existing content
         updateData.content = existingContent
           ? `${existingContent}\n${prefix} ${extractedText}`
           : `${prefix} ${extractedText}`;

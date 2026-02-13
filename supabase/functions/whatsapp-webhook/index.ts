@@ -6,6 +6,41 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function classifyTextContent(content: string): { message_category: string; business_relevance_score: number; intent: string; classification_confidence: string } {
+  if (!content || content.trim().length === 0) {
+    return { message_category: "unknown", business_relevance_score: 0, intent: "none", classification_confidence: "low" };
+  }
+  const t = content.toLowerCase().trim();
+  const greetingPatterns = [
+    /^(bom dia|boa tarde|boa noite|oi|olá|ola|hey|eai|e ai|fala)/,
+    /(bom dia|boa tarde|boa noite|feliz|abençoado|abençoada|sexta|segunda|terça|quarta|quinta|sábado|domingo)/,
+    /(bença|deus|amém|gratidão|paz|🙏|😊|🌅|🌞|☀️|🙌|❤️|💛)/,
+  ];
+  const memePatterns = [/(kkkk|hahah|kkk|rsrs|😂|🤣|😅|😆)/, /^(sticker|figurinha)/];
+  const healthPatterns = [
+    /(plano|saúde|saude|operadora|unimed|amil|bradesco|sulamerica|hapvida|notredame|intermédica|golden|cross|coparticipação|carência|enfermaria|apartamento|rede credenciada|hospital|clínica|clinica)/,
+    /(cotação|cotacao|proposta|orçamento|orcamento|reajuste|mensalidade|fatura|boleto|implantação|vigência)/,
+    /(cpf|rg|contrato|documentação|carteirinha|ans|beneficiário|titular|dependente)/,
+  ];
+  const quotePatterns = [/(cotação|cotacao|proposta|orçamento|orcamento|valor|preço|preco|R\$|reais|mensalidade|tabela)/];
+  const docPatterns = [/(cpf|rg|cnh|documento|certidão|comprovante|contrato|declaração)/];
+  const isGreeting = greetingPatterns.some(p => p.test(t));
+  const isMeme = memePatterns.some(p => p.test(t));
+  const isHealth = healthPatterns.some(p => p.test(t));
+  const isQuote = quotePatterns.some(p => p.test(t));
+  const isDoc = docPatterns.some(p => p.test(t));
+  if (t.length < 60 && isGreeting && !isHealth && !isQuote && !isDoc) {
+    return { message_category: "greeting", business_relevance_score: 0.1, intent: "greeting", classification_confidence: "high" };
+  }
+  if (isMeme && !isHealth) {
+    return { message_category: "meme_sticker", business_relevance_score: 0.05, intent: "none", classification_confidence: "high" };
+  }
+  if (isQuote) return { message_category: "quote", business_relevance_score: 0.95, intent: "quote_followup", classification_confidence: "medium" };
+  if (isDoc) return { message_category: "documents", business_relevance_score: 0.9, intent: "ask_docs", classification_confidence: "medium" };
+  if (isHealth) return { message_category: "health_content", business_relevance_score: 0.85, intent: "qualify", classification_confidence: "medium" };
+  return { message_category: "small_talk", business_relevance_score: 0.3, intent: "none", classification_confidence: "low" };
+}
+
 async function downloadAudioFromUazapi(messageId: string): Promise<{ base64: string; format: string } | null> {
   try {
     const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
@@ -434,6 +469,14 @@ Deno.serve(async (req) => {
     const direction = isFromMe ? "outbound" : "inbound";
     const msgStatus = isFromMe ? "sent" : "received";
 
+    // === Classify text messages inline (lightweight, no AI call) ===
+    let msgClassification = { message_category: "unknown", business_relevance_score: 0, intent: "none", classification_confidence: "low" };
+    if (messageType === "text" && content) {
+      msgClassification = classifyTextContent(content);
+    } else if (messageType === "sticker") {
+      msgClassification = { message_category: "meme_sticker", business_relevance_score: 0.05, intent: "none", classification_confidence: "high" };
+    }
+
     // === STEP 1: Save message immediately (for realtime) ===
     const { data: savedMsg, error: insertError } = await supabase
       .from("whatsapp_messages")
@@ -448,6 +491,10 @@ Deno.serve(async (req) => {
         uazapi_message_id: uazapiMessageId,
         status: msgStatus,
         contact_name: cleanContactName,
+        message_category: msgClassification.message_category,
+        business_relevance_score: msgClassification.business_relevance_score,
+        intent: msgClassification.intent,
+        classification_confidence: msgClassification.classification_confidence,
       })
       .select("id")
       .single();
