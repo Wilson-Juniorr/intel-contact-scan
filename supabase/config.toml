@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.suggest-tasks]
 verify_jwt = false
+
+[functions.closing-engine]
+verify_jwt = false

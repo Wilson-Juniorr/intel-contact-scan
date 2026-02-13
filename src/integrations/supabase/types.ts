@@ -49,6 +49,103 @@ export type Database = {
           },
         ]
       }
+      closing_sequences: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          id: string
+          lead_id: string
+          paused_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          id?: string
+          lead_id: string
+          paused_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          id?: string
+          lead_id?: string
+          paused_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_sequences_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closing_steps: {
+        Row: {
+          ai_analysis: string | null
+          created_at: string
+          generated_message: string | null
+          id: string
+          scheduled_at: string
+          sent_at: string | null
+          sequence_id: string
+          status: string
+          step_number: number
+          step_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: string | null
+          created_at?: string
+          generated_message?: string | null
+          id?: string
+          scheduled_at: string
+          sent_at?: string | null
+          sequence_id: string
+          status?: string
+          step_number: number
+          step_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: string | null
+          created_at?: string
+          generated_message?: string | null
+          id?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          sequence_id?: string
+          status?: string
+          step_number?: number
+          step_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "closing_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_up_queue: {
         Row: {
           attempt_number: number
