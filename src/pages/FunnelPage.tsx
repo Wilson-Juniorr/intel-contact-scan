@@ -259,6 +259,7 @@ export default function FunnelPage() {
               onDrop={() => handleDrop(stage.key)}
               onLeadClick={(id) => setSelectedLeadId(id)}
               onDeleteLead={(id) => setDeleteLeadId(id)}
+              onMoveStage={(id, stage) => tryMoveStage(id, stage)}
             />
           );
         })}
