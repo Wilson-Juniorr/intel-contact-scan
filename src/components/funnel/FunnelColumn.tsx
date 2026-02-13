@@ -1,7 +1,6 @@
 import { FunnelCard } from "./FunnelCard";
 import type { FunnelStage } from "@/types/lead";
-import { ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface StageInfo {
   key: FunnelStage;
@@ -45,45 +44,37 @@ export function FunnelColumn({
 
   return (
     <div
-      className="flex-1 min-w-[220px] max-w-[280px] flex flex-col bg-muted/20"
+      className="flex-1 min-w-[240px] max-w-[290px] flex flex-col"
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      {/* Header */}
-      <div className="flex items-center gap-1.5 px-2.5 py-2 bg-muted/50 border-b border-border">
-        {!isFirst && (
-          <button className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground shrink-0">
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <span className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: stage.color }}>
-          {stage.label}
-        </span>
-        <span
-          className="text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[28px] text-center shrink-0"
-          style={{ backgroundColor: stage.color, color: "#fff" }}
-        >
-          {leads.length}
-        </span>
-        <div className="ml-auto flex items-center gap-0.5 shrink-0">
-          <button className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
-            <ArrowUpDown className="h-3 w-3" />
-          </button>
-          <button className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground">
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+      {/* Header – sticky */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="px-3 py-2.5 flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+          <span className="text-xs font-semibold uppercase tracking-wider text-foreground truncate">
+            {stage.label}
+          </span>
+          <span
+            className="ml-auto text-[10px] font-bold rounded-full px-2 py-0.5 min-w-[24px] text-center"
+            style={{ backgroundColor: stage.color + "18", color: stage.color }}
+          >
+            {leads.length}
+          </span>
         </div>
       </div>
 
-      {/* Cards */}
-      <div
-        className={`flex-1 overflow-y-auto transition-colors ${
-          isDragOver ? "bg-primary/5" : ""
+      {/* Cards area */}
+      <motion.div
+        className={`flex-1 overflow-y-auto px-1.5 py-1.5 transition-colors duration-200 ${
+          isDragOver ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""
         }`}
+        animate={isDragOver ? { scale: 1.005 } : { scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
       >
         {leads.length === 0 && (
-          <div className="p-8 text-center text-xs text-muted-foreground italic">
+          <div className="p-8 text-center text-xs text-muted-foreground/60 italic">
             Nenhum negócio
           </div>
         )}
@@ -98,17 +89,17 @@ export function FunnelColumn({
             />
           ))}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Footer totals */}
-      <div className="px-2.5 py-1.5 border-t border-border bg-muted/40 text-[10px] text-muted-foreground leading-relaxed">
-        <div>
+      <div className="px-3 py-2 border-t border-border bg-muted/30 text-[10px] text-muted-foreground leading-relaxed">
+        <div className="flex items-center justify-between">
+          <span>Valor total</span>
           <span className="font-semibold text-foreground">{formatCurrency(totalValue)}</span>
-          {" "}| Valor total
         </div>
-        <div>
+        <div className="flex items-center justify-between">
+          <span>Ponderado ({stage.weight}%)</span>
           <span className="font-semibold text-foreground">{formatCurrency(weightedValue)}</span>
-          {" "}({stage.weight}%) | Valor ponderado <span className="opacity-50">ⓘ</span>
         </div>
       </div>
     </div>

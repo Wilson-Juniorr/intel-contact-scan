@@ -87,14 +87,14 @@ export default function FunnelPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-5rem)] flex flex-col">
+    <div className="h-[calc(100vh-4.5rem)] flex flex-col gap-3">
       {/* Top bar */}
-      <div className="px-1 pb-2">
-        <div className="flex items-center justify-between mb-2">
+      <div>
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Pipeline de Vendas</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Arraste os cards entre as colunas • {filteredLeads.length} de {leads.length} negócios
+            <h1 className="text-lg font-bold text-foreground tracking-tight">Pipeline de Vendas</h1>
+            <p className="text-[13px] text-muted-foreground mt-0.5">
+              Arraste os cards entre as colunas · {filteredLeads.length} de {leads.length} negócios
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export default function FunnelPage() {
       </div>
 
       {/* Pipeline columns */}
-      <div className="flex-1 flex gap-0 overflow-x-auto">
+      <div className="flex-1 flex gap-px overflow-x-auto bg-border/50 rounded-lg border border-border">
         {FUNNEL_STAGES.map((stage, index) => {
           const stageLeads = filteredLeads.filter((l) => l.stage === stage.key);
           return (

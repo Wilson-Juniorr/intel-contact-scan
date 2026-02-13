@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Mail, User, Clock, ClipboardList, PhoneCall } from "lucide-react";
+import { Phone, MessageCircle, Mail, User, PhoneCall } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -19,122 +19,126 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
     ? formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: false, locale: ptBR })
     : null;
 
-  const typeLabel = lead.type === "PF" ? "PF" : lead.type === "ADESAO" ? "Adesão" : "PME";
-  const typeFull = lead.type === "ADESAO" ? "Adesão" : lead.type === "PME" ? "PME" : "";
-
+  const typeLabel = lead.type === "ADESAO" ? "Adesão" : lead.type === "PME" ? "PME" : "PF";
   const estimatedValue = lead.lives ? lead.lives * 120 : null;
+
+  const goal = 6;
+  const progress = Math.min(totalAttempts, goal);
+  const pct = (progress / goal) * 100;
+  const isComplete = progress >= goal;
+  const barColor = isComplete ? "hsl(160, 84%, 39%)" : stageColor;
 
   return (
     <motion.div
       layout
       layoutId={lead.id}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.8 }}
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="mx-2 my-1.5 rounded border border-border bg-card shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow group"
+      className="mx-1 my-1 rounded-lg border border-border bg-card shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 group hover:border-border/80"
     >
-      <div className="px-3 pt-2.5 pb-2">
-        {/* Title */}
-        <p className="text-[13px] font-bold leading-snug break-words" style={{ color: stageColor }}>
-          {lead.name}
-          {typeFull ? ` | ${typeFull}` : ` | ${typeLabel}`}
-        </p>
+      <div className="px-3 pt-2.5 pb-2 space-y-1.5">
+        {/* Title row */}
+        <div className="flex items-start justify-between gap-1">
+          <p className="text-[13px] font-semibold leading-snug text-foreground break-words flex-1">
+            {lead.name}
+          </p>
+          <span
+            className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+            style={{ backgroundColor: stageColor + "15", color: stageColor }}
+          >
+            {typeLabel}
+          </span>
+        </div>
 
         {/* Value */}
         {estimatedValue && (
-          <p className="text-xs text-foreground mt-1.5">
-            Valor: R$ {estimatedValue.toLocaleString("pt-BR")}
-          </p>
-        )}
-
-        {/* Status */}
-        {lead.operator && (
-          <p className="text-xs text-foreground">
-            Status do Negócio: {lead.operator}
+          <p className="text-xs text-muted-foreground">
+            R$ {estimatedValue.toLocaleString("pt-BR")}
           </p>
         )}
 
         {/* Contact person */}
-        <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
-          <User className="h-3.5 w-3.5 shrink-0" style={{ color: stageColor }} />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <User className="h-3 w-3 shrink-0" />
           <span className="truncate">{lead.name}</span>
         </div>
 
         {/* Follow-up progress */}
-        {(() => {
-          const goal = 6;
-          const progress = Math.min(totalAttempts, goal);
-          const pct = (progress / goal) * 100;
-          const isComplete = progress >= goal;
-          const barColor = isComplete ? "hsl(140, 70%, 40%)" : stageColor;
-          return (
-            <div className="mt-1.5 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <PhoneCall className="h-3 w-3" style={{ color: stageColor }} />
-                  {progress}/{goal} dias
-                </span>
-                {responseRate > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted" style={{ color: responseRate > 50 ? "hsl(140, 70%, 40%)" : "hsl(35, 85%, 50%)" }}>
-                    {responseRate}% resp.
-                  </span>
-                )}
-              </div>
-              <div className="h-1 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-              </div>
-            </div>
-          );
-        })()}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <PhoneCall className="h-3 w-3" />
+              {progress}/{goal} dias
+            </span>
+            {responseRate > 0 && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{
+                  backgroundColor: (responseRate > 50 ? "hsl(160, 84%, 39%)" : "hsl(38, 92%, 50%)") + "15",
+                  color: responseRate > 50 ? "hsl(160, 84%, 39%)" : "hsl(38, 92%, 50%)",
+                }}
+              >
+                {responseRate}% resp.
+              </span>
+            )}
+          </div>
+          <div className="h-1 rounded-full bg-muted overflow-hidden">
+            <motion.div
+              className="h-full rounded-full"
+              style={{ backgroundColor: barColor }}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            />
+          </div>
+        </div>
 
-        {/* Time */}
+        {/* Time since */}
         {timeSince && (
-          <p className="text-[11px] text-muted-foreground mt-1.5">
-            Tarefa há {timeSince}
+          <p className="text-[10px] text-muted-foreground">
+            Última atividade há {timeSince}
           </p>
         )}
 
         {/* Lost reason */}
         {(lead.stage === "perdido" || lead.stage === "declinado" || lead.stage === "cancelado") && lead.lost_reason && (
-          <div className="mt-1.5 text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
+          <div className="text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
             {lead.lost_reason}
           </div>
         )}
       </div>
 
-      {/* Action icons */}
-      <div className="flex items-center gap-0 px-1.5 py-1 border-t border-border/40">
-        <ActionBtn icon={<ClipboardList className="h-3.5 w-3.5" />} onClick={onClick} color={stageColor} />
-        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} color={stageColor} />
-        <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} color={stageColor} />
-        <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} color={stageColor} disabled={!lead.email} />
-        
+      {/* Action icons – visible on hover */}
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} />
+        <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} />
+        <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} disabled={!lead.email} />
       </div>
     </motion.div>
   );
 }
 
 function ActionBtn({
-  icon, href, onClick, color, disabled = false,
+  icon, href, onClick, disabled = false,
 }: {
-  icon: React.ReactNode; href?: string; onClick?: () => void; color: string; disabled?: boolean;
+  icon: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean;
 }) {
-  const style = disabled ? {} : { color };
-  const cls = `p-1.5 rounded transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : "hover:bg-muted"}`;
+  const cls = `p-1.5 rounded-md transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
 
   if (href && !disabled) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={cls} style={style}>
+      <a href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={cls}>
         {icon}
       </a>
     );
   }
   return (
-    <button onClick={(e) => { e.stopPropagation(); onClick?.(); }} disabled={disabled} className={cls} style={style}>
+    <button onClick={(e) => { e.stopPropagation(); onClick?.(); }} disabled={disabled} className={cls}>
       {icon}
     </button>
   );
