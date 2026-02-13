@@ -55,12 +55,21 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick }: Props) {
           </span>
         </div>
 
-        {/* Value */}
-        {estimatedValue && (
+        {/* Quote / Approved value */}
+        {lead.approved_value ? (
+          <p className="text-xs font-medium text-emerald-600">
+            ✓ R$ {Number(lead.approved_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+        ) : lead.quote_min_value ? (
+          <p className="text-xs text-muted-foreground">
+            Cotação: R$ {Number(lead.quote_min_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            {lead.quote_operadora && <span className="ml-1 opacity-70">· {lead.quote_operadora}</span>}
+          </p>
+        ) : estimatedValue ? (
           <p className="text-xs text-muted-foreground">
             R$ {estimatedValue.toLocaleString("pt-BR")}
           </p>
-        )}
+        ) : null}
 
         {/* Contact person */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
