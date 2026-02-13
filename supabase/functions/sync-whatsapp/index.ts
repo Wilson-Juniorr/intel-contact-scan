@@ -474,6 +474,26 @@ Deno.serve(async (req) => {
           .eq("phone", normalized)
           .eq("user_id", userId);
 
+        // Initialize lead_memory
+        await supabase.from("lead_memory").insert({
+          user_id: userId,
+          lead_id: newLead.id,
+          summary: null,
+          structured_json: {},
+        });
+
+        // Update last_contact_at from most recent message
+        const { data: lastMsg } = await supabase
+          .from("whatsapp_messages")
+          .select("created_at")
+          .eq("lead_id", newLead.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastMsg) {
+          await supabase.from("leads").update({ last_contact_at: lastMsg.created_at }).eq("id", newLead.id);
+        }
+
         // Log
         await supabase.from("action_log").insert({
           user_id: userId,
