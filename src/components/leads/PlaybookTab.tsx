@@ -58,6 +58,8 @@ export function PlaybookTab({ lead }: Props) {
   const [timeline, setTimeline] = useState<any>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [aiTasks, setAiTasks] = useState<{ title: string; reason: string }[]>([]);
+  const [generatingAiTasks, setGeneratingAiTasks] = useState(false);
 
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
 
@@ -83,6 +85,33 @@ export function PlaybookTab({ lead }: Props) {
       toast({ title: "Tarefa concluída!" });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleGenerateAiTasks = async () => {
+    setGeneratingAiTasks(true);
+    setAiTasks([]);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Não autenticado");
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ leadId: lead.id }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || "Erro ao sugerir tarefas");
+      }
+      const data = await resp.json();
+      setAiTasks(Array.isArray(data.tasks) ? data.tasks : []);
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setGeneratingAiTasks(false);
     }
   };
 
@@ -211,6 +240,42 @@ export function PlaybookTab({ lead }: Props) {
           })}
         </div>
       )}
+
+      {/* AI-suggested tasks based on conversation */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+            <Brain className="h-3 w-3" /> Tarefas sugeridas pela IA
+          </h4>
+          <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-2" onClick={handleGenerateAiTasks} disabled={generatingAiTasks}>
+            {generatingAiTasks ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {aiTasks.length > 0 ? "Atualizar" : "Analisar conversa"}
+          </Button>
+        </div>
+        {generatingAiTasks && (
+          <p className="text-[10px] text-muted-foreground animate-pulse">Analisando conversas, áudios, imagens e PDFs...</p>
+        )}
+        {aiTasks.map((at, i) => {
+          const alreadyCreated = tasks.some((t: any) => t.title === at.title);
+          return (
+            <div key={i} className="p-2 rounded-md border border-primary/20 bg-primary/5 text-xs space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                <span className="flex-1 font-medium">{at.title}</span>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-2 shrink-0"
+                  disabled={alreadyCreated} onClick={() => handleAddTask(at.title)}>
+                  {alreadyCreated ? <Check className="h-3 w-3" /> : <CalendarPlus className="h-3 w-3" />}
+                  {alreadyCreated ? "Criada" : "Criar"}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground pl-5">{at.reason}</p>
+            </div>
+          );
+        })}
+        {aiTasks.length === 0 && !generatingAiTasks && (
+          <p className="text-[10px] text-muted-foreground">Clique em "Analisar conversa" para gerar tarefas baseadas no histórico</p>
+        )}
+      </div>
 
       {/* Open tasks */}
       <div className="space-y-1.5">
