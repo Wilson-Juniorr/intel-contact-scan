@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -60,7 +60,6 @@ const stagePriority: Record<string, number> = {
 };
 
 interface FollowUpPanelProps {
-  /** When provided, show only this lead (used inside LeadDetailSheet) */
   singleLeadId?: string;
 }
 
@@ -71,11 +70,13 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Record<string, string>>({});
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Now stores arrays of messages per lead
+  const [messageSeqs, setMessageSeqs] = useState<Record<string, string[]>>({});
+  const [copiedIdx, setCopiedIdx] = useState<{ leadId: string; idx: number } | null>(null);
+  const [editingMsg, setEditingMsg] = useState<{ leadId: string; idx: number } | null>(null);
   const [contexts, setContexts] = useState<Record<string, string>>({});
   const [sendingFor, setSendingFor] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState<string | null>(null);
 
   const excludedStages = ["implantado", "declinado", "cancelado"];
 
@@ -141,43 +142,43 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         throw new Error(err.error || "Erro ao gerar mensagem");
       }
       const data = await resp.json();
-      setMessages((prev) => ({ ...prev, [il.lead.id]: data.message }));
-      setEditingId(null);
+      // Support both new (messages[]) and old (message) format
+      const msgs = Array.isArray(data.messages) ? data.messages : [data.message];
+      setMessageSeqs((prev) => ({ ...prev, [il.lead.id]: msgs }));
+      setEditingMsg(null);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     }
     setGeneratingFor(null);
   };
 
-  const sendToWhatsApp = async (lead: any, message: string) => {
-    setSendingFor(lead.id);
+  const sendSingleMessage = async (lead: any, message: string, idx: number) => {
+    setSendingFor(`${lead.id}-${idx}`);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
-        return;
-      }
-
       const resp = await supabase.functions.invoke("send-whatsapp", {
         body: { phone: lead.phone, message, lead_id: lead.id },
       });
-
       if (resp.error) throw new Error(resp.error.message);
 
-      // Register interaction
       await addInteraction({
         lead_id: lead.id,
         type: "whatsapp",
-        description: `[Follow-up enviado] ${message.slice(0, 120)}${message.length > 120 ? "..." : ""}`,
+        description: `[Follow-up ${idx + 1}] ${message.slice(0, 100)}${message.length > 100 ? "..." : ""}`,
       });
 
-      toast({ title: "✅ Enviado!", description: `Mensagem enviada para ${lead.name} via WhatsApp` });
-      setMessages((prev) => {
-        const copy = { ...prev };
-        delete copy[lead.id];
-        return copy;
+      toast({ title: "✅ Enviado!", description: `Mensagem ${idx + 1} enviada para ${lead.name}` });
+      
+      // Remove sent message from sequence
+      setMessageSeqs((prev) => {
+        const seq = [...(prev[lead.id] || [])];
+        seq.splice(idx, 1);
+        if (seq.length === 0) {
+          const copy = { ...prev };
+          delete copy[lead.id];
+          return copy;
+        }
+        return { ...prev, [lead.id]: seq };
       });
-      setEditingId(null);
     } catch (e: any) {
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
     } finally {
@@ -185,11 +186,57 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     }
   };
 
-  const copyMessage = (id: string, message: string) => {
+  const sendAllMessages = async (lead: any, msgs: string[]) => {
+    setSendingAll(lead.id);
+    try {
+      for (let i = 0; i < msgs.length; i++) {
+        const resp = await supabase.functions.invoke("send-whatsapp", {
+          body: { phone: lead.phone, message: msgs[i], lead_id: lead.id },
+        });
+        if (resp.error) throw new Error(resp.error.message);
+        // Small delay between messages for natural feel
+        if (i < msgs.length - 1) await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      await addInteraction({
+        lead_id: lead.id,
+        type: "whatsapp",
+        description: `[Follow-up sequência ${msgs.length}x] ${msgs[0].slice(0, 80)}...`,
+      });
+
+      toast({ title: "✅ Sequência enviada!", description: `${msgs.length} mensagens enviadas para ${lead.name}` });
+      setMessageSeqs((prev) => {
+        const copy = { ...prev };
+        delete copy[lead.id];
+        return copy;
+      });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar sequência", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingAll(null);
+    }
+  };
+
+  const copyMessage = (leadId: string, idx: number, message: string) => {
     navigator.clipboard.writeText(message);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({ title: "Copiado!", description: "Mensagem copiada para a área de transferência" });
+    setCopiedIdx({ leadId, idx });
+    setTimeout(() => setCopiedIdx(null), 2000);
+    toast({ title: "Copiado!" });
+  };
+
+  const copyAll = (leadId: string, msgs: string[]) => {
+    navigator.clipboard.writeText(msgs.join("\n\n"));
+    setCopiedIdx({ leadId, idx: -1 });
+    setTimeout(() => setCopiedIdx(null), 2000);
+    toast({ title: "Toda sequência copiada!" });
+  };
+
+  const updateMessageAt = (leadId: string, idx: number, value: string) => {
+    setMessageSeqs((prev) => {
+      const seq = [...(prev[leadId] || [])];
+      seq[idx] = value;
+      return { ...prev, [leadId]: seq };
+    });
   };
 
   const stageLabel = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.label || key;
@@ -270,7 +317,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         {filtered.map((il) => {
           const cfg = urgencyConfig[il.urgency];
           const Icon = cfg.icon;
-          const msg = messages[il.lead.id];
+          const msgs = messageSeqs[il.lead.id];
           const lastActivity = il.lead.last_contact_at || il.lead.updated_at || il.lead.created_at;
 
           return (
@@ -305,31 +352,80 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                 </div>
 
                 {/* Context input */}
-                <div className="space-y-1.5">
-                  <Textarea
-                    placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto')"
-                    value={contexts[il.lead.id] || ""}
-                    onChange={(e) => setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
-                    className="text-xs min-h-[48px] resize-none"
-                    rows={2}
-                  />
-                </div>
+                <Textarea
+                  placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto')"
+                  value={contexts[il.lead.id] || ""}
+                  onChange={(e) => setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
+                  className="text-xs min-h-[48px] resize-none"
+                  rows={2}
+                />
 
-                {/* AI message */}
-                {msg && (
+                {/* Message sequence */}
+                {msgs && msgs.length > 0 && (
                   <div className="space-y-2">
-                    {editingId === il.lead.id ? (
-                      <Textarea
-                        value={msg}
-                        onChange={(e) => setMessages((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
-                        className="text-sm min-h-[80px]"
-                        rows={4}
-                      />
-                    ) : (
-                      <div className="bg-muted/50 rounded-lg p-3 text-sm whitespace-pre-wrap border border-border">
-                        {msg}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                        Sequência ({msgs.length} mensagens)
+                      </span>
+                    </div>
+                    {msgs.map((msg, idx) => {
+                      const isEditing = editingMsg?.leadId === il.lead.id && editingMsg.idx === idx;
+                      const isCopied = copiedIdx?.leadId === il.lead.id && copiedIdx.idx === idx;
+                      const isSending = sendingFor === `${il.lead.id}-${idx}`;
+
+                      return (
+                        <div key={idx} className="group relative rounded-lg border border-border bg-muted/30 p-3">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
+                              {idx + 1}/{msgs.length}
+                            </Badge>
+                          </div>
+
+                          {isEditing ? (
+                            <Textarea
+                              value={msg}
+                              onChange={(e) => updateMessageAt(il.lead.id, idx, e.target.value)}
+                              className="text-sm min-h-[40px] resize-none"
+                              rows={2}
+                              autoFocus
+                            />
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg}</p>
+                          )}
+
+                          {/* Per-message actions */}
+                          <div className="flex items-center gap-1 mt-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => setEditingMsg(isEditing ? null : { leadId: il.lead.id, idx })}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              {isEditing ? "OK" : "Editar"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => copyMessage(il.lead.id, idx, msg)}
+                            >
+                              {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => sendSingleMessage(il.lead, msg, idx)}
+                              disabled={!!isSending}
+                            >
+                              {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                              Enviar
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -344,46 +440,37 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                   >
                     {generatingFor === il.lead.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : msg ? (
+                    ) : msgs ? (
                       <RefreshCw className="h-3.5 w-3.5" />
                     ) : (
                       <Sparkles className="h-3.5 w-3.5" />
                     )}
-                    {msg ? "Regenerar" : "Gerar mensagem IA"}
+                    {msgs ? "Regenerar" : "Gerar sequência IA"}
                   </Button>
 
-                  {msg && (
+                  {msgs && msgs.length > 0 && (
                     <>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-xs gap-1"
-                        onClick={() => setEditingId(editingId === il.lead.id ? null : il.lead.id)}
+                        className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => sendAllMessages(il.lead, msgs)}
+                        disabled={sendingAll === il.lead.id}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                        {editingId === il.lead.id ? "Pronto" : "Editar"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="text-xs gap-1.5 bg-[hsl(142,70%,40%)] hover:bg-[hsl(142,70%,35%)] text-white"
-                        onClick={() => sendToWhatsApp(il.lead, msg)}
-                        disabled={sendingFor === il.lead.id}
-                      >
-                        {sendingFor === il.lead.id ? (
+                        {sendingAll === il.lead.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Send className="h-3.5 w-3.5" />
+                          <SendHorizonal className="h-3.5 w-3.5" />
                         )}
-                        {sendingFor === il.lead.id ? "Enviando..." : "Enviar WhatsApp"}
+                        {sendingAll === il.lead.id ? "Enviando..." : `Enviar sequência (${msgs.length})`}
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="text-xs gap-1"
-                        onClick={() => copyMessage(il.lead.id, msg)}
+                        onClick={() => copyAll(il.lead.id, msgs)}
                       >
-                        {copiedId === il.lead.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copiedId === il.lead.id ? "Copiado" : "Copiar"}
+                        {copiedIdx?.leadId === il.lead.id && copiedIdx.idx === -1 ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        Copiar tudo
                       </Button>
                     </>
                   )}

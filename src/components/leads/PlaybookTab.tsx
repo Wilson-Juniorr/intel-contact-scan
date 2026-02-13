@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, Target, MessageCircle, CalendarPlus,
-  Loader2, Sparkles, Copy, Check, Trash2,
+  Loader2, Sparkles, Copy, Check, Trash2, Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,8 +32,9 @@ export function PlaybookTab({ lead }: Props) {
   const [newTaskDue, setNewTaskDue] = useState("");
   const [saving, setSaving] = useState(false);
   const [generatingMsg, setGeneratingMsg] = useState(false);
-  const [suggestedMsg, setSuggestedMsg] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [suggestedMsgs, setSuggestedMsgs] = useState<string[]>([]);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
 
@@ -68,8 +69,9 @@ export function PlaybookTab({ lead }: Props) {
 
   const handleGenerateMessage = async () => {
     setGeneratingMsg(true);
-    setSuggestedMsg("");
-    setCopied(false);
+    setSuggestedMsgs([]);
+    setCopiedIdx(null);
+    setEditingIdx(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Não autenticado");
@@ -84,7 +86,8 @@ export function PlaybookTab({ lead }: Props) {
       });
       if (!resp.ok) throw new Error("Erro ao gerar mensagem");
       const data = await resp.json();
-      setSuggestedMsg(data.message);
+      const msgs = Array.isArray(data.messages) ? data.messages : [data.message];
+      setSuggestedMsgs(msgs);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -193,26 +196,57 @@ export function PlaybookTab({ lead }: Props) {
       <div className="space-y-2">
         <Button size="sm" variant="outline" className="w-full text-xs gap-1.5 h-8" onClick={handleGenerateMessage} disabled={generatingMsg}>
           {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          Gerar mensagem alinhada ao playbook
+          Gerar sequência alinhada ao playbook
         </Button>
 
-        {suggestedMsg && (
+        {suggestedMsgs.length > 0 && (
           <div className="space-y-2">
-            <div className="bg-muted/30 rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap border border-border">
-              {suggestedMsg}
-            </div>
+            {suggestedMsgs.map((msg, idx) => (
+              <div key={idx} className="bg-muted/30 rounded-lg p-2.5 text-xs border border-border space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[9px] h-4 px-1.5">{idx + 1}/{suggestedMsgs.length}</Badge>
+                </div>
+                {editingIdx === idx ? (
+                  <textarea
+                    className="w-full text-xs bg-background border border-input rounded p-1.5 resize-none"
+                    value={msg}
+                    rows={2}
+                    onChange={(e) => {
+                      const copy = [...suggestedMsgs];
+                      copy[idx] = e.target.value;
+                      setSuggestedMsgs(copy);
+                    }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg}</p>
+                )}
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-0.5 px-1" onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}>
+                    <Pencil className="h-2.5 w-2.5" />{editingIdx === idx ? "OK" : "Editar"}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-0.5 px-1" onClick={async () => {
+                    await navigator.clipboard.writeText(msg);
+                    setCopiedIdx(idx);
+                    toast({ title: "Copiado!" });
+                    setTimeout(() => setCopiedIdx(null), 2000);
+                  }}>
+                    {copiedIdx === idx ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                  </Button>
+                </div>
+              </div>
+            ))}
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="flex-1 text-xs gap-1 h-7" onClick={async () => {
-                await navigator.clipboard.writeText(suggestedMsg);
-                setCopied(true);
-                toast({ title: "Copiado!" });
-                setTimeout(() => setCopied(false), 2000);
+                await navigator.clipboard.writeText(suggestedMsgs.join("\n\n"));
+                setCopiedIdx(-1);
+                toast({ title: "Toda sequência copiada!" });
+                setTimeout(() => setCopiedIdx(null), 2000);
               }}>
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                {copied ? "Copiado!" : "Copiar"}
+                {copiedIdx === -1 ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                Copiar tudo
               </Button>
               <Button size="sm" className="flex-1 text-xs gap-1 h-7 bg-secondary hover:bg-secondary/90 text-secondary-foreground" asChild>
-                <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(suggestedMsg)}`} target="_blank" rel="noopener noreferrer">
+                <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(suggestedMsgs[0])}`} target="_blank" rel="noopener noreferrer">
                   <MessageCircle className="h-3 w-3" /> WhatsApp
                 </a>
               </Button>

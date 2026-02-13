@@ -58,7 +58,7 @@ serve(async (req) => {
       .eq("user_id", userId)
       .maybeSingle();
 
-    // Load last WhatsApp messages (text + extracted_text)
+    // Load last WhatsApp messages
     const normalizedPhone = lead.phone.replace(/\D/g, "");
     const phoneVariant = normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
     const { data: whatsappMsgs } = await supabase
@@ -126,33 +126,47 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em vendas de planos de saúde. Gere UMA mensagem de follow-up para WhatsApp.
+            content: `Você é um ESPECIALISTA em comunicação comercial via WhatsApp, focado em vendas de planos de saúde. Você domina técnicas de copywriting, persuasão e gatilhos mentais adaptados ao WhatsApp.
+
+FORMATO DE RESPOSTA:
+- Retorne EXATAMENTE um JSON com a estrutura: {"messages": ["msg1", "msg2", "msg3"]}
+- Gere de 2 a 4 mensagens curtas em SEQUÊNCIA
+- Cada mensagem deve ter NO MÁXIMO 2 linhas (cerca de 120 caracteres)
+- NÃO retorne nada além do JSON
+
+ESTILO DE COMUNICAÇÃO:
+- Tom HUMANO, como se fosse uma pessoa real digitando no WhatsApp
+- Linguagem conversacional e natural (não robotizada)
+- Use abreviações comuns quando natural (ex: "vc", "pra", "tá")
+- Emojis moderados e estratégicos (0-1 por mensagem, NUNCA no início)
+- NUNCA comece com "Olá" ou "Bom dia" genérico — seja criativo na abertura
+- Cada mensagem deve ter uma função específica na sequência
+
+ESTRUTURA DA SEQUÊNCIA:
+1ª mensagem: Gancho de atenção / referência pessoal ao contexto do lead
+2ª mensagem: Valor / benefício / informação relevante  
+3ª mensagem: CTA suave (pergunta que convida resposta)
+4ª mensagem (opcional): Complemento ou urgência sutil
 
 REGRAS:
-- Mensagem curta, profissional e amigável
-- Use o primeiro nome do lead
-- Adapte o tom conforme a etapa do funil e tempo sem contato
-- NÃO use emojis excessivos (máximo 2)
-- NÃO inclua saudação formal demais
-- Inclua um CTA sutil no final
+- Use o PRIMEIRO NOME do lead
+- SE tiver dados reais do histórico (operadora, valores, rede, objeções), USE para personalizar
+- Adapte urgência conforme tempo sem contato (>=5d mais direto, 1-2d mais casual)
 - NUNCA prometa cobertura ou valores exatos sem confirmação
-- SE tiver informações reais do histórico (operadora, valores, rede, objeções), USE-AS para personalizar
-- Responda APENAS com a mensagem, sem explicações
+- O OBJETIVO é gerar uma RESPOSTA do cliente
+- Pense como vendedor experiente que manda WhatsApp pra cliente real
 
 CONTEXTO DA ETAPA:
-- "Novo Negócio" / "Tentativa de Contato": Abertura + tentativa de contato + pergunta simples
-- "Contato Realizado": Reforce o interesse, pergunte se ficou alguma dúvida
-- "Cotação Enviada": Lembre a cotação + ofereça ajuste + CTA
-- "Cotação Aprovada": Parabenize e agilize a documentação
-- "Documentação Completa" / "Em Emissão": Atualização de status + próximo passo
-- "Retrabalho": Entenda o problema e ofereça solução
-
-Se parado há muito tempo (>=5 dias), seja mais direto e urgente.
-Se parado há pouco tempo (1-2 dias), seja mais casual.`,
+- "Novo Negócio" / "Tentativa de Contato": Primeiro contato, descobrir necessidade
+- "Contato Realizado": Reforçar interesse, tirar dúvida pendente
+- "Cotação Enviada": Lembrar cotação + oferecer ajuste + CTA
+- "Cotação Aprovada": Parabenizar e agilizar documentação
+- "Documentação Completa" / "Em Emissão": Atualização de status
+- "Retrabalho": Entender problema e oferecer solução`,
           },
           {
             role: "user",
-            content: `Gere uma mensagem de follow-up para:
+            content: `Gere a SEQUÊNCIA de mensagens de follow-up para:
 - Nome: ${lead.name}
 - Etapa atual: ${stageLabel}
 - Tipo: ${lead.type === "PF" ? "Pessoa Física" : lead.type === "PME" ? "PME" : "Adesão"}
@@ -161,7 +175,9 @@ Se parado há pouco tempo (1-2 dias), seja mais casual.`,
 - Tempo sem contato: ${idleDays} dias (${idleHours} horas)
 - Notas: ${lead.notes || "nenhuma"}
 ${interactionsSummary ? `\nÚLTIMAS INTERAÇÕES:\n${interactionsSummary}` : ""}
-${whatsappSummary ? `\nÚLTIMAS MENSAGENS WHATSAPP:\n${whatsappSummary}` : ""}${memoryContext}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}`,
+${whatsappSummary ? `\nÚLTIMAS MENSAGENS WHATSAPP:\n${whatsappSummary}` : ""}${memoryContext}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}
+
+Responda APENAS com o JSON {"messages": [...]}`,
           },
         ],
       }),
@@ -184,9 +200,30 @@ ${whatsappSummary ? `\nÚLTIMAS MENSAGENS WHATSAPP:\n${whatsappSummary}` : ""}${
     }
 
     const data = await response.json();
-    const message = data.choices?.[0]?.message?.content || "Erro ao gerar mensagem";
+    const rawContent = data.choices?.[0]?.message?.content || "";
 
-    return new Response(JSON.stringify({ message }), {
+    // Parse the JSON response - handle markdown code blocks
+    let messagesArray: string[] = [];
+    try {
+      const cleaned = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+      messagesArray = Array.isArray(parsed.messages) ? parsed.messages : [rawContent];
+    } catch {
+      // Fallback: split by newlines if JSON parsing fails
+      messagesArray = rawContent.split("\n").filter((l: string) => l.trim().length > 0).slice(0, 4);
+      if (messagesArray.length === 0) messagesArray = [rawContent];
+    }
+
+    // Ensure 2-4 messages
+    messagesArray = messagesArray.slice(0, 4);
+    if (messagesArray.length < 2 && messagesArray[0]?.length > 200) {
+      // Split long single message
+      const words = messagesArray[0].split(" ");
+      const mid = Math.ceil(words.length / 2);
+      messagesArray = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
+    }
+
+    return new Response(JSON.stringify({ messages: messagesArray }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
