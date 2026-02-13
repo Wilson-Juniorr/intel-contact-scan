@@ -3,21 +3,25 @@ import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { FunnelColumn } from "@/components/funnel/FunnelColumn";
+import { BootstrapWhatsAppDialog } from "@/components/leads/BootstrapWhatsAppDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Search, X, CalendarIcon } from "lucide-react";
+import { Search, X, CalendarIcon, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function FunnelPage() {
   const { leads, moveStage } = useLeadsContext();
+  const queryClient = useQueryClient();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FunnelStage | null>(null);
+  const [bootstrapOpen, setBootstrapOpen] = useState(false);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -93,11 +97,16 @@ export default function FunnelPage() {
               Arraste os cards entre as colunas • {filteredLeads.length} de {leads.length} negócios
             </p>
           </div>
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground gap-1">
-              <X className="h-3 w-3" /> Limpar filtros
+          <div className="flex items-center gap-2">
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground gap-1">
+                <X className="h-3 w-3" /> Limpar filtros
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setBootstrapOpen(true)} className="text-xs gap-1.5 h-8">
+              <Zap className="h-3.5 w-3.5" /> Criar negócios do WhatsApp
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Filter bar */}
@@ -185,6 +194,11 @@ export default function FunnelPage() {
       </div>
 
       <LeadDetailSheet lead={selectedLead} onClose={() => setSelectedLeadId(null)} />
+      <BootstrapWhatsAppDialog
+        open={bootstrapOpen}
+        onOpenChange={setBootstrapOpen}
+        onComplete={() => queryClient.invalidateQueries({ queryKey: ["leads"] })}
+      />
     </div>
   );
 }

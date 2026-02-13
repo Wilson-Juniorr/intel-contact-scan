@@ -506,6 +506,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           id: string
+          lead_id: string | null
           phone: string
           updated_at: string
           user_id: string
@@ -514,6 +515,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           id?: string
+          lead_id?: string | null
           phone: string
           updated_at?: string
           user_id: string
@@ -522,11 +524,20 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           id?: string
+          lead_id?: string | null
           phone?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_messages: {
         Row: {

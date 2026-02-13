@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.next-best-action]
 verify_jwt = false
+
+[functions.bootstrap-whatsapp-leads]
+verify_jwt = false
