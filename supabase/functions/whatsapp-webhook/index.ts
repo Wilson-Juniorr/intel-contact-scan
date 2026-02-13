@@ -445,6 +445,33 @@ Deno.serve(async (req) => {
       if (contact) userId = contact.user_id;
     }
 
+    // Fallback: use "owner" phone from UaZapi payload to find user
+    if (!userId) {
+      const ownerPhone = (body.chat?.owner || body.message?.owner || "").replace(/\D/g, "");
+      if (ownerPhone && ownerPhone.length >= 10) {
+        const ownerNormalized = ownerPhone.startsWith("55") ? ownerPhone : `55${ownerPhone}`;
+        // Find any contact or message belonging to this owner instance
+        const { data: ownerContact } = await supabase
+          .from("whatsapp_contacts")
+          .select("user_id")
+          .limit(1)
+          .maybeSingle();
+        
+        if (!ownerContact) {
+          // Try messages table
+          const { data: ownerMsg } = await supabase
+            .from("whatsapp_messages")
+            .select("user_id")
+            .limit(1)
+            .maybeSingle();
+          if (ownerMsg) userId = ownerMsg.user_id;
+        } else {
+          userId = ownerContact.user_id;
+        }
+        if (userId) console.log("Resolved userId from owner fallback:", ownerPhone);
+      }
+    }
+
     if (!userId) {
       console.log("No matching user found for phone:", phone);
       return new Response(JSON.stringify({ status: "ignored", reason: "no matching user" }), {
