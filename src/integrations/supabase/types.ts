@@ -562,6 +562,8 @@ export type Database = {
           content: string | null
           created_at: string
           direction: string
+          extracted_entities: Json | null
+          extracted_semantic_summary: string | null
           extracted_text: string | null
           id: string
           intent: string | null
@@ -584,6 +586,8 @@ export type Database = {
           content?: string | null
           created_at?: string
           direction: string
+          extracted_entities?: Json | null
+          extracted_semantic_summary?: string | null
           extracted_text?: string | null
           id?: string
           intent?: string | null
@@ -606,6 +610,8 @@ export type Database = {
           content?: string | null
           created_at?: string
           direction?: string
+          extracted_entities?: Json | null
+          extracted_semantic_summary?: string | null
           extracted_text?: string | null
           id?: string
           intent?: string | null
