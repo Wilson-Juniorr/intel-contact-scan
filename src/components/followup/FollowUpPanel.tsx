@@ -109,6 +109,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [regeneratingMsg, setRegeneratingMsg] = useState<{ leadId: string; idx: number } | null>(null);
   const [results, setResults] = useState<Record<string, FollowUpResult>>({});
   const [copiedIdx, setCopiedIdx] = useState<{ leadId: string; idx: number } | null>(null);
   const [editingMsg, setEditingMsg] = useState<{ leadId: string; idx: number } | null>(null);
@@ -294,6 +295,40 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     });
   };
 
+  const regenerateSingleMessage = async (leadId: string, idx: number) => {
+    const result = results[leadId];
+    if (!result) return;
+    setRegeneratingMsg({ leadId, idx });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Não autenticado");
+      const userContext = contexts[leadId]?.trim() || "";
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          leadId,
+          userContext,
+          regenerateIndex: idx,
+          existingMessages: result.messages,
+          existingAnalysis: result.analysis,
+        }),
+      });
+      if (!resp.ok) throw new Error("Erro ao regenerar mensagem");
+      const data = await resp.json();
+      if (data.message) {
+        updateMessageAt(leadId, idx, data.message);
+        toast({ title: `Mensagem ${idx + 1} regenerada! ✨` });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setRegeneratingMsg(null);
+    }
+  };
   const stageLabel = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.label || key;
   const stageColor = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.color || "hsl(0,0%,50%)";
 
@@ -552,6 +587,14 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                             <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
                               onClick={() => copyMessage(il.lead.id, idx, msg)}>
                               {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => regenerateSingleMessage(il.lead.id, idx)}
+                              disabled={regeneratingMsg?.leadId === il.lead.id && regeneratingMsg.idx === idx}>
+                              {regeneratingMsg?.leadId === il.lead.id && regeneratingMsg.idx === idx
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <RefreshCw className="h-3 w-3" />}
+                              Regenerar
                             </Button>
                             <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
                               onClick={() => sendSingleMessage(il.lead, msg, idx)} disabled={!!isSending}>

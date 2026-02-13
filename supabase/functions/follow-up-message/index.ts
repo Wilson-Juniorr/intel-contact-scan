@@ -114,8 +114,9 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    const { leadId, userContext } = await req.json();
+    const { leadId, userContext, regenerateIndex, existingMessages, existingAnalysis } = await req.json();
     if (!leadId) throw new Error("leadId é obrigatório");
+    const isRegenSingle = typeof regenerateIndex === "number" && Array.isArray(existingMessages);
 
     // Parallel data loading
     const [leadRes, interactionsRes, memoryRes] = await Promise.all([
@@ -261,18 +262,26 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `Você é um TOP CLOSER — estrategista de vendas de planos de saúde via WhatsApp. Você combina leitura comportamental, controle de pressão e copy persuasiva para gerar resposta do cliente.
+    // Build AI prompt - either full generation or single message regeneration
+    const systemPrompt = isRegenSingle
+      ? `Você é um TOP CLOSER — estrategista de vendas de planos de saúde via WhatsApp.
+
+Você já gerou uma sequência de follow-up. O vendedor quer REGENERAR APENAS a mensagem ${regenerateIndex + 1} de ${existingMessages.length}.
+
+Sequência atual:
+${existingMessages.map((m: string, i: number) => `${i + 1}. ${m}`).join("\n")}
+
+REGRAS:
+- Gere UMA nova alternativa para a mensagem ${regenerateIndex + 1} APENAS
+- Mantenha coerência com as outras mensagens da sequência
+- A nova mensagem deve ter o mesmo PROPÓSITO da original (${regenerateIndex === 0 ? "abertura" : regenerateIndex === existingMessages.length - 1 ? "CTA final" : "desenvolvimento"}) mas com abordagem DIFERENTE
+- Até 2 linhas (~120 chars), tom humano e natural
+- Use primeiro nome do lead
+- NUNCA "Olá" ou "Bom dia" genérico
+${existingAnalysis ? `\nAnálise prévia: ${existingAnalysis}` : ""}
+
+Responda APENAS com JSON: { "message": "nova mensagem aqui" }`
+      : `Você é um TOP CLOSER — estrategista de vendas de planos de saúde via WhatsApp. Você combina leitura comportamental, controle de pressão e copy persuasiva para gerar resposta do cliente.
 
 FORMATO DE RESPOSTA OBRIGATÓRIO — retorne EXATAMENTE um JSON:
 {
@@ -374,12 +383,23 @@ Retorne alertas se:
 
 ESTRATÉGIAS: destravar_resposta, tratar_objecao, reforcar_valor, fechar_proxima_etapa, recuperar_lead_frio, acompanhar_processo, primeira_abordagem
 
-NÃO retorne nada além do JSON.`,
-          },
-          {
-            role: "user",
-            content: `Analise e gere follow-up Brain Pro:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nResponda APENAS com o JSON.`,
-          },
+NÃO retorne nada além do JSON.`;
+
+    const userPrompt = isRegenSingle
+      ? `Contexto do lead:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nGere uma nova versão da mensagem ${regenerateIndex + 1}. Responda APENAS com o JSON.`
+      : `Analise e gere follow-up Brain Pro:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nResponda APENAS com o JSON.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
       }),
     });
@@ -417,6 +437,28 @@ NÃO retorne nada além do JSON.`,
         goal: "Gerar resposta do cliente",
         messages: msgs.length > 0 ? msgs : [rawContent],
       };
+    }
+
+    // Handle single message regeneration response
+    if (isRegenSingle) {
+      let newMessage = "";
+      try {
+        const cleaned = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        newMessage = parsed.message || parsed.messages?.[0] || rawContent;
+      } catch {
+        newMessage = rawContent.trim();
+      }
+      // Return updated messages array with only the target index replaced
+      const updatedMessages = [...existingMessages];
+      updatedMessages[regenerateIndex] = newMessage;
+      return new Response(JSON.stringify({
+        regeneratedIndex: regenerateIndex,
+        message: newMessage,
+        messages: updatedMessages,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Ensure messages array is valid
