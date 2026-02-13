@@ -397,22 +397,21 @@ Deno.serve(async (req) => {
 
     // Find matching lead
     const cleanPhone = phone.replace(/\D/g, "");
-    const phoneVariants = [cleanPhone];
-    if (cleanPhone.startsWith("55")) {
-      phoneVariants.push(cleanPhone.slice(2));
-    } else {
-      phoneVariants.push(`55${cleanPhone}`);
-    }
+    const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+    const phoneVariants = [cleanPhone, normalizedPhone];
+    if (cleanPhone.startsWith("55")) phoneVariants.push(cleanPhone.slice(2));
 
     let leadId: string | null = null;
     let userId: string | null = null;
 
+    // Step 1: Try to resolve userId from leads, messages, or contacts
     const { data: leads } = await supabase
       .from("leads")
       .select("id, user_id, phone")
-      .limit(1000);
+      .or(phoneVariants.map(p => `phone.eq.${p}`).join(","));
 
-    if (leads) {
+    if (leads && leads.length > 0) {
+      // Match by normalized phone
       for (const lead of leads) {
         const leadClean = lead.phone.replace(/\D/g, "");
         const leadNormalized = leadClean.startsWith("55") ? leadClean : `55${leadClean}`;
@@ -428,23 +427,19 @@ Deno.serve(async (req) => {
       const { data: prevMsg } = await supabase
         .from("whatsapp_messages")
         .select("user_id")
-        .eq("phone", cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`)
+        .eq("phone", normalizedPhone)
         .eq("direction", "outbound")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-
-      if (prevMsg) {
-        userId = prevMsg.user_id;
-      }
+      if (prevMsg) userId = prevMsg.user_id;
     }
 
-    // Try to find userId from whatsapp_contacts
     if (!userId) {
       const { data: contact } = await supabase
         .from("whatsapp_contacts")
         .select("user_id")
-        .eq("phone", cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`)
+        .eq("phone", normalizedPhone)
         .limit(1)
         .maybeSingle();
       if (contact) userId = contact.user_id;
@@ -458,7 +453,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+    // Step 2: If userId found but no leadId, re-search leads filtered by user_id
+    if (!leadId && userId) {
+      const { data: userLeads } = await supabase
+        .from("leads")
+        .select("id, phone")
+        .eq("user_id", userId);
+      if (userLeads) {
+        for (const lead of userLeads) {
+          const leadClean = lead.phone.replace(/\D/g, "");
+          const leadNormalized = leadClean.startsWith("55") ? leadClean : `55${leadClean}`;
+          if (phoneVariants.includes(leadClean) || phoneVariants.includes(leadNormalized)) {
+            leadId = lead.id;
+            break;
+          }
+        }
+      }
+    }
+
+    // normalizedPhone already computed above
 
     // Extract contact name from webhook payload
     const contactName = body.chat?.wa_name || body.chat?.wa_contactName || 
@@ -508,8 +521,21 @@ Deno.serve(async (req) => {
 
     // === AUTO-CREATE LEAD if no lead matched ===
     if (!leadId && userId && messageId) {
-      console.log("No lead found for phone, auto-creating...");
-      const normalizedAutoPhone = normalizedPhone;
+      // Final dedup check: race condition guard (two rapid messages from same number)
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("phone", normalizedPhone)
+        .maybeSingle();
+
+      if (existingLead) {
+        leadId = existingLead.id;
+        console.log("Lead already exists (race condition avoided):", leadId);
+        await supabase.from("whatsapp_messages").update({ lead_id: leadId }).eq("id", messageId);
+      } else {
+        console.log("No lead found for phone, auto-creating...");
+        const normalizedAutoPhone = normalizedPhone;
 
       // Determine initial stage based on message direction history
       let stage = "novo";
@@ -577,6 +603,7 @@ Deno.serve(async (req) => {
       } else {
         console.error("Auto-create lead error:", newLeadError?.message);
       }
+      } // close else (dedup check)
     }
 
     // === STEP 2: Process media (audio/image/document) via unified pipeline ===
