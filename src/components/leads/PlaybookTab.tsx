@@ -8,14 +8,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import {
   CheckCircle2, Circle, Target, MessageCircle, CalendarPlus,
-  Loader2, Sparkles, Copy, Check, Trash2, Pencil,
+  Loader2, Sparkles, Copy, Check, Trash2, Pencil, Brain, Lightbulb,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const strategyLabels: Record<string, { label: string; emoji: string; color: string }> = {
+  destravar_resposta: { label: "Destravar Resposta", emoji: "🔓", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  tratar_objecao: { label: "Tratar Objeção", emoji: "🛡️", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+  reforcar_valor: { label: "Reforçar Valor", emoji: "💎", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  fechar_proxima_etapa: { label: "Fechar Próxima Etapa", emoji: "🎯", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  recuperar_lead_frio: { label: "Recuperar Lead Frio", emoji: "❄️", color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300" },
+  acompanhar_processo: { label: "Acompanhar Processo", emoji: "📋", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+  primeira_abordagem: { label: "Primeira Abordagem", emoji: "👋", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+};
 
 interface Props {
   lead: Lead;
@@ -33,6 +42,9 @@ export function PlaybookTab({ lead }: Props) {
   const [saving, setSaving] = useState(false);
   const [generatingMsg, setGeneratingMsg] = useState(false);
   const [suggestedMsgs, setSuggestedMsgs] = useState<string[]>([]);
+  const [analysis, setAnalysis] = useState("");
+  const [strategy, setStrategy] = useState("");
+  const [strategyReason, setStrategyReason] = useState("");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -43,11 +55,7 @@ export function PlaybookTab({ lead }: Props) {
     if (!t) return;
     setSaving(true);
     try {
-      await addTask({
-        lead_id: lead.id,
-        title: t,
-        due_at: newTaskDue || undefined,
-      });
+      await addTask({ lead_id: lead.id, title: t, due_at: newTaskDue || undefined });
       setNewTaskTitle("");
       setNewTaskDue("");
       toast({ title: "Tarefa criada!" });
@@ -70,6 +78,9 @@ export function PlaybookTab({ lead }: Props) {
   const handleGenerateMessage = async () => {
     setGeneratingMsg(true);
     setSuggestedMsgs([]);
+    setAnalysis("");
+    setStrategy("");
+    setStrategyReason("");
     setCopiedIdx(null);
     setEditingIdx(null);
     try {
@@ -88,12 +99,17 @@ export function PlaybookTab({ lead }: Props) {
       const data = await resp.json();
       const msgs = Array.isArray(data.messages) ? data.messages : [data.message];
       setSuggestedMsgs(msgs);
+      setAnalysis(data.analysis || "");
+      setStrategy(data.strategy || "");
+      setStrategyReason(data.strategy_reason || "");
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
       setGeneratingMsg(false);
     }
   };
+
+  const strat = strategy ? strategyLabels[strategy] : null;
 
   return (
     <div className="space-y-4">
@@ -122,13 +138,8 @@ export function PlaybookTab({ lead }: Props) {
             return (
               <div key={i} className="flex items-center gap-2 p-2 rounded-md border border-dashed border-border text-xs">
                 <span className="flex-1">{pt.title}</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 text-[10px] gap-1 px-2"
-                  disabled={alreadyCreated}
-                  onClick={() => handleAddTask(pt.title)}
-                >
+                <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-2"
+                  disabled={alreadyCreated} onClick={() => handleAddTask(pt.title)}>
                   {alreadyCreated ? <Check className="h-3 w-3" /> : <CalendarPlus className="h-3 w-3" />}
                   {alreadyCreated ? "Criada" : "Criar"}
                 </Button>
@@ -180,13 +191,8 @@ export function PlaybookTab({ lead }: Props) {
 
       {/* Add custom task */}
       <div className="flex gap-2">
-        <Input
-          placeholder="Nova tarefa..."
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          className="h-8 text-xs flex-1"
-          onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
-        />
+        <Input placeholder="Nova tarefa..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)}
+          className="h-8 text-xs flex-1" onKeyDown={(e) => e.key === "Enter" && handleAddTask()} />
         <Button size="sm" className="h-8 text-xs gap-1" onClick={() => handleAddTask()} disabled={!newTaskTitle.trim() || saving}>
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CalendarPlus className="h-3 w-3" />}
         </Button>
@@ -196,8 +202,30 @@ export function PlaybookTab({ lead }: Props) {
       <div className="space-y-2">
         <Button size="sm" variant="outline" className="w-full text-xs gap-1.5 h-8" onClick={handleGenerateMessage} disabled={generatingMsg}>
           {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          Gerar sequência alinhada ao playbook
+          {suggestedMsgs.length > 0 ? "Regenerar follow-up estratégico" : "Gerar follow-up estratégico"}
         </Button>
+
+        {/* Analysis & Strategy */}
+        {analysis && (
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Brain className="h-3 w-3 text-primary shrink-0" />
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Análise</span>
+              {strat && (
+                <Badge className={`${strat.color} text-[9px] gap-0.5`}>
+                  <span>{strat.emoji}</span> {strat.label}
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-foreground/80 leading-relaxed">{analysis}</p>
+            {strategyReason && (
+              <div className="flex items-start gap-1 text-[9px] text-muted-foreground">
+                <Lightbulb className="h-2.5 w-2.5 shrink-0 mt-0.5" />
+                <span>{strategyReason}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {suggestedMsgs.length > 0 && (
           <div className="space-y-2">
@@ -209,8 +237,7 @@ export function PlaybookTab({ lead }: Props) {
                 {editingIdx === idx ? (
                   <textarea
                     className="w-full text-xs bg-background border border-input rounded p-1.5 resize-none"
-                    value={msg}
-                    rows={2}
+                    value={msg} rows={2}
                     onChange={(e) => {
                       const copy = [...suggestedMsgs];
                       copy[idx] = e.target.value;

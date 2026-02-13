@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal, Brain, Lightbulb } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -41,6 +41,16 @@ const urgencyConfig = {
   low: { label: "OK", color: "bg-muted text-muted-foreground", icon: Clock },
 };
 
+const strategyLabels: Record<string, { label: string; emoji: string; color: string }> = {
+  destravar_resposta: { label: "Destravar Resposta", emoji: "🔓", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  tratar_objecao: { label: "Tratar Objeção", emoji: "🛡️", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+  reforcar_valor: { label: "Reforçar Valor", emoji: "💎", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  fechar_proxima_etapa: { label: "Fechar Próxima Etapa", emoji: "🎯", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  recuperar_lead_frio: { label: "Recuperar Lead Frio", emoji: "❄️", color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300" },
+  acompanhar_processo: { label: "Acompanhar Processo", emoji: "📋", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+  primeira_abordagem: { label: "Primeira Abordagem", emoji: "👋", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+};
+
 function formatIdleTime(hours: number, days: number) {
   if (days === 0) return `${hours}h parado`;
   if (days === 1) return "1 dia parado";
@@ -48,16 +58,17 @@ function formatIdleTime(hours: number, days: number) {
 }
 
 const stagePriority: Record<string, number> = {
-  tentativa_contato: 1,
-  contato_realizado: 2,
-  cotacao_enviada: 3,
-  novo: 4,
-  cotacao_aprovada: 5,
-  documentacao_completa: 6,
-  em_emissao: 7,
-  aguardando_implantacao: 8,
-  retrabalho: 9,
+  tentativa_contato: 1, contato_realizado: 2, cotacao_enviada: 3,
+  novo: 4, cotacao_aprovada: 5, documentacao_completa: 6,
+  em_emissao: 7, aguardando_implantacao: 8, retrabalho: 9,
 };
+
+interface FollowUpResult {
+  analysis: string;
+  strategy: string;
+  strategy_reason: string;
+  messages: string[];
+}
 
 interface FollowUpPanelProps {
   singleLeadId?: string;
@@ -70,8 +81,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  // Now stores arrays of messages per lead
-  const [messageSeqs, setMessageSeqs] = useState<Record<string, string[]>>({});
+  const [results, setResults] = useState<Record<string, FollowUpResult>>({});
   const [copiedIdx, setCopiedIdx] = useState<{ leadId: string; idx: number } | null>(null);
   const [editingMsg, setEditingMsg] = useState<{ leadId: string; idx: number } | null>(null);
   const [contexts, setContexts] = useState<Record<string, string>>({});
@@ -142,9 +152,15 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         throw new Error(err.error || "Erro ao gerar mensagem");
       }
       const data = await resp.json();
-      // Support both new (messages[]) and old (message) format
-      const msgs = Array.isArray(data.messages) ? data.messages : [data.message];
-      setMessageSeqs((prev) => ({ ...prev, [il.lead.id]: msgs }));
+      setResults((prev) => ({
+        ...prev,
+        [il.lead.id]: {
+          analysis: data.analysis || "",
+          strategy: data.strategy || "destravar_resposta",
+          strategy_reason: data.strategy_reason || "",
+          messages: Array.isArray(data.messages) ? data.messages : [data.message],
+        },
+      }));
       setEditingMsg(null);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
@@ -168,16 +184,17 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
 
       toast({ title: "✅ Enviado!", description: `Mensagem ${idx + 1} enviada para ${lead.name}` });
       
-      // Remove sent message from sequence
-      setMessageSeqs((prev) => {
-        const seq = [...(prev[lead.id] || [])];
-        seq.splice(idx, 1);
-        if (seq.length === 0) {
+      setResults((prev) => {
+        const r = prev[lead.id];
+        if (!r) return prev;
+        const msgs = [...r.messages];
+        msgs.splice(idx, 1);
+        if (msgs.length === 0) {
           const copy = { ...prev };
           delete copy[lead.id];
           return copy;
         }
-        return { ...prev, [lead.id]: seq };
+        return { ...prev, [lead.id]: { ...r, messages: msgs } };
       });
     } catch (e: any) {
       toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
@@ -194,7 +211,6 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
           body: { phone: lead.phone, message: msgs[i], lead_id: lead.id },
         });
         if (resp.error) throw new Error(resp.error.message);
-        // Small delay between messages for natural feel
         if (i < msgs.length - 1) await new Promise((r) => setTimeout(r, 1500));
       }
 
@@ -205,7 +221,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
       });
 
       toast({ title: "✅ Sequência enviada!", description: `${msgs.length} mensagens enviadas para ${lead.name}` });
-      setMessageSeqs((prev) => {
+      setResults((prev) => {
         const copy = { ...prev };
         delete copy[lead.id];
         return copy;
@@ -232,10 +248,12 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   };
 
   const updateMessageAt = (leadId: string, idx: number, value: string) => {
-    setMessageSeqs((prev) => {
-      const seq = [...(prev[leadId] || [])];
-      seq[idx] = value;
-      return { ...prev, [leadId]: seq };
+    setResults((prev) => {
+      const r = prev[leadId];
+      if (!r) return prev;
+      const msgs = [...r.messages];
+      msgs[idx] = value;
+      return { ...prev, [leadId]: { ...r, messages: msgs } };
     });
   };
 
@@ -269,9 +287,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             />
           </div>
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos ({idleLeads.length})</SelectItem>
               <SelectItem value="critical">Críticos ({stats.critical})</SelectItem>
@@ -281,9 +297,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 w-[100px] text-xs">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[100px] text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
@@ -292,9 +306,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             </SelectContent>
           </Select>
           <Select value={operatorFilter} onValueChange={setOperatorFilter}>
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Operadora" />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue placeholder="Operadora" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas operadoras</SelectItem>
               {operators.map((op) => (
@@ -317,8 +329,10 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         {filtered.map((il) => {
           const cfg = urgencyConfig[il.urgency];
           const Icon = cfg.icon;
-          const msgs = messageSeqs[il.lead.id];
+          const result = results[il.lead.id];
+          const msgs = result?.messages;
           const lastActivity = il.lead.last_contact_at || il.lead.updated_at || il.lead.created_at;
+          const strat = result?.strategy ? strategyLabels[result.strategy] : null;
 
           return (
             <Card key={il.lead.id} className="overflow-hidden">
@@ -360,14 +374,34 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                   rows={2}
                 />
 
+                {/* Analysis & Strategy */}
+                {result && result.analysis && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Análise da IA</span>
+                      {strat && (
+                        <Badge className={`${strat.color} text-[10px] gap-1`}>
+                          <span>{strat.emoji}</span> {strat.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground/80 leading-relaxed">{result.analysis}</p>
+                    {result.strategy_reason && (
+                      <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                        <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
+                        <span>{result.strategy_reason}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Message sequence */}
                 {msgs && msgs.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                        Sequência ({msgs.length} mensagens)
-                      </span>
-                    </div>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      Sequência ({msgs.length} mensagens)
+                    </span>
                     {msgs.map((msg, idx) => {
                       const isEditing = editingMsg?.leadId === il.lead.id && editingMsg.idx === idx;
                       const isCopied = copiedIdx?.leadId === il.lead.id && copiedIdx.idx === idx;
@@ -380,7 +414,6 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                               {idx + 1}/{msgs.length}
                             </Badge>
                           </div>
-
                           {isEditing ? (
                             <Textarea
                               value={msg}
@@ -392,33 +425,18 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                           ) : (
                             <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg}</p>
                           )}
-
-                          {/* Per-message actions */}
                           <div className="flex items-center gap-1 mt-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 text-[10px] gap-1 px-1.5"
-                              onClick={() => setEditingMsg(isEditing ? null : { leadId: il.lead.id, idx })}
-                            >
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => setEditingMsg(isEditing ? null : { leadId: il.lead.id, idx })}>
                               <Pencil className="h-3 w-3" />
                               {isEditing ? "OK" : "Editar"}
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 text-[10px] gap-1 px-1.5"
-                              onClick={() => copyMessage(il.lead.id, idx, msg)}
-                            >
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => copyMessage(il.lead.id, idx, msg)}>
                               {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
-                              onClick={() => sendSingleMessage(il.lead, msg, idx)}
-                              disabled={!!isSending}
-                            >
+                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => sendSingleMessage(il.lead, msg, idx)} disabled={!!isSending}>
                               {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                               Enviar
                             </Button>
@@ -431,31 +449,22 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs gap-1.5"
-                    onClick={() => generateMessage(il)}
-                    disabled={generatingFor === il.lead.id}
-                  >
+                  <Button size="sm" variant="outline" className="text-xs gap-1.5"
+                    onClick={() => generateMessage(il)} disabled={generatingFor === il.lead.id}>
                     {generatingFor === il.lead.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : msgs ? (
+                    ) : result ? (
                       <RefreshCw className="h-3.5 w-3.5" />
                     ) : (
                       <Sparkles className="h-3.5 w-3.5" />
                     )}
-                    {msgs ? "Regenerar" : "Gerar sequência IA"}
+                    {result ? "Regenerar" : "Gerar follow-up estratégico"}
                   </Button>
 
                   {msgs && msgs.length > 0 && (
                     <>
-                      <Button
-                        size="sm"
-                        className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={() => sendAllMessages(il.lead, msgs)}
-                        disabled={sendingAll === il.lead.id}
-                      >
+                      <Button size="sm" className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => sendAllMessages(il.lead, msgs)} disabled={sendingAll === il.lead.id}>
                         {sendingAll === il.lead.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
@@ -463,12 +472,8 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                         )}
                         {sendingAll === il.lead.id ? "Enviando..." : `Enviar sequência (${msgs.length})`}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs gap-1"
-                        onClick={() => copyAll(il.lead.id, msgs)}
-                      >
+                      <Button size="sm" variant="ghost" className="text-xs gap-1"
+                        onClick={() => copyAll(il.lead.id, msgs)}>
                         {copiedIdx?.leadId === il.lead.id && copiedIdx.idx === -1 ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         Copiar tudo
                       </Button>
