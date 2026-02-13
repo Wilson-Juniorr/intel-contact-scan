@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.error("No auth header");
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
@@ -23,11 +24,12 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
+    const { data: userData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !userData?.user) {
+      console.error("Auth failed:", authErr?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
+    console.log("Authenticated user:", userData.user.id);
 
     const body = await req.json();
     const { text, lead_id } = body;
@@ -48,13 +50,52 @@ Deno.serve(async (req) => {
         .eq("id", lead_id)
         .single();
 
-      // Fetch WhatsApp messages with business relevance
+      // Fetch WhatsApp messages
       const { data: messages } = await supabase
         .from("whatsapp_messages")
-        .select("content, extracted_text, extracted_semantic_summary, extracted_entities, message_type, direction, message_category, business_relevance_score, created_at")
+        .select("id, content, extracted_text, extracted_semantic_summary, extracted_entities, message_type, direction, message_category, business_relevance_score, created_at, uazapi_message_id, media_url, processing_status")
         .eq("lead_id", lead_id)
         .order("created_at", { ascending: false })
         .limit(100);
+
+      // Try to process unprocessed media (audio/documents that might contain quote data)
+      if (messages) {
+        const unprocessedMedia = messages.filter((m: any) => 
+          ["audio", "ptt", "document", "image"].includes(m.message_type) && 
+          !m.extracted_text && 
+          (m.processing_status === "none" || m.processing_status === null || m.processing_status === "pending")
+        );
+        
+        if (unprocessedMedia.length > 0) {
+          console.log(`Found ${unprocessedMedia.length} unprocessed media, triggering processing...`);
+          const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+          
+          // Process up to 3 most recent media items (to avoid timeout)
+          const toProcess = unprocessedMedia.slice(0, 3);
+          const processPromises = toProcess.map(async (m: any) => {
+            try {
+              const resp = await fetch(`${SUPABASE_URL}/functions/v1/process-message-media`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messageId: m.id }),
+              });
+              if (resp.ok) {
+                const result = await resp.json();
+                if (result.processed && result.extractedText) {
+                  // Update local reference so we can use it
+                  m.extracted_text = result.extractedText;
+                  m.extracted_semantic_summary = result.semanticSummary || null;
+                  m.extracted_entities = result.entities || {};
+                  console.log(`Processed ${m.message_type} inline: ${result.extractedText?.slice(0, 80)}`);
+                }
+              }
+            } catch (e) {
+              console.error(`Inline process error for ${m.id}:`, e);
+            }
+          });
+          await Promise.all(processPromises);
+        }
+      }
 
       // Fetch lead memory
       const { data: memory } = await supabase
@@ -83,18 +124,31 @@ Deno.serve(async (req) => {
         }
       }
 
+      console.log(`Messages found: ${messages.length}`);
+      
       if (messages && messages.length > 0) {
-        // Prioritize business messages with extracted content
-        const businessMsgs = messages.filter((m: any) => 
-          m.message_category === "business" || 
-          (m.business_relevance_score && m.business_relevance_score >= 0.5) ||
-          m.extracted_entities && Object.keys(m.extracted_entities as object).length > 0
+        // Use ALL messages that have any content (text, extracted_text, summary, entities)
+        // Don't filter aggressively — many messages may not be classified yet
+        const msgsWithContent = messages.filter((m: any) => 
+          m.content || m.extracted_text || m.extracted_semantic_summary || 
+          (m.extracted_entities && typeof m.extracted_entities === "object" && Object.keys(m.extracted_entities as object).length > 0)
         );
 
-        const relevantMsgs = businessMsgs.length > 0 ? businessMsgs : messages.slice(0, 30);
+        // If classified messages exist, prioritize them, otherwise use all with content
+        const businessMsgs = msgsWithContent.filter((m: any) => 
+          m.message_category === "business" || m.message_category === "quote" || m.message_category === "health_content" || m.message_category === "documents" ||
+          (m.business_relevance_score && m.business_relevance_score >= 0.5) ||
+          (m.extracted_text && m.extracted_text.length > 100)  // Long extracted text = likely important
+        );
+
+        // Put business/extracted messages FIRST, then other messages
+        const otherMsgs = msgsWithContent.filter((m: any) => !businessMsgs.includes(m));
+        const relevantMsgs = [...businessMsgs, ...otherMsgs].slice(0, 50);
+        
+        console.log(`Business msgs: ${businessMsgs.length}, with content: ${msgsWithContent.length}, using: ${relevantMsgs.length}`);
 
         parts.push("\nMENSAGENS RELEVANTES:");
-        for (const m of relevantMsgs.slice(0, 40)) {
+        for (const m of relevantMsgs.slice(0, 50)) {
           const msg = m as any;
           const dir = msg.direction === "inbound" ? "CLIENTE" : "CORRETOR";
           const lines: string[] = [];
@@ -105,6 +159,10 @@ Deno.serve(async (req) => {
           if (msg.extracted_entities && typeof msg.extracted_entities === "object" && Object.keys(msg.extracted_entities as object).length > 0) {
             lines.push(`[Entidades: ${JSON.stringify(msg.extracted_entities)}]`);
           }
+          // For media without extracted content, note the type
+          if (lines.length === 0 && msg.message_type !== "text") {
+            lines.push(`[${msg.message_type} enviado - sem transcrição disponível]`);
+          }
 
           if (lines.length > 0) {
             parts.push(`${dir}: ${lines.join(" | ")}`);
@@ -113,6 +171,8 @@ Deno.serve(async (req) => {
       }
 
       contextText = parts.join("\n");
+      console.log("Context text length:", contextText.length, "parts:", parts.length);
+      console.log("Context preview:", contextText.slice(0, 500));
     } else if (text && typeof text === "string") {
       contextText = text;
     }
@@ -142,7 +202,7 @@ Retorne APENAS JSON:
 Campos que não encontrar = null. Confidence: 0.9+ claro, 0.5-0.8 inferido, 0 não encontrou.
 
 HISTÓRICO COMPLETO DO LEAD:
-${contextText.slice(0, 12000)}`;
+${contextText.slice(0, 20000)}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -165,9 +225,11 @@ ${contextText.slice(0, 12000)}`;
 
     const aiData = await response.json();
     const raw = aiData.choices?.[0]?.message?.content?.trim() || "";
+    console.log("AI raw response:", raw.slice(0, 500));
 
     const jsonMatch = raw.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
+      console.error("No JSON found in AI response");
       return new Response(JSON.stringify(EMPTY_RESULT), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

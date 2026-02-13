@@ -157,7 +157,7 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button size="sm" onClick={handleSubmit} disabled={loading}>
-            Confirmar Cotação
+            {minValue && parseFloat(minValue) > 0 ? "Confirmar Cotação" : "Avançar sem cotação"}
           </Button>
         </DialogFooter>
       </DialogContent>
