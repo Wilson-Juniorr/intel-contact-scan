@@ -556,15 +556,19 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          business_relevance_score: number | null
+          classification_confidence: string | null
           contact_name: string | null
           content: string | null
           created_at: string
           direction: string
           extracted_text: string | null
           id: string
+          intent: string | null
           lead_id: string | null
           media_storage_path: string | null
           media_url: string | null
+          message_category: string | null
           message_type: string
           phone: string
           processing_error: string | null
@@ -574,15 +578,19 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          business_relevance_score?: number | null
+          classification_confidence?: string | null
           contact_name?: string | null
           content?: string | null
           created_at?: string
           direction: string
           extracted_text?: string | null
           id?: string
+          intent?: string | null
           lead_id?: string | null
           media_storage_path?: string | null
           media_url?: string | null
+          message_category?: string | null
           message_type?: string
           phone: string
           processing_error?: string | null
@@ -592,15 +600,19 @@ export type Database = {
           user_id: string
         }
         Update: {
+          business_relevance_score?: number | null
+          classification_confidence?: string | null
           contact_name?: string | null
           content?: string | null
           created_at?: string
           direction?: string
           extracted_text?: string | null
           id?: string
+          intent?: string | null
           lead_id?: string | null
           media_storage_path?: string | null
           media_url?: string | null
+          message_category?: string | null
           message_type?: string
           phone?: string
           processing_error?: string | null

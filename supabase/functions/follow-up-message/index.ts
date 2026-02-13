@@ -85,7 +85,8 @@ function buildContextSummary(ctx: LeadContext): string {
     if (parts.length) lines.push(`DADOS: ${parts.join(" | ")}`);
   }
   
-  if (ctx.recentMessages) lines.push(`\nÚLTIMAS MENSAGENS:\n${ctx.recentMessages}`);
+  if (ctx.recentMessages) lines.push(`\nÚLTIMAS MENSAGENS RELEVANTES:\n${ctx.recentMessages}`);
+  if ((ctx as any).greetingNote) lines.push((ctx as any).greetingNote);
   if (ctx.recentInteractions) lines.push(`\nINTERAÇÕES:\n${ctx.recentInteractions}`);
   
   return lines.join("\n");
@@ -128,15 +129,15 @@ serve(async (req) => {
     }
     const lead = leadRes.data;
 
-    // Load WhatsApp messages
+    // Load WhatsApp messages with classification data
     const normalizedPhone = lead.phone.replace(/\D/g, "");
     const phoneVariant = normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
     const { data: whatsappMsgs } = await supabase
       .from("whatsapp_messages")
-      .select("direction, message_type, content, extracted_text, created_at")
+      .select("direction, message_type, content, extracted_text, created_at, message_category, business_relevance_score, intent")
       .or(`phone.eq.${phoneVariant},phone.eq.${normalizedPhone}`)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
 
     // Calculate idle
     const lastActivity = lead.last_contact_at || lead.updated_at || lead.created_at;
@@ -199,12 +200,30 @@ serve(async (req) => {
       avg_response_time_days: responseCount > 0 ? Math.round((totalResponseDays / responseCount) * 10) / 10 : null,
     };
 
-    const recentMessages = (whatsappMsgs || []).reverse()
+    // Split messages into relevant (business) and non-relevant (greetings/small talk)
+    const allMessages = (whatsappMsgs || []).reverse();
+    const relevantMessages = allMessages.filter((m: any) => {
+      const score = Number(m.business_relevance_score) || 0;
+      return score >= 0.3; // Include moderate+ relevance
+    });
+    const greetingCount = allMessages.filter((m: any) => {
+      const cat = m.message_category;
+      return cat === "greeting" || cat === "meme_sticker" || cat === "small_talk";
+    }).length;
+
+    // Build context with relevant messages only, but note greeting activity
+    const recentMessages = relevantMessages
       .map((m: any) => {
         const dir = m.direction === "outbound" ? "EU" : "CLIENTE";
         const text = m.extracted_text || m.content || "[mídia]";
-        return `${dir}: ${text.slice(0, 200)}`;
+        const catLabel = m.message_category && m.message_category !== "unknown" ? ` [${m.message_category}]` : "";
+        return `${dir}${catLabel}: ${text.slice(0, 200)}`;
       }).join("\n");
+
+    // Add greeting context separately so AI understands without confusing it with business content
+    const greetingNote = greetingCount > 0
+      ? `\n⚠️ ${greetingCount} mensagens de cumprimento/social (bom dia, memes, stickers) foram filtradas. NÃO são cotações nem documentos.`
+      : "";
 
     const recentInteractions = (interactionsRes.data || [])
       .map((i: any) => `[${i.type}] ${i.description} (${new Date(i.created_at).toLocaleDateString("pt-BR")})`)
@@ -234,6 +253,8 @@ serve(async (req) => {
       lastClientMessageDaysAgo,
       timeline,
     };
+    // Attach greetingNote for context builder
+    (ctx as any).greetingNote = greetingNote;
 
     const contextSummary = buildContextSummary(ctx);
 
@@ -343,6 +364,13 @@ Retorne alertas se:
 - Se já enviou follow-ups, MUDE a abordagem
 - CTA ÚNICO e claro por sequência (última msg)
 - NUNCA prometa cobertura/valores sem confirmação
+
+═══ H) FILTRO DE RELEVÂNCIA (CRÍTICO) ═══
+- As mensagens no contexto já foram FILTRADAS por relevância. Mensagens de "bom dia", memes, stickers e cumprimentos foram REMOVIDAS.
+- Se houver nota de "mensagens filtradas", entenda que foram cumprimentos sociais, NÃO cotações/documentos/propostas.
+- Mensagens marcadas como [greeting], [small_talk] ou [meme_sticker] são APENAS sinais de contato social. NUNCA interprete como envio de cotação, proposta ou documento.
+- Se a última mensagem outbound foi greeting/nudge: o vendedor apenas tentou manter contato, NÃO enviou cotação.
+- Só considere que cotação foi enviada se existir mensagem com [quote] ou se lead.last_quote_sent_at estiver preenchido.
 
 ESTRATÉGIAS: destravar_resposta, tratar_objecao, reforcar_valor, fechar_proxima_etapa, recuperar_lead_frio, acompanhar_processo, primeira_abordagem
 
