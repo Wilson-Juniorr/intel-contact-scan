@@ -395,6 +395,36 @@ serve(async (req) => {
       ? `\n\n## ARQUIVO ENVIADO PELO USUÁRIO:\nNome: ${fileInfo.file_name}\nTipo: ${fileInfo.file_type}\nTamanho: ${fileInfo.file_size ? Math.round(fileInfo.file_size / 1024) + "KB" : "?"}\n\nPergunte ao usuário a qual lead este documento pertence e qual a categoria (RG/CPF, Comprovante de Residência, Cartão SUS, Contrato Social, Proposta, Declaração de Saúde, Outros).`
       : "";
 
+    // Load lead_memory if a lead is referenced in crmContext
+    let leadMemoryContext = "";
+    if (supabase && userId && crmContext) {
+      // Try to extract lead_id from crmContext (format: "Lead selecionado: NAME (ID: UUID)")
+      const leadIdMatch = crmContext.match(/ID:\s*([0-9a-f-]{36})/i);
+      if (leadIdMatch) {
+        const selLeadId = leadIdMatch[1];
+        const { data: mem } = await supabase
+          .from("lead_memory")
+          .select("summary, structured_json")
+          .eq("lead_id", selLeadId)
+          .maybeSingle();
+
+        if (mem?.summary) {
+          leadMemoryContext = `\n\n## MEMÓRIA DO LEAD (resumo atualizado pela IA):\n${mem.summary}`;
+          if (mem.structured_json && typeof mem.structured_json === "object") {
+            const sj = mem.structured_json as any;
+            const parts: string[] = [];
+            if (sj.orcamento) parts.push(`Orçamento: ${sj.orcamento}`);
+            if (sj.rede_hospitais?.length) parts.push(`Rede desejada: ${sj.rede_hospitais.join(", ")}`);
+            if (sj.objecoes?.length) parts.push(`Objeções: ${sj.objecoes.join(", ")}`);
+            if (sj.sentimento) parts.push(`Sentimento: ${sj.sentimento}`);
+            if (sj.operadoras_discutidas?.length) parts.push(`Operadoras discutidas: ${sj.operadoras_discutidas.join(", ")}`);
+            if (sj.proximos_passos?.length) parts.push(`Próximos passos: ${sj.proximos_passos.join(", ")}`);
+            if (parts.length) leadMemoryContext += `\nDADOS ESTRUTURADOS:\n${parts.join("\n")}`;
+          }
+        }
+      }
+    }
+
     const systemContent = `Você é um assistente especialista em planos de saúde no Brasil. Seu nome é CRM Saúde IA.
 
 Você tem ACESSO TOTAL aos dados do CRM E às conversas do WhatsApp. Pode EXECUTAR AÇÕES diretamente.
@@ -419,6 +449,11 @@ Você tem ACESSO TOTAL aos dados do CRM E às conversas do WhatsApp. Pode EXECUT
 - Analise o tom, interesse e objeções do cliente nas mensagens
 - Sugira abordagens personalizadas baseadas no que o cliente disse E no que foi enviado (propostas, imagens)
 
+## MEMÓRIA DO LEAD:
+- Quando houver memória do lead disponível, USE-A para dar respostas contextualizadas
+- A memória contém resumo da negociação, objeções, orçamento, operadoras discutidas, sentimento do cliente
+- Isso permite que você dê conselhos ESPECÍFICOS e personalizados
+
 ## REGRAS OBRIGATÓRIAS DE CONFIRMAÇÃO:
 1. ANTES de qualquer ação, SEMPRE use search_lead primeiro para buscar o lead
 2. Apresente os dados do lead encontrado ao usuário em formato organizado
@@ -435,6 +470,7 @@ Você tem ACESSO TOTAL aos dados do CRM E às conversas do WhatsApp. Pode EXECUT
 
 Seja direto e prático. Use linguagem acessível.
 ${fileContext}
+${leadMemoryContext}
 
 ${crmContext || "Nenhum dado do CRM disponível."}`;
 

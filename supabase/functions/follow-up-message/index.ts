@@ -10,7 +10,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // JWT validation
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -32,7 +31,6 @@ serve(async (req) => {
     const { leadId, userContext } = await req.json();
     if (!leadId) throw new Error("leadId é obrigatório");
 
-    // Load lead from DB, ensure it belongs to user
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .select("*")
@@ -43,7 +41,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Lead não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Load last 10 interactions
+    // Load interactions
     const { data: interactions } = await supabase
       .from("interactions")
       .select("*")
@@ -52,6 +50,24 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(10);
 
+    // Load lead_memory
+    const { data: memory } = await supabase
+      .from("lead_memory")
+      .select("summary, structured_json")
+      .eq("lead_id", leadId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // Load last WhatsApp messages (text + extracted_text)
+    const normalizedPhone = lead.phone.replace(/\D/g, "");
+    const phoneVariant = normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
+    const { data: whatsappMsgs } = await supabase
+      .from("whatsapp_messages")
+      .select("direction, message_type, content, extracted_text, created_at")
+      .or(`phone.eq.${phoneVariant},phone.eq.${normalizedPhone}`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
     // Calculate idle time
     const lastActivity = lead.last_contact_at || lead.updated_at || lead.created_at;
     const diffMs = Date.now() - new Date(lastActivity).getTime();
@@ -59,18 +75,12 @@ serve(async (req) => {
     const idleDays = Math.floor(idleHours / 24);
 
     const stageLabels: Record<string, string> = {
-      novo: "Novo Negócio",
-      tentativa_contato: "Tentativa de Contato",
-      contato_realizado: "Contato Realizado",
-      cotacao_enviada: "Cotação Enviada",
-      cotacao_aprovada: "Cotação Aprovada",
-      documentacao_completa: "Documentação Completa",
-      em_emissao: "Em Emissão",
-      aguardando_implantacao: "Aguardando Implantação",
-      implantado: "Implantado",
-      retrabalho: "Retrabalho",
-      declinado: "Declinado",
-      cancelado: "Cancelado",
+      novo: "Novo Negócio", tentativa_contato: "Tentativa de Contato",
+      contato_realizado: "Contato Realizado", cotacao_enviada: "Cotação Enviada",
+      cotacao_aprovada: "Cotação Aprovada", documentacao_completa: "Documentação Completa",
+      em_emissao: "Em Emissão", aguardando_implantacao: "Aguardando Implantação",
+      implantado: "Implantado", retrabalho: "Retrabalho",
+      declinado: "Declinado", cancelado: "Cancelado",
     };
 
     const stageLabel = stageLabels[lead.stage] || lead.stage;
@@ -78,6 +88,29 @@ serve(async (req) => {
     const interactionsSummary = (interactions || [])
       .map((i: any) => `[${i.type}] ${i.description} (${new Date(i.created_at).toLocaleDateString("pt-BR")})`)
       .join("\n");
+
+    const whatsappSummary = (whatsappMsgs || []).reverse()
+      .map((m: any) => {
+        const dir = m.direction === "outbound" ? "EU" : "CLIENTE";
+        const text = m.extracted_text || m.content || "[mídia]";
+        return `${dir}: ${text.slice(0, 200)}`;
+      }).join("\n");
+
+    // Build memory context
+    let memoryContext = "";
+    if (memory?.summary) {
+      memoryContext = `\nMEMÓRIA DO LEAD (resumo atualizado):\n${memory.summary}`;
+    }
+    if (memory?.structured_json && Object.keys(memory.structured_json).length > 0) {
+      const sj = memory.structured_json as any;
+      const parts: string[] = [];
+      if (sj.orcamento) parts.push(`Orçamento: ${sj.orcamento}`);
+      if (sj.rede_hospitais?.length) parts.push(`Rede desejada: ${sj.rede_hospitais.join(", ")}`);
+      if (sj.objecoes?.length) parts.push(`Objeções: ${sj.objecoes.join(", ")}`);
+      if (sj.sentimento) parts.push(`Sentimento: ${sj.sentimento}`);
+      if (sj.operadoras_discutidas?.length) parts.push(`Operadoras discutidas: ${sj.operadoras_discutidas.join(", ")}`);
+      if (parts.length) memoryContext += `\nDADOS ESTRUTURADOS:\n${parts.join("\n")}`;
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -103,6 +136,7 @@ REGRAS:
 - NÃO inclua saudação formal demais
 - Inclua um CTA sutil no final
 - NUNCA prometa cobertura ou valores exatos sem confirmação
+- SE tiver informações reais do histórico (operadora, valores, rede, objeções), USE-AS para personalizar
 - Responda APENAS com a mensagem, sem explicações
 
 CONTEXTO DA ETAPA:
@@ -126,7 +160,8 @@ Se parado há pouco tempo (1-2 dias), seja mais casual.`,
 - Vidas: ${lead.lives || "não informado"}
 - Tempo sem contato: ${idleDays} dias (${idleHours} horas)
 - Notas: ${lead.notes || "nenhuma"}
-${interactionsSummary ? `\nÚLTIMAS INTERAÇÕES:\n${interactionsSummary}` : ""}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}`,
+${interactionsSummary ? `\nÚLTIMAS INTERAÇÕES:\n${interactionsSummary}` : ""}
+${whatsappSummary ? `\nÚLTIMAS MENSAGENS WHATSAPP:\n${whatsappSummary}` : ""}${memoryContext}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}`,
           },
         ],
       }),

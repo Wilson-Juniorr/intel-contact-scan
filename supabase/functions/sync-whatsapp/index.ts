@@ -416,75 +416,37 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // STEP 5.5: Process media (images, documents, audios) via AI
+    // STEP 5.5: Process media via unified pipeline
     // =============================================
-    const mediaMessages = insertedMessages.filter(
-      m => m.message_type === "image" || m.message_type === "document"
+    const allMediaMessages = insertedMessages.filter(
+      m => ["image", "document", "audio", "ptt"].includes(m.message_type)
     );
-    const audioMessages = insertedMessages.filter(
-      m => m.message_type === "audio" || m.message_type === "ptt"
-    );
-    let mediaAnalyzed = 0;
-    let audiosTranscribed = 0;
-    
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    let mediaProcessed = 0;
 
-    // Analyze images + documents
-    if (mediaMessages.length > 0) {
-      console.log(`=== STEP 5.5a: Analyzing ${mediaMessages.length} media messages ===`);
-      for (let i = 0; i < mediaMessages.length; i += 5) {
-        const batch = mediaMessages.slice(i, i + 5);
+    if (allMediaMessages.length > 0) {
+      console.log(`=== STEP 5.5: Processing ${allMediaMessages.length} media messages ===`);
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      
+      for (let i = 0; i < allMediaMessages.length; i += 3) {
+        const batch = allMediaMessages.slice(i, i + 3);
         const promises = batch.map(async (msg) => {
           try {
-            const resp = await fetch(`${SUPABASE_URL}/functions/v1/analyze-media`, {
+            const resp = await fetch(`${SUPABASE_URL}/functions/v1/process-message-media`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({
-                message_id: msg.id,
-                uazapi_message_id: msg.uazapi_message_id,
-                message_type: msg.message_type,
-              }),
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ messageId: msg.id }),
             });
             if (resp.ok) {
               const result = await resp.json();
-              if (result.analyzed) mediaAnalyzed++;
+              if (result.processed) mediaProcessed++;
             }
           } catch (e) {
-            console.error(`Media analysis error for ${msg.id}:`, e);
+            console.error(`Process media error for ${msg.id}:`, e);
           }
         });
         await Promise.all(promises);
       }
-      console.log(`Media analyzed: ${mediaAnalyzed}/${mediaMessages.length}`);
-    }
-
-    // Transcribe audios
-    if (audioMessages.length > 0) {
-      console.log(`=== STEP 5.5b: Transcribing ${audioMessages.length} audio messages ===`);
-      for (let i = 0; i < audioMessages.length; i += 3) {
-        const batch = audioMessages.slice(i, i + 3);
-        const promises = batch.map(async (msg) => {
-          if (!msg.uazapi_message_id) return;
-          try {
-            const transcription = await transcribeAudio(msg.uazapi_message_id);
-            if (transcription) {
-              await supabase
-                .from("whatsapp_messages")
-                .update({ content: `🎤 ${transcription}` })
-                .eq("id", msg.id);
-              audiosTranscribed++;
-            }
-          } catch (e) {
-            console.error(`Audio transcription error for ${msg.id}:`, e);
-          }
-        });
-        await Promise.all(promises);
-      }
-      console.log(`Audios transcribed: ${audiosTranscribed}/${audioMessages.length}`);
+      console.log(`Media processed: ${mediaProcessed}/${allMediaMessages.length}`);
     }
 
     // =============================================
@@ -530,10 +492,8 @@ Deno.serve(async (req) => {
       totalSkipped,
       namesUpdated,
       contactsSaved,
-      mediaAnalyzed,
-      totalMediaFound: mediaMessages.length,
-      audiosTranscribed,
-      totalAudiosFound: audioMessages.length,
+      mediaProcessed,
+      totalMediaFound: allMediaMessages.length,
     };
 
     console.log(`=== DONE ===`, JSON.stringify(summary));
