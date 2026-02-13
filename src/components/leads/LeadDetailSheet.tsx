@@ -18,12 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LeadObservationsPanel } from "@/components/leads/LeadObservationsPanel";
 import { LeadConversationTab } from "@/components/leads/LeadConversationTab";
 import { LeadMemoryCard } from "@/components/leads/LeadMemoryCard";
+import { PlaybookTab } from "@/components/leads/PlaybookTab";
 import { MemberSection } from "@/components/leads/MemberSection";
 import {
   MessageCircle, Phone, Mail, User, Clock, Info, StickyNote,
   Maximize2, Minimize2, Pencil, Save, X, Loader2, FileUp,
   Upload, Download, Eye, Trash2, File, Image as ImageIcon,
-  FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall,
+  FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall, BookOpen,
 } from "lucide-react";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { formatDistanceToNow, format } from "date-fns";
@@ -759,10 +760,15 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <Tabs defaultValue="info" className="mt-4">
-      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-4"} h-9`}>
+      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-5"} h-9`}>
         <TabsTrigger value="info" className="text-xs gap-1">
           <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Info"}
         </TabsTrigger>
+        {!isEditing && (
+          <TabsTrigger value="playbook" className="text-xs gap-1">
+            <BookOpen className="h-3 w-3" /> Playbook
+          </TabsTrigger>
+        )}
         {!isEditing && (
           <TabsTrigger value="observations" className="text-xs gap-1">
             <StickyNote className="h-3 w-3" /> Notas
@@ -872,6 +878,11 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
         )}
       </TabsContent>
 
+      {!isEditing && (
+        <TabsContent value="playbook" className="mt-3">
+          <PlaybookTab lead={lead} />
+        </TabsContent>
+      )}
       {!isEditing && (
         <TabsContent value="observations" className="mt-3">
           <LeadObservationsPanel lead={lead} />

@@ -1,15 +1,19 @@
 import { useMemo } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
+import { useTasks } from "@/hooks/useTasks";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, Handshake, TrendingUp, AlertTriangle, Phone } from "lucide-react";
+import { Users, UserPlus, Handshake, TrendingUp, AlertTriangle, Phone, CheckSquare } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { leads } = useLeadsContext();
+  const { todayTasks } = useTasks();
+  const navigate = useNavigate();
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -52,6 +56,7 @@ export default function Dashboard() {
     { label: "Implantados", value: stats.converted, icon: TrendingUp, accent: "text-secondary" },
     { label: "Cancelados", value: stats.lost, icon: AlertTriangle, accent: "text-destructive" },
     { label: "Follow-up", value: stats.needsFollowUp.length, icon: Phone, accent: "text-warning" },
+    { label: "Tarefas hoje", value: todayTasks.length, icon: CheckSquare, accent: "text-primary" },
   ];
 
   return (
@@ -125,6 +130,30 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {todayTasks.length > 0 && (
+        <Card className="border-primary/30 cursor-pointer hover:bg-accent/10 transition-colors" onClick={() => navigate("/today")}>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckSquare className="h-5 w-5 text-primary" />
+              Tarefas pendentes hoje ({todayTasks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {todayTasks.slice(0, 5).map((task: any) => (
+              <div key={task.id} className="flex items-center justify-between py-1">
+                <span className="text-sm">{task.title}</span>
+                {task.due_at && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(task.due_at), { addSuffix: true, locale: ptBR })}
+                  </span>
+                )}
+              </div>
+            ))}
+            {todayTasks.length > 5 && <p className="text-xs text-muted-foreground">+{todayTasks.length - 5} mais...</p>}
+          </CardContent>
+        </Card>
+      )}
 
       {stats.needsFollowUp.length > 0 && (
         <Card className="border-warning/30">

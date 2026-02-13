@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle, Clock } from "lucide-react";
+import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle, Clock, Zap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Central do Dia", url: "/today", icon: Zap },
   { title: "Leads", url: "/leads", icon: Users },
   { title: "Funil", url: "/funnel", icon: Columns3 },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },

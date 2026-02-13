@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.update-lead-memory]
 verify_jwt = false
+
+[functions.next-best-action]
+verify_jwt = false
