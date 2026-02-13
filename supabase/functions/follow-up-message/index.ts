@@ -87,6 +87,23 @@ function buildContextSummary(ctx: LeadContext): string {
   
   if (ctx.recentMessages) lines.push(`\nÚLTIMAS MENSAGENS RELEVANTES:\n${ctx.recentMessages}`);
   if ((ctx as any).greetingNote) lines.push((ctx as any).greetingNote);
+  
+  // Include aggregated entities from media analysis
+  const ent = (ctx as any).aggregatedEntities;
+  if (ent && Object.keys(ent).length > 0) {
+    const entParts: string[] = [];
+    if (ent.operadora) entParts.push(`Operadora detectada: ${ent.operadora}`);
+    if (ent.plano) entParts.push(`Plano: ${ent.plano}`);
+    if (ent.valores) entParts.push(`Valores: ${JSON.stringify(ent.valores)}`);
+    if (ent.hospitais_rede?.length) entParts.push(`Rede: ${ent.hospitais_rede.join(", ")}`);
+    if (ent.coparticipacao) entParts.push(`Copart: ${ent.coparticipacao}`);
+    if (ent.carencia) entParts.push(`Carência: ${ent.carencia}`);
+    if (ent.acomodacao) entParts.push(`Acomod: ${ent.acomodacao}`);
+    if (ent.abrangencia) entParts.push(`Abrangência: ${ent.abrangencia}`);
+    if (ent.vidas) entParts.push(`Vidas: ${ent.vidas}`);
+    if (entParts.length) lines.push(`\nENTIDADES EXTRAÍDAS DE MÍDIA:\n${entParts.join(" | ")}`);
+  }
+  
   if (ctx.recentInteractions) lines.push(`\nINTERAÇÕES:\n${ctx.recentInteractions}`);
   
   return lines.join("\n");
@@ -135,7 +152,7 @@ serve(async (req) => {
     const phoneVariant = normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
     const { data: whatsappMsgs } = await supabase
       .from("whatsapp_messages")
-      .select("direction, message_type, content, extracted_text, created_at, message_category, business_relevance_score, intent")
+      .select("direction, message_type, content, extracted_text, created_at, message_category, business_relevance_score, intent, extracted_semantic_summary, extracted_entities")
       .or(`phone.eq.${phoneVariant},phone.eq.${normalizedPhone}`)
       .order("created_at", { ascending: false })
       .limit(30);
@@ -218,8 +235,26 @@ serve(async (req) => {
         const dir = m.direction === "outbound" ? "EU" : "CLIENTE";
         const text = m.extracted_text || m.content || "[mídia]";
         const catLabel = m.message_category && m.message_category !== "unknown" ? ` [${m.message_category}]` : "";
-        return `${dir}${catLabel}: ${text.slice(0, 200)}`;
+        const semantic = m.extracted_semantic_summary ? ` (${m.extracted_semantic_summary.slice(0, 100)})` : "";
+        return `${dir}${catLabel}: ${text.slice(0, 200)}${semantic}`;
       }).join("\n");
+
+    // Aggregate extracted entities from business-relevant media
+    const aggregatedEntities: Record<string, any> = {};
+    for (const m of relevantMessages) {
+      const ent = m.extracted_entities as Record<string, any> | null;
+      if (ent && typeof ent === "object") {
+        for (const [key, val] of Object.entries(ent)) {
+          if (val !== null && val !== undefined) {
+            if (Array.isArray(val) && val.length > 0) {
+              aggregatedEntities[key] = [...(aggregatedEntities[key] || []), ...val];
+            } else if (!Array.isArray(val)) {
+              aggregatedEntities[key] = val; // last wins for scalar
+            }
+          }
+        }
+      }
+    }
 
     // Add greeting context separately so AI understands without confusing it with business content
     const greetingNote = greetingCount > 0
@@ -254,8 +289,9 @@ serve(async (req) => {
       lastClientMessageDaysAgo,
       timeline,
     };
-    // Attach greetingNote for context builder
+    // Attach greetingNote and aggregatedEntities for context builder
     (ctx as any).greetingNote = greetingNote;
+    (ctx as any).aggregatedEntities = aggregatedEntities;
 
     const contextSummary = buildContextSummary(ctx);
 

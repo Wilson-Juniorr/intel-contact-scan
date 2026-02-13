@@ -139,47 +139,91 @@ Texto/conteúdo extraído:
   }
 }
 
-async function extractTextWithAI(base64: string, mimetype: string, type: "audio" | "image" | "document"): Promise<string | null> {
+async function extractTextWithAI(base64: string, mimetype: string, type: "audio" | "image" | "document"): Promise<{ extractedText: string | null; semanticSummary: string | null; entities: Record<string, any> }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return null;
+  if (!LOVABLE_API_KEY) return { extractedText: null, semanticSummary: null, entities: {} };
 
   const dataUri = `data:${mimetype};base64,${base64}`;
 
   let prompt: string;
   if (type === "audio") {
-    prompt = `Transcreva este áudio de voz em português brasileiro com precisão. Retorne APENAS o texto transcrito, sem aspas, sem explicações. Se inaudível, retorne '[Áudio não compreendido]'.`;
+    prompt = `Transcreva este áudio de voz em português brasileiro com precisão. 
+
+Retorne um JSON com:
+{
+  "transcription": "texto transcrito aqui",
+  "semantic_summary": "resumo em 1-2 frases do que a pessoa está comunicando",
+  "entities": {
+    "operadora": null ou "nome",
+    "plano": null ou "nome do plano",
+    "valores": null ou [lista de valores mencionados],
+    "hospitais_rede": null ou ["hospital1"],
+    "objecoes": null ou ["objeção mencionada"],
+    "prazos": null ou "prazo mencionado",
+    "coparticipacao": null ou "detalhe",
+    "vidas": null ou número,
+    "modalidade": null ou "enfermaria/apartamento"
+  },
+  "is_social": false
+}
+
+Se o áudio for saudação social simples (bom dia, etc), coloque is_social=true e entities vazias.
+Se inaudível, retorne transcription="[Áudio não compreendido]".
+Retorne APENAS o JSON.`;
   } else if (type === "image") {
-    prompt = `Analise esta imagem. PRIMEIRO determine se é conteúdo de negócio (proposta, cotação, tabela de preços, documento) ou conteúdo social (bom dia, meme, motivacional, sticker, foto pessoal).
+    prompt = `Analise esta imagem com precisão. Retorne um JSON:
+{
+  "extracted_text": "todo texto visível na imagem",
+  "semantic_summary": "descrição do conteúdo em 2-3 frases (o que aparece, contexto visual)",
+  "entities": {
+    "operadora": null ou "nome da operadora",
+    "plano": null ou "nome do plano",
+    "valores": null ou [{"faixa": "0-18", "valor": 150.00}],
+    "hospitais_rede": null ou ["hospital1"],
+    "coparticipacao": null ou "sim/não + detalhes",
+    "carencia": null ou "detalhes de carência",
+    "abrangencia": null ou "municipal/estadual/nacional",
+    "acomodacao": null ou "enfermaria/apartamento",
+    "vidas": null ou número,
+    "modalidade": null ou "tipo"
+  },
+  "is_social": boolean
+}
 
-Se for conteúdo social/greeting/meme: retorne apenas "[SOCIAL] breve descrição" (ex: "[SOCIAL] Imagem motivacional de bom dia")
-
-Se for proposta de plano de saúde, extraia:
-- Operadora e nome do plano
-- Valores mensais
-- Tipo de acomodação
-- Cobertura/abrangência
-- Coparticipação
-- Rede credenciada mencionada
-
-Se for outro conteúdo de negócio (print de conversa, tabela de preços, etc.), descreva o conteúdo relevante.
-Retorne uma descrição concisa e estruturada. Sem saudações.`;
+REGRAS CRÍTICAS:
+- Imagens motivacionais, bom dia, memes, frases inspiracionais, stickers = is_social=true, entities vazias
+- Propostas, cotações, tabelas de preço = is_social=false, extrair TODOS os dados possíveis
+- Prints de conversa sobre plano = is_social=false, extrair contexto relevante
+- Se não conseguir extrair texto, descreva o conteúdo visual semanticamente
+Retorne APENAS o JSON.`;
   } else {
-    prompt = `Analise este documento em detalhes. Se for uma proposta de plano de saúde, extraia:
-- Operadora e nome do plano
-- Valores mensais por faixa etária
-- Tipo de acomodação (enfermaria/apartamento)
-- Cobertura/abrangência geográfica
-- Coparticipação (sim/não, valores)
-- Carências
-- Rede credenciada principal
-- Condições especiais
+    prompt = `Analise este documento em detalhes. Retorne um JSON:
+{
+  "extracted_text": "texto principal extraído do documento",
+  "semantic_summary": "resumo estruturado do documento em 3-5 frases",
+  "entities": {
+    "operadora": null ou "nome da operadora",
+    "plano": null ou "nome do plano",
+    "valores": null ou [{"faixa": "0-18", "valor": 150.00}, ...],
+    "hospitais_rede": null ou ["hospital1", "hospital2"],
+    "coparticipacao": null ou "detalhes completos",
+    "carencia": null ou "prazos de carência",
+    "abrangencia": null ou "municipal/estadual/nacional",
+    "acomodacao": null ou "enfermaria/apartamento",
+    "vidas": null ou número,
+    "modalidade": null ou "tipo",
+    "condicoes_especiais": null ou "condições negociadas",
+    "vigencia": null ou "data de vigência"
+  },
+  "is_social": false
+}
 
-Se for outro tipo de documento, extraia as informações mais relevantes de forma estruturada.
-Retorne uma descrição concisa e organizada. Sem saudações.`;
+Extraia o MÁXIMO de dados estruturados possível. Se for scan/imagem, faça OCR.
+Retorne APENAS o JSON.`;
   }
 
   try {
-    const model = type === "audio" ? "google/gemini-2.5-flash" : "google/gemini-2.5-flash";
+    const model = "google/gemini-2.5-flash";
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -200,14 +244,41 @@ Retorne uma descrição concisa e organizada. Sem saudações.`;
 
     if (!response.ok) {
       console.error("AI error:", response.status, await response.text());
-      return null;
+      return { extractedText: null, semanticSummary: null, entities: {} };
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
+    const rawContent = data.choices?.[0]?.message?.content?.trim() || "";
+    
+    // Try to parse as JSON
+    try {
+      const cleaned = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+      
+      const extractedText = type === "audio" 
+        ? (parsed.transcription || parsed.extracted_text || rawContent)
+        : (parsed.extracted_text || rawContent);
+      const semanticSummary = parsed.semantic_summary || null;
+      const entities = parsed.entities || {};
+      const isSocial = parsed.is_social === true;
+      
+      // If social, prefix with [SOCIAL]
+      if (isSocial && type !== "audio") {
+        return { 
+          extractedText: `[SOCIAL] ${semanticSummary || extractedText}`, 
+          semanticSummary, 
+          entities: {} 
+        };
+      }
+      
+      return { extractedText, semanticSummary, entities };
+    } catch {
+      // Fallback: use raw content as text
+      return { extractedText: rawContent, semanticSummary: null, entities: {} };
+    }
   } catch (e) {
     console.error("AI extraction error:", e);
-    return null;
+    return { extractedText: null, semanticSummary: null, entities: {} };
   }
 }
 
@@ -315,7 +386,10 @@ Deno.serve(async (req) => {
       else mime = "application/pdf";
     }
 
-    const extractedText = await extractTextWithAI(media.base64, mime, type);
+    const result = await extractTextWithAI(media.base64, mime, type);
+    const extractedText = result.extractedText;
+    const semanticSummary = result.semanticSummary;
+    const entities = result.entities;
 
     // Classify the message content
     const textForClassification = extractedText || msg.content || "";
@@ -349,6 +423,10 @@ Deno.serve(async (req) => {
     };
 
     if (storagePath) updateData.media_storage_path = storagePath;
+    if (semanticSummary) updateData.extracted_semantic_summary = semanticSummary;
+    if (entities && Object.keys(entities).length > 0 && Object.values(entities).some(v => v !== null)) {
+      updateData.extracted_entities = entities;
+    }
 
     if (extractedText) {
       updateData.extracted_text = extractedText;
