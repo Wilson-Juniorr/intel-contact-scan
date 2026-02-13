@@ -367,10 +367,12 @@ export type Database = {
       }
       leads: {
         Row: {
+          approved_value: number | null
           created_at: string
           email: string | null
           id: string
           last_contact_at: string | null
+          last_quote_sent_at: string | null
           lives: number | null
           lost_reason: string | null
           name: string
@@ -378,16 +380,21 @@ export type Database = {
           operator: string | null
           phone: string
           plan_type: string | null
+          quote_min_value: number | null
+          quote_operadora: string | null
+          quote_plan_name: string | null
           stage: string
           type: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          approved_value?: number | null
           created_at?: string
           email?: string | null
           id?: string
           last_contact_at?: string | null
+          last_quote_sent_at?: string | null
           lives?: number | null
           lost_reason?: string | null
           name: string
@@ -395,16 +402,21 @@ export type Database = {
           operator?: string | null
           phone: string
           plan_type?: string | null
+          quote_min_value?: number | null
+          quote_operadora?: string | null
+          quote_plan_name?: string | null
           stage?: string
           type?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          approved_value?: number | null
           created_at?: string
           email?: string | null
           id?: string
           last_contact_at?: string | null
+          last_quote_sent_at?: string | null
           lives?: number | null
           lost_reason?: string | null
           name?: string
@@ -412,6 +424,9 @@ export type Database = {
           operator?: string | null
           phone?: string
           plan_type?: string | null
+          quote_min_value?: number | null
+          quote_operadora?: string | null
+          quote_plan_name?: string | null
           stage?: string
           type?: string
           updated_at?: string

@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { FunnelColumn } from "@/components/funnel/FunnelColumn";
 import { BootstrapWhatsAppDialog } from "@/components/leads/BootstrapWhatsAppDialog";
+import { QuoteConfirmDialog } from "@/components/leads/QuoteConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -14,14 +15,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+// Stages that require quote_min_value
+const STAGES_REQUIRE_QUOTE: FunnelStage[] = ["cotacao_enviada"];
+// Stages that require approved_value
+const STAGES_REQUIRE_APPROVED: FunnelStage[] = ["cotacao_aprovada", "documentacao_completa", "em_emissao"];
 
 export default function FunnelPage() {
-  const { leads, moveStage } = useLeadsContext();
+  const { leads, moveStage, updateLead } = useLeadsContext();
   const queryClient = useQueryClient();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<FunnelStage | null>(null);
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
+
+  // Quote dialog state
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [quoteDialogMode, setQuoteDialogMode] = useState<"quote" | "approved">("quote");
+  const [pendingMove, setPendingMove] = useState<{ leadId: string; stage: FunnelStage } | null>(null);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -75,15 +87,60 @@ export default function FunnelPage() {
     setDragOverStage(null);
   };
 
+  const tryMoveStage = useCallback((leadId: string, stage: FunnelStage) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.stage === stage) return;
+
+    // Check if quote_min_value is needed
+    if (STAGES_REQUIRE_QUOTE.includes(stage) && !lead.quote_min_value) {
+      setPendingMove({ leadId, stage });
+      setQuoteDialogMode("quote");
+      setQuoteDialogOpen(true);
+      return;
+    }
+
+    // Check if approved_value is needed
+    if (STAGES_REQUIRE_APPROVED.includes(stage) && !lead.approved_value) {
+      setPendingMove({ leadId, stage });
+      setQuoteDialogMode("approved");
+      setQuoteDialogOpen(true);
+      return;
+    }
+
+    moveStage(leadId, stage);
+  }, [leads, moveStage]);
+
   const handleDrop = (stage: FunnelStage) => {
     if (draggedLeadId) {
-      const lead = leads.find((l) => l.id === draggedLeadId);
-      if (lead && lead.stage !== stage) {
-        moveStage(draggedLeadId, stage);
-      }
+      tryMoveStage(draggedLeadId, stage);
     }
     setDraggedLeadId(null);
     setDragOverStage(null);
+  };
+
+  const handleQuoteConfirm = async (data: { min_value?: number; operadora?: string; plan_name?: string; approved_value?: number }) => {
+    if (!pendingMove) return;
+    try {
+      const updates: Record<string, unknown> = {};
+
+      if (data.min_value !== undefined) {
+        updates.quote_min_value = data.min_value;
+        updates.last_quote_sent_at = new Date().toISOString();
+        if (data.operadora) updates.quote_operadora = data.operadora;
+        if (data.plan_name) updates.quote_plan_name = data.plan_name;
+      }
+      if (data.approved_value !== undefined) {
+        updates.approved_value = data.approved_value;
+      }
+
+      await updateLead(pendingMove.leadId, updates);
+      await moveStage(pendingMove.leadId, pendingMove.stage);
+      toast.success("Cotação registrada e etapa atualizada!");
+    } catch {
+      toast.error("Erro ao atualizar lead");
+    }
+    setQuoteDialogOpen(false);
+    setPendingMove(null);
   };
 
   return (
@@ -113,18 +170,10 @@ export default function FunnelPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[180px] max-w-[280px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, telefone ou email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-xs"
-            />
+            <Input placeholder="Buscar por nome, telefone ou email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-xs" />
           </div>
-
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 w-[110px] text-xs">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[110px] text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
@@ -132,19 +181,13 @@ export default function FunnelPage() {
               <SelectItem value="PME">PME</SelectItem>
             </SelectContent>
           </Select>
-
           <Select value={operatorFilter} onValueChange={setOperatorFilter}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Operadora" />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Operadora" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas operadoras</SelectItem>
-              {operators.map((op) => (
-                <SelectItem key={op} value={op}>{op}</SelectItem>
-              ))}
+              {operators.map((op) => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
             </SelectContent>
           </Select>
-
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("h-8 text-xs gap-1.5", dateFrom && "text-foreground")}>
@@ -156,7 +199,6 @@ export default function FunnelPage() {
               <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
             </PopoverContent>
           </Popover>
-
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("h-8 text-xs gap-1.5", dateTo && "text-foreground")}>
@@ -194,10 +236,17 @@ export default function FunnelPage() {
       </div>
 
       <LeadDetailSheet lead={selectedLead} onClose={() => setSelectedLeadId(null)} />
-      <BootstrapWhatsAppDialog
-        open={bootstrapOpen}
-        onOpenChange={setBootstrapOpen}
-        onComplete={() => queryClient.invalidateQueries({ queryKey: ["leads"] })}
+      <BootstrapWhatsAppDialog open={bootstrapOpen} onOpenChange={setBootstrapOpen} onComplete={() => queryClient.invalidateQueries({ queryKey: ["leads"] })} />
+      
+      <QuoteConfirmDialog
+        open={quoteDialogOpen}
+        onOpenChange={(open) => {
+          setQuoteDialogOpen(open);
+          if (!open) setPendingMove(null);
+        }}
+        quoteData={null}
+        mode={quoteDialogMode}
+        onConfirm={handleQuoteConfirm}
       />
     </div>
   );

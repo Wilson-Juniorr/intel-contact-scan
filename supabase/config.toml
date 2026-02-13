@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.bootstrap-whatsapp-leads]
 verify_jwt = false
+
+[functions.extract-quote-data]
+verify_jwt = false

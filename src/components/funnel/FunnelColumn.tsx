@@ -34,7 +34,11 @@ export function FunnelColumn({
   onDrop,
   onLeadClick,
 }: Props) {
-  const totalValue = leads.reduce((sum, l) => sum + (l.lives ? l.lives * 120 : 0), 0);
+  const totalValue = leads.reduce((sum, l) => {
+    if (l.approved_value) return sum + Number(l.approved_value);
+    if (l.quote_min_value) return sum + Number(l.quote_min_value);
+    return sum + (l.lives ? l.lives * 120 : 0);
+  }, 0);
   const weightedValue = Math.round(totalValue * stage.weight / 100);
 
   const formatCurrency = (v: number) => {
