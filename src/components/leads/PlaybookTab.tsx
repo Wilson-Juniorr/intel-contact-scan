@@ -54,6 +54,7 @@ export function PlaybookTab({ lead }: Props) {
   const [guardrails, setGuardrails] = useState<any>(null);
   const [urgencyFlag, setUrgencyFlag] = useState(false);
   const [riskFlags, setRiskFlags] = useState<string[]>([]);
+  const [timeline, setTimeline] = useState<any>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -98,6 +99,7 @@ export function PlaybookTab({ lead }: Props) {
     setGuardrails(null);
     setUrgencyFlag(false);
     setRiskFlags([]);
+    setTimeline(null);
     setCopiedIdx(null);
     setEditingIdx(null);
     try {
@@ -127,6 +129,7 @@ export function PlaybookTab({ lead }: Props) {
       setGuardrails(data.guardrails || null);
       setUrgencyFlag(data.urgency_flag || false);
       setRiskFlags(Array.isArray(data.risk_flags) ? data.risk_flags : []);
+      setTimeline(data.timeline || null);
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally {
@@ -252,6 +255,18 @@ export function PlaybookTab({ lead }: Props) {
               <div className="flex items-start gap-1 text-[9px] text-muted-foreground">
                 <Lightbulb className="h-2.5 w-2.5 shrink-0 mt-0.5" />
                 <span><strong>Objetivo:</strong> {goal}</span>
+              </div>
+            )}
+
+            {/* Timeline */}
+            {timeline && (
+              <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground">
+                <span>📅 {timeline.days_since_first_contact}d desde 1º contato</span>
+                <span>📌 {timeline.days_in_current_stage}d na etapa</span>
+                <span>🔇 {timeline.days_since_last_contact}d sem contato</span>
+                <span>📤 {timeline.outbound_attempts} enviadas</span>
+                <span>📥 {timeline.inbound_responses} recebidas</span>
+                {timeline.avg_response_time_days !== null && <span>⏱️ Resp. média: {timeline.avg_response_time_days}d</span>}
               </div>
             )}
 
