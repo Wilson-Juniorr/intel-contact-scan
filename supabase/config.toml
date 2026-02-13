@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.analyze-media]
 verify_jwt = false
+
+[functions.rewrite-message]
+verify_jwt = false

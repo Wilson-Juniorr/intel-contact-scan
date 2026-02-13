@@ -358,6 +358,8 @@ export default function WhatsAppPage() {
           leadStage={selectedLead?.stage}
           leadOperator={selectedLead?.operator || undefined}
           leadLives={selectedLead?.lives || undefined}
+          leadId={selectedConversation?.leadId}
+          leadType={selectedLead?.type}
         />
       </div>
     </motion.div>
