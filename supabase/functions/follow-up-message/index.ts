@@ -34,12 +34,20 @@ interface LeadContext {
   recentMessages: string;
   recentInteractions: string;
   followUpsSent: number;
+  waitingReply: boolean;
+  lastClientMessage: string | null;
+  lastClientMessageDaysAgo: number | null;
 }
 
 function buildContextSummary(ctx: LeadContext): string {
   const lines: string[] = [];
   lines.push(`LEAD: ${ctx.name} | Etapa: ${ctx.stageLabel} | Tipo: ${ctx.type === "PF" ? "Pessoa Física" : ctx.type === "PME" ? "PME" : "Adesão"}`);
   lines.push(`Operadora: ${ctx.operator || "não definida"} | Vidas: ${ctx.lives || "?"} | Parado: ${ctx.idleDays}d (${ctx.idleHours}h)`);
+  lines.push(`Aguardando resposta: ${ctx.waitingReply ? "SIM" : "NÃO"}`);
+  
+  if (ctx.lastClientMessage) {
+    lines.push(`Última msg do cliente (${ctx.lastClientMessageDaysAgo}d atrás): "${ctx.lastClientMessage.slice(0, 200)}"`);
+  }
   
   if (ctx.quoteMinValue) lines.push(`Cotação enviada: R$${ctx.quoteMinValue}${ctx.lastQuoteSentAt ? ` em ${new Date(ctx.lastQuoteSentAt).toLocaleDateString("pt-BR")}` : ""}`);
   if (ctx.approvedValue) lines.push(`Valor aprovado: R$${ctx.approvedValue}`);
@@ -56,6 +64,8 @@ function buildContextSummary(ctx: LeadContext): string {
     if (sd.objecoes?.length) parts.push(`Objeções: ${sd.objecoes.join(", ")}`);
     if (sd.sentimento) parts.push(`Sentimento: ${sd.sentimento}`);
     if (sd.operadoras_discutidas?.length) parts.push(`Operadoras discutidas: ${sd.operadoras_discutidas.join(", ")}`);
+    if (sd.prazos) parts.push(`Prazos: ${JSON.stringify(sd.prazos)}`);
+    if (sd.concorrentes) parts.push(`Concorrentes: ${JSON.stringify(sd.concorrentes)}`);
     if (parts.length) lines.push(`DADOS: ${parts.join(" | ")}`);
   }
   
@@ -91,11 +101,11 @@ serve(async (req) => {
     if (!leadId) throw new Error("leadId é obrigatório");
 
     // Parallel data loading
-    const leadPromise = supabase.from("leads").select("*").eq("id", leadId).eq("user_id", userId).single();
-    const interactionsPromise = supabase.from("interactions").select("*").eq("lead_id", leadId).eq("user_id", userId).order("created_at", { ascending: false }).limit(15);
-    const memoryPromise = supabase.from("lead_memory").select("summary, structured_json").eq("lead_id", leadId).eq("user_id", userId).maybeSingle();
-
-    const [leadRes, interactionsRes, memoryRes] = await Promise.all([leadPromise, interactionsPromise, memoryPromise]);
+    const [leadRes, interactionsRes, memoryRes] = await Promise.all([
+      supabase.from("leads").select("*").eq("id", leadId).eq("user_id", userId).single(),
+      supabase.from("interactions").select("*").eq("lead_id", leadId).eq("user_id", userId).order("created_at", { ascending: false }).limit(15),
+      supabase.from("lead_memory").select("summary, structured_json").eq("lead_id", leadId).eq("user_id", userId).maybeSingle(),
+    ]);
 
     if (leadRes.error || !leadRes.data) {
       return new Response(JSON.stringify({ error: "Lead não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -120,6 +130,19 @@ serve(async (req) => {
 
     // Count follow-ups sent
     const followUpsSent = (interactionsRes.data || []).filter((i: any) => i.description?.includes("[Follow-up")).length;
+
+    // Determine waiting_reply and last client message
+    const sortedMsgs = (whatsappMsgs || []).slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const lastOutbound = sortedMsgs.find((m: any) => m.direction === "outbound");
+    const lastInbound = sortedMsgs.find((m: any) => m.direction === "inbound");
+    const waitingReply = lastOutbound && (!lastInbound || new Date(lastOutbound.created_at) > new Date(lastInbound.created_at));
+    
+    let lastClientMessage: string | null = null;
+    let lastClientMessageDaysAgo: number | null = null;
+    if (lastInbound) {
+      lastClientMessage = lastInbound.extracted_text || lastInbound.content || null;
+      lastClientMessageDaysAgo = Math.floor((Date.now() - new Date(lastInbound.created_at).getTime()) / (1000 * 60 * 60 * 24));
+    }
 
     const recentMessages = (whatsappMsgs || []).reverse()
       .map((m: any) => {
@@ -151,6 +174,9 @@ serve(async (req) => {
       recentMessages,
       recentInteractions,
       followUpsSent,
+      waitingReply: !!waitingReply,
+      lastClientMessage,
+      lastClientMessageDaysAgo,
     };
 
     const contextSummary = buildContextSummary(ctx);
@@ -169,56 +195,95 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um ESTRATEGISTA DE VENDAS e ESPECIALISTA em comunicação comercial via WhatsApp para planos de saúde. Você analisa o contexto completo do lead e define a melhor estratégia antes de gerar mensagens.
+            content: `Você é um TOP CLOSER — estrategista de vendas de planos de saúde via WhatsApp. Você combina leitura comportamental, controle de pressão e copy persuasiva para gerar resposta do cliente.
 
-FORMATO DE RESPOSTA OBRIGATÓRIO:
-Retorne EXATAMENTE um JSON com esta estrutura:
+FORMATO DE RESPOSTA OBRIGATÓRIO — retorne EXATAMENTE um JSON:
 {
-  "analysis": "Análise breve do estado atual do lead (2-3 frases)",
+  "analysis": "Análise breve do estado atual (2-3 frases)",
   "strategy": "nome_da_estrategia",
-  "strategy_reason": "Explicação de 1 frase do porquê dessa estratégia",
-  "messages": ["msg1", "msg2", "msg3"]
+  "goal": "Objetivo específico desta sequência (1 frase)",
+  "silence_stage": "early|mid|late",
+  "pressure_level": "soft|medium|direct",
+  "flow_pattern": "super_short|default|validate_tension_direct",
+  "behavior": {
+    "decision_style": "analytical|practical|emotional|skeptical"|null,
+    "likely_objection": "price|trust|indecision|comparison"|null,
+    "energy_level": "high|medium|low"|null,
+    "confidence": "low|medium|high"
+  },
+  "guardrails": {
+    "must_confirm_network": boolean,
+    "avoid_discount_promises": boolean,
+    "competitor_mode": boolean
+  },
+  "urgency_flag": boolean,
+  "messages": ["msg1", "msg2", ...],
+  "risk_flags": ["flag1", ...]
 }
 
-ESTRATÉGIAS DISPONÍVEIS (escolha a mais adequada):
-- "destravar_resposta": Lead não responde. Foco em gerar qualquer interação.
-- "tratar_objecao": Lead tem objeção identificada (preço, rede, carência). Contornar com empatia.
-- "reforcar_valor": Lead demonstrou interesse mas esfriou. Reforçar benefícios.
-- "fechar_proxima_etapa": Lead quente, pronto para avançar. Guiar para próximo passo.
-- "recuperar_lead_frio": Lead parado há muito tempo (5d+). Abordagem de resgate.
-- "acompanhar_processo": Lead em fase operacional (emissão, documentação). Atualizar status.
-- "primeira_abordagem": Lead novo, primeiro contato. Descobrir necessidade.
+═══ A) BEHAVIORAL LAYER ═══
+Infira com base nas mensagens do cliente:
+- decision_style: analytical (pede dados/comparativos), practical (quer solução rápida), emotional (fala de família/medo), skeptical (desconfia/questiona). null se sem evidência.
+- likely_objection: price (reclamou valor), trust (desconfia), indecision (vai pensar), comparison (comparou concorrente). null se sem evidência.
+- energy_level: high (respostas rápidas/longas), medium (respostas curtas), low (monossilábico/sumiu). null se sem mensagens.
+- confidence: quão confiante você está nessas inferências.
+REGRA: Trate como HIPÓTESE, adapte a copy mas nunca afirme certezas sobre o cliente.
 
-CRITÉRIOS PARA ESCOLHA:
-- Se não responde há 3+ dias → destravar_resposta ou recuperar_lead_frio
-- Se tem objeções registradas na memória → tratar_objecao
-- Se cotação enviada e sem retorno → reforcar_valor
-- Se demonstrou interesse recente → fechar_proxima_etapa  
-- Se está em documentação/emissão → acompanhar_processo
-- Se é lead novo → primeira_abordagem
+═══ B) SILENCE & PRESSURE ═══
+Calcule:
+- silence_stage: early (0-2d sem resposta), mid (3-5d), late (6d+)
+- pressure_level: soft (early ou lead novo), medium (mid), direct (late + já enviou follow-ups)
+Ajuste pela situação: se waiting_reply=false, pode ser mais soft mesmo em mid.
 
-REGRAS DE MENSAGEM:
-- 2 a 4 mensagens curtas (até 2 linhas cada, ~120 chars)
-- Tom HUMANO e natural — como vendedor real no WhatsApp
-- Use o PRIMEIRO NOME do lead
-- Emojis moderados (0-1 por msg, nunca no início)
+═══ C) FLOW PATTERN ═══
+Escolha automática:
+- super_short (2 msgs): silence_stage=late OU pressure=soft com lead frio
+- default (2-3 msgs): cenário padrão
+- validate_tension_direct (3 msgs): mid/late + medium/direct, padrão: validar → tensão leve → CTA direto
+
+═══ D) GUARDRAILS ═══
+- must_confirm_network: true se cliente citou hospital/rede específica nas mensagens ou memória. A mensagem deve PERGUNTAR/CONFIRMAR, NUNCA PROMETER cobertura.
+- avoid_discount_promises: true se objeção é preço. NUNCA prometa desconto. Ofereça alternativas (plano diferente, coparticipação, ajuste de rede).
+- competitor_mode: true se citou outro corretor/seguradora. Use abordagem consultiva comparativa, sem falar mal.
+Se ativado, a copy DEVE respeitar o guardrail. Violar guardrail é erro grave.
+
+═══ E) URGENCY ═══
+urgency_flag=true APENAS se existir dado real:
+- prazo de cotação expirando (last_quote_sent_at > 7d)
+- prazo de reajuste mencionado na memória
+- prazo de implantação/carência  
+Se NÃO existir dado real → urgency_flag=false. Tom sempre leve, nunca inventar urgência.
+
+═══ F) RISK FLAGS ═══
+Retorne alertas se:
+- Lead pode estar irritado com excesso de follow-up
+- Informação contraditória detectada
+- Guardrail pode ser difícil de respeitar
+- Dados insuficientes para inferência confiável
+
+═══ G) COPY RULES ═══
+- Quantidade: obedeça flow_pattern (2 a 3 msgs)
+- Cada msg: até 2 linhas (~120 chars)
+- Tom HUMANO e natural — como top vendedor real
+- Use PRIMEIRO NOME do lead
+- Emojis: pressure=soft→1 emoji máx total; pressure=medium→1 por msg máx; pressure=direct→0-1 total
+- Se decision_style=analytical: inclua dados/números quando possível
+- Se decision_style=emotional: empatia e segurança
+- Se decision_style=skeptical: transparência e provas sociais
+- Se waiting_reply=true: foco em destravar resposta
+- Se waiting_reply=false: foco em avançar etapa
 - NUNCA "Olá" ou "Bom dia" genérico
-- Se tiver dados reais (operadora, valores, rede), USE para personalizar
-- Adapte urgência: >=5d mais direto, 1-2d mais casual
-- O OBJETIVO é gerar RESPOSTA do cliente
-- Se já enviou follow-ups, MUDE a abordagem (não repita)
+- Se já enviou follow-ups, MUDE a abordagem
+- CTA ÚNICO e claro por sequência (última msg)
+- NUNCA prometa cobertura/valores sem confirmação
 
-ESTRUTURA DA SEQUÊNCIA:
-1ª: Gancho / referência pessoal
-2ª: Valor / informação relevante
-3ª: CTA suave (pergunta)
-4ª (opcional): Complemento / urgência sutil
+ESTRATÉGIAS: destravar_resposta, tratar_objecao, reforcar_valor, fechar_proxima_etapa, recuperar_lead_frio, acompanhar_processo, primeira_abordagem
 
 NÃO retorne nada além do JSON.`,
           },
           {
             role: "user",
-            content: `Analise o contexto e gere o follow-up estratégico:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nResponda APENAS com o JSON.`,
+            content: `Analise e gere follow-up Brain Pro:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nResponda APENAS com o JSON.`,
           },
         ],
       }),
@@ -244,34 +309,44 @@ NÃO retorne nada além do JSON.`,
     const rawContent = data.choices?.[0]?.message?.content || "";
 
     // Parse response
-    let analysis = "";
-    let strategy = "";
-    let strategyReason = "";
-    let messagesArray: string[] = [];
-
+    let result: any = {};
     try {
       const cleaned = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      analysis = parsed.analysis || "";
-      strategy = parsed.strategy || "destravar_resposta";
-      strategyReason = parsed.strategy_reason || "";
-      messagesArray = Array.isArray(parsed.messages) ? parsed.messages : [rawContent];
+      result = JSON.parse(cleaned);
     } catch {
-      messagesArray = rawContent.split("\n").filter((l: string) => l.trim().length > 0).slice(0, 4);
-      if (messagesArray.length === 0) messagesArray = [rawContent];
-      strategy = "destravar_resposta";
-      analysis = "Não foi possível analisar o contexto detalhadamente.";
+      // Fallback
+      const msgs = rawContent.split("\n").filter((l: string) => l.trim().length > 0).slice(0, 4);
+      result = {
+        analysis: "Não foi possível analisar o contexto detalhadamente.",
+        strategy: "destravar_resposta",
+        goal: "Gerar resposta do cliente",
+        messages: msgs.length > 0 ? msgs : [rawContent],
+      };
     }
 
-    // Ensure 2-4 messages
-    messagesArray = messagesArray.slice(0, 4);
+    // Ensure messages array is valid
+    let messagesArray: string[] = Array.isArray(result.messages) ? result.messages : [rawContent];
+    messagesArray = messagesArray.filter((m: string) => m && m.trim().length > 0).slice(0, 4);
     if (messagesArray.length < 2 && messagesArray[0]?.length > 200) {
       const words = messagesArray[0].split(" ");
       const mid = Math.ceil(words.length / 2);
       messagesArray = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
     }
 
-    return new Response(JSON.stringify({ analysis, strategy, strategy_reason: strategyReason, messages: messagesArray }), {
+    return new Response(JSON.stringify({
+      analysis: result.analysis || "",
+      strategy: result.strategy || "destravar_resposta",
+      strategy_reason: result.goal || "",
+      goal: result.goal || "",
+      silence_stage: result.silence_stage || "early",
+      pressure_level: result.pressure_level || "soft",
+      flow_pattern: result.flow_pattern || "default",
+      behavior: result.behavior || { decision_style: null, likely_objection: null, energy_level: null, confidence: "low" },
+      guardrails: result.guardrails || { must_confirm_network: false, avoid_discount_promises: false, competitor_mode: false },
+      urgency_flag: result.urgency_flag || false,
+      messages: messagesArray,
+      risk_flags: Array.isArray(result.risk_flags) ? result.risk_flags : [],
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

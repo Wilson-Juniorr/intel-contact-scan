@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal, Brain, Lightbulb } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal, Brain, Lightbulb, Shield, Zap, Activity, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -67,7 +67,24 @@ interface FollowUpResult {
   analysis: string;
   strategy: string;
   strategy_reason: string;
+  goal: string;
+  silence_stage: string;
+  pressure_level: string;
+  flow_pattern: string;
+  behavior: {
+    decision_style: string | null;
+    likely_objection: string | null;
+    energy_level: string | null;
+    confidence: string;
+  };
+  guardrails: {
+    must_confirm_network: boolean;
+    avoid_discount_promises: boolean;
+    competitor_mode: boolean;
+  };
+  urgency_flag: boolean;
   messages: string[];
+  risk_flags: string[];
 }
 
 interface FollowUpPanelProps {
@@ -158,7 +175,15 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
           analysis: data.analysis || "",
           strategy: data.strategy || "destravar_resposta",
           strategy_reason: data.strategy_reason || "",
+          goal: data.goal || "",
+          silence_stage: data.silence_stage || "early",
+          pressure_level: data.pressure_level || "soft",
+          flow_pattern: data.flow_pattern || "default",
+          behavior: data.behavior || { decision_style: null, likely_objection: null, energy_level: null, confidence: "low" },
+          guardrails: data.guardrails || { must_confirm_network: false, avoid_discount_promises: false, competitor_mode: false },
+          urgency_flag: data.urgency_flag || false,
           messages: Array.isArray(data.messages) ? data.messages : [data.message],
+          risk_flags: Array.isArray(data.risk_flags) ? data.risk_flags : [],
         },
       }));
       setEditingMsg(null);
@@ -374,23 +399,83 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                   rows={2}
                 />
 
-                {/* Analysis & Strategy */}
+                {/* Analysis & Strategy — Brain Pro V2 */}
                 {result && result.analysis && (
-                  <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                  <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                    {/* Header row */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Análise da IA</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Brain Pro V2</span>
                       {strat && (
                         <Badge className={`${strat.color} text-[10px] gap-1`}>
                           <span>{strat.emoji}</span> {strat.label}
                         </Badge>
                       )}
+                      {result.urgency_flag && (
+                        <Badge variant="destructive" className="text-[9px] gap-0.5">
+                          <Zap className="h-2.5 w-2.5" /> Urgência real
+                        </Badge>
+                      )}
                     </div>
+
+                    {/* Analysis text */}
                     <p className="text-xs text-foreground/80 leading-relaxed">{result.analysis}</p>
-                    {result.strategy_reason && (
+                    {result.goal && (
                       <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                         <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
-                        <span>{result.strategy_reason}</span>
+                        <span><strong>Objetivo:</strong> {result.goal}</span>
+                      </div>
+                    )}
+
+                    {/* Silence / Pressure / Flow chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <SilenceChip stage={result.silence_stage} />
+                      <PressureChip level={result.pressure_level} />
+                      <FlowChip pattern={result.flow_pattern} />
+                    </div>
+
+                    {/* Behavior inference */}
+                    {result.behavior && result.behavior.confidence !== "low" && (
+                      <div className="rounded border border-border/60 bg-background/50 p-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Eye className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Leitura comportamental</span>
+                          <Badge variant="outline" className="text-[8px] h-3.5 px-1">
+                            {result.behavior.confidence === "high" ? "Alta confiança" : "Média confiança"}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2 flex-wrap text-[10px] text-muted-foreground">
+                          {result.behavior.decision_style && <span>🧠 {behaviorLabels.decision[result.behavior.decision_style]}</span>}
+                          {result.behavior.likely_objection && <span>🛡️ {behaviorLabels.objection[result.behavior.likely_objection]}</span>}
+                          {result.behavior.energy_level && <span>⚡ {behaviorLabels.energy[result.behavior.energy_level]}</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Guardrails */}
+                    {result.guardrails && (result.guardrails.must_confirm_network || result.guardrails.avoid_discount_promises || result.guardrails.competitor_mode) && (
+                      <div className="rounded border border-warning/30 bg-warning/5 p-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Shield className="h-3 w-3 text-warning" />
+                          <span className="text-[9px] font-semibold uppercase text-warning">Guardrails ativos</span>
+                        </div>
+                        <div className="flex gap-2 flex-wrap text-[10px]">
+                          {result.guardrails.must_confirm_network && <Badge variant="outline" className="text-[8px] border-warning/40">🏥 Confirmar rede</Badge>}
+                          {result.guardrails.avoid_discount_promises && <Badge variant="outline" className="text-[8px] border-warning/40">💰 Sem prometer desconto</Badge>}
+                          {result.guardrails.competitor_mode && <Badge variant="outline" className="text-[8px] border-warning/40">🤝 Modo consultivo</Badge>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Risk flags */}
+                    {result.risk_flags && result.risk_flags.length > 0 && (
+                      <div className="space-y-1">
+                        {result.risk_flags.map((flag, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-[10px] text-destructive/80">
+                            <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                            <span>{flag}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -487,6 +572,42 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
       </div>
     </div>
   );
+}
+
+const behaviorLabels = {
+  decision: { analytical: "Analítico", practical: "Prático", emotional: "Emocional", skeptical: "Cético" } as Record<string, string>,
+  objection: { price: "Preço", trust: "Confiança", indecision: "Indecisão", comparison: "Comparação" } as Record<string, string>,
+  energy: { high: "Energia alta", medium: "Energia média", low: "Energia baixa" } as Record<string, string>,
+};
+
+function SilenceChip({ stage }: { stage: string }) {
+  const cfg: Record<string, { label: string; cls: string }> = {
+    early: { label: "Silêncio inicial", cls: "bg-muted text-muted-foreground" },
+    mid: { label: "Silêncio médio", cls: "bg-accent text-accent-foreground" },
+    late: { label: "Silêncio longo", cls: "bg-destructive/10 text-destructive" },
+  };
+  const c = cfg[stage] || cfg.early;
+  return <Badge className={`${c.cls} text-[9px] gap-0.5`}><Clock className="h-2.5 w-2.5" />{c.label}</Badge>;
+}
+
+function PressureChip({ level }: { level: string }) {
+  const cfg: Record<string, { label: string; cls: string }> = {
+    soft: { label: "Pressão leve", cls: "bg-muted text-muted-foreground" },
+    medium: { label: "Pressão média", cls: "bg-accent text-accent-foreground" },
+    direct: { label: "Pressão direta", cls: "bg-primary/10 text-primary" },
+  };
+  const c = cfg[level] || cfg.soft;
+  return <Badge className={`${c.cls} text-[9px] gap-0.5`}><Activity className="h-2.5 w-2.5" />{c.label}</Badge>;
+}
+
+function FlowChip({ pattern }: { pattern: string }) {
+  const cfg: Record<string, { label: string }> = {
+    super_short: { label: "Flow curto (2)" },
+    default: { label: "Flow padrão" },
+    validate_tension_direct: { label: "Validar→Tensão→CTA" },
+  };
+  const c = cfg[pattern] || cfg.default;
+  return <Badge variant="outline" className="text-[9px]">{c.label}</Badge>;
 }
 
 function StatCard({ label, value, variant }: { label: string; value: number; variant: string }) {
