@@ -31,21 +31,22 @@ function AppSidebarContent() {
   const collapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <div className="flex items-center gap-2 px-4 py-5">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background">
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-4 py-5">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
               <span className="text-primary-foreground font-bold text-sm">CS</span>
             </div>
             <div>
-              <h1 className="text-sm font-bold text-sidebar-foreground">CRM Saúde</h1>
-              <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{user?.email}</p>
+              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">CRM Saúde</h1>
+              <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">{user?.email}</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto shadow-sm">
             <span className="text-primary-foreground font-bold text-sm">CS</span>
           </div>
         )}
@@ -61,11 +62,11 @@ function AppSidebarContent() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
                     >
-                      <item.icon className="h-5 w-5 shrink-0" />
-                      <span>{item.title}</span>
+                      <item.icon className="h-4.5 w-4.5 shrink-0" />
+                      <span className="text-sm">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -80,10 +81,10 @@ function AppSidebarContent() {
           variant="ghost"
           size={collapsed ? "icon" : "default"}
           onClick={signOut}
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive"
+          className="w-full justify-start gap-2 text-sidebar-foreground/40 hover:text-destructive hover:bg-destructive/10"
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed && <span>Sair</span>}
+          {!collapsed && <span className="text-sm">Sair</span>}
         </Button>
       </div>
     </Sidebar>
@@ -93,12 +94,12 @@ function AppSidebarContent() {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-background">
         <AppSidebarContent />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <header className="h-12 border-b border-border flex items-center px-4 gap-3 bg-background/80 backdrop-blur-md sticky top-0 z-20">
             <SidebarTrigger>
-              <Menu className="h-5 w-5" />
+              <Menu className="h-4.5 w-4.5 text-muted-foreground" />
             </SidebarTrigger>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
