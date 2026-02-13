@@ -469,6 +469,54 @@ Deno.serve(async (req) => {
         .eq("id", leadId);
     }
 
+    // === REAL-TIME STAGE TRANSITIONS ===
+    if (leadId) {
+      // Get current lead stage
+      const { data: currentLead } = await supabase
+        .from("leads")
+        .select("stage")
+        .eq("id", leadId)
+        .single();
+
+      const currentStage = currentLead?.stage;
+      const excludedFromAuto = ["implantado", "declinado", "cancelado", "retrabalho"];
+
+      // 1) INBOUND message → auto-move to "contato_realizado" if in early stages
+      if (!isFromMe && currentStage && ["novo", "tentativa_contato"].includes(currentStage)) {
+        await supabase
+          .from("leads")
+          .update({ stage: "contato_realizado", updated_at: new Date().toISOString() })
+          .eq("id", leadId);
+        console.log(`Lead ${leadId} auto-moved to contato_realizado (client responded)`);
+      }
+
+      // 2) OUTBOUND message → check if 6+ unique outbound days with zero inbound → retrabalho
+      if (isFromMe && currentStage && !excludedFromAuto.includes(currentStage)) {
+        const cleanLeadPhone = normalizedPhone;
+        const { data: msgs } = await supabase
+          .from("whatsapp_messages")
+          .select("direction, created_at")
+          .eq("phone", cleanLeadPhone)
+          .eq("user_id", userId);
+
+        if (msgs) {
+          const outboundDays = new Set<string>();
+          let hasInbound = false;
+          for (const m of msgs) {
+            if (m.direction === "outbound") outboundDays.add(m.created_at.slice(0, 10));
+            if (m.direction === "inbound") hasInbound = true;
+          }
+          if (outboundDays.size >= 6 && !hasInbound) {
+            await supabase
+              .from("leads")
+              .update({ stage: "retrabalho", updated_at: new Date().toISOString() })
+              .eq("id", leadId);
+            console.log(`Lead ${leadId} auto-moved to retrabalho (6+ days, no response)`);
+          }
+        }
+      }
+    }
+
     // Log interaction
     if (leadId && userId) {
       const interactionType = isFromMe ? "whatsapp_sent" : "whatsapp_received";

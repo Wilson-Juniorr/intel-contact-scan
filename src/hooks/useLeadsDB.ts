@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { FunnelStage } from "@/types/lead";
@@ -7,6 +7,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 export function useLeadsDB() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Realtime subscription: auto-refresh leads on any DB change
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("leads-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "leads" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["leads"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
 
   const leadsQuery = useQuery({
     queryKey: ["leads", user?.id],
