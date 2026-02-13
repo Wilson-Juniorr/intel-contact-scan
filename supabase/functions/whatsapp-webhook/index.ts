@@ -404,6 +404,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Try to find userId from whatsapp_contacts
+    if (!userId) {
+      const { data: contact } = await supabase
+        .from("whatsapp_contacts")
+        .select("user_id")
+        .eq("phone", cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`)
+        .limit(1)
+        .maybeSingle();
+      if (contact) userId = contact.user_id;
+    }
+
     if (!userId) {
       console.log("No matching user found for phone:", phone);
       return new Response(JSON.stringify({ status: "ignored", reason: "no matching user" }), {
@@ -447,6 +458,72 @@ Deno.serve(async (req) => {
     }
 
     const messageId = savedMsg?.id;
+
+    // === AUTO-CREATE LEAD if no lead matched ===
+    if (!leadId && userId && messageId) {
+      console.log("No lead found for phone, auto-creating...");
+      const normalizedAutoPhone = normalizedPhone;
+
+      // Determine initial stage based on message direction history
+      let stage = "novo";
+      if (isFromMe) {
+        // Only outbound so far
+        stage = "tentativa_contato";
+      } else {
+        // Inbound = at least one contact from client
+        // Check if there's any outbound already
+        const { data: prevMsgs } = await supabase
+          .from("whatsapp_messages")
+          .select("direction")
+          .eq("phone", normalizedAutoPhone)
+          .eq("user_id", userId)
+          .limit(20);
+        const hasOutbound = prevMsgs?.some((m) => m.direction === "outbound") || false;
+        stage = hasOutbound ? "contato_realizado" : "novo";
+      }
+
+      const leadName = cleanContactName || normalizedAutoPhone;
+      const { data: newLead, error: newLeadError } = await supabase
+        .from("leads")
+        .insert({
+          user_id: userId,
+          name: leadName,
+          phone: normalizedAutoPhone,
+          stage,
+          type: "PF",
+        })
+        .select("id")
+        .single();
+
+      if (!newLeadError && newLead) {
+        leadId = newLead.id;
+        // Update the just-saved message with lead_id
+        await supabase.from("whatsapp_messages").update({ lead_id: leadId }).eq("id", messageId);
+        // Link all prior messages
+        await supabase
+          .from("whatsapp_messages")
+          .update({ lead_id: leadId })
+          .eq("phone", normalizedAutoPhone)
+          .eq("user_id", userId)
+          .is("lead_id", null);
+        // Link contact
+        await supabase
+          .from("whatsapp_contacts")
+          .update({ lead_id: leadId })
+          .eq("phone", normalizedAutoPhone)
+          .eq("user_id", userId);
+        // Log
+        await supabase.from("action_log").insert({
+          user_id: userId,
+          lead_id: leadId,
+          action_type: "auto_lead_created",
+          metadata: { source: "webhook", phone: normalizedAutoPhone, stage, trigger: isFromMe ? "outbound" : "inbound" },
+        });
+        console.log(`Auto-created lead ${leadId} for phone ${normalizedAutoPhone}, stage: ${stage}`);
+      } else {
+        console.error("Auto-create lead error:", newLeadError?.message);
+      }
+    }
 
     // === STEP 2: Process media (audio/image/document) via unified pipeline ===
     const mediaTypes = ["audio", "ptt", "image", "document"];

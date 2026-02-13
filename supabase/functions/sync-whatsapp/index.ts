@@ -416,6 +416,76 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
+    // STEP 5.1: Auto-create leads for contacts without lead_id
+    // =============================================
+    console.log("=== STEP 5.1: Auto-creating leads for unlinked contacts ===");
+    let autoCreated = 0;
+
+    // Build lead phone map
+    const leadPhoneMap = new Map<string, string>();
+    if (leads) {
+      for (const lead of leads) {
+        leadPhoneMap.set(normalizePhone(lead.phone.replace(/\D/g, "")), lead.id);
+      }
+    }
+
+    for (const [phone, info] of contactMap) {
+      const normalized = normalizePhone(phone);
+      if (leadPhoneMap.has(normalized)) continue;
+
+      // Determine stage from messages
+      const { data: msgs } = await supabase
+        .from("whatsapp_messages")
+        .select("direction")
+        .eq("phone", normalized)
+        .eq("user_id", userId)
+        .limit(50);
+
+      const hasInbound = msgs?.some((m) => m.direction === "inbound") || false;
+      const hasOutbound = msgs?.some((m) => m.direction === "outbound") || false;
+
+      let stage = "novo";
+      if (hasInbound && hasOutbound) stage = "contato_realizado";
+      else if (hasOutbound && !hasInbound) stage = "tentativa_contato";
+
+      const name = info.name || normalized;
+      const { data: newLead, error: leadError } = await supabase
+        .from("leads")
+        .insert({ user_id: userId, name, phone: normalized, stage, type: "PF" })
+        .select("id")
+        .single();
+
+      if (!leadError && newLead) {
+        leadPhoneMap.set(normalized, newLead.id);
+        autoCreated++;
+
+        // Link messages
+        await supabase
+          .from("whatsapp_messages")
+          .update({ lead_id: newLead.id })
+          .eq("phone", normalized)
+          .eq("user_id", userId)
+          .is("lead_id", null);
+
+        // Link contact
+        await supabase
+          .from("whatsapp_contacts")
+          .update({ lead_id: newLead.id })
+          .eq("phone", normalized)
+          .eq("user_id", userId);
+
+        // Log
+        await supabase.from("action_log").insert({
+          user_id: userId,
+          lead_id: newLead.id,
+          action_type: "auto_lead_created",
+          metadata: { source: "sync", phone: normalized, stage },
+        });
+      }
+    }
+    console.log(`Auto-created ${autoCreated} leads during sync`);
+
+    // =============================================
     // STEP 5.5: Process media via unified pipeline
     // =============================================
     const allMediaMessages = insertedMessages.filter(
@@ -494,6 +564,7 @@ Deno.serve(async (req) => {
       contactsSaved,
       mediaProcessed,
       totalMediaFound: allMediaMessages.length,
+      autoCreatedLeads: autoCreated,
     };
 
     console.log(`=== DONE ===`, JSON.stringify(summary));
