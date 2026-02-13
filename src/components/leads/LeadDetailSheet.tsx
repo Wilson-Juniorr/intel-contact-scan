@@ -24,6 +24,7 @@ import {
   Upload, Download, Eye, Trash2, File, Image as ImageIcon,
   FolderDown, Sparkles, Tag, Plus, Copy, Check, PhoneCall,
 } from "lucide-react";
+import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
@@ -756,13 +757,18 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <Tabs defaultValue="info" className="mt-4">
-      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-3"} h-9`}>
+      <TabsList className={`w-full grid ${isEditing ? "grid-cols-1" : "grid-cols-4"} h-9`}>
         <TabsTrigger value="info" className="text-xs gap-1">
           <Info className="h-3 w-3" /> {isEditing ? "Editando Lead" : "Info"}
         </TabsTrigger>
         {!isEditing && (
           <TabsTrigger value="observations" className="text-xs gap-1">
             <StickyNote className="h-3 w-3" /> Notas
+          </TabsTrigger>
+        )}
+        {!isEditing && (
+          <TabsTrigger value="followup" className="text-xs gap-1">
+            <PhoneCall className="h-3 w-3" /> Follow-Up
           </TabsTrigger>
         )}
         {!isEditing && (
@@ -866,6 +872,11 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
       {!isEditing && (
         <TabsContent value="observations" className="mt-3">
           <LeadObservationsPanel lead={lead} />
+        </TabsContent>
+      )}
+      {!isEditing && (
+        <TabsContent value="followup" className="mt-3">
+          <FollowUpPanel singleLeadId={lead.id} />
         </TabsContent>
       )}
       {!isEditing && (

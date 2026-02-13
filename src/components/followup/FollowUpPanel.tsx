@@ -4,13 +4,14 @@ import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-const FOLLOW_UP_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`;
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface IdleLead {
   lead: any;
@@ -26,7 +27,7 @@ function getIdleInfo(lead: any): IdleLead {
   const idleDays = Math.floor(idleHours / 24);
 
   let urgency: IdleLead["urgency"] = "low";
-  if (idleDays >= 7) urgency = "critical";
+  if (idleDays >= 5) urgency = "critical";
   else if (idleDays >= 3) urgency = "high";
   else if (idleDays >= 1) urgency = "medium";
 
@@ -46,9 +47,29 @@ function formatIdleTime(hours: number, days: number) {
   return `${days} dias parado`;
 }
 
-export function FollowUpPanel() {
-  const { leads } = useLeadsContext();
+const stagePriority: Record<string, number> = {
+  tentativa_contato: 1,
+  contato_realizado: 2,
+  cotacao_enviada: 3,
+  novo: 4,
+  cotacao_aprovada: 5,
+  documentacao_completa: 6,
+  em_emissao: 7,
+  aguardando_implantacao: 8,
+  retrabalho: 9,
+};
+
+interface FollowUpPanelProps {
+  /** When provided, show only this lead (used inside LeadDetailSheet) */
+  singleLeadId?: string;
+}
+
+export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
+  const { leads, addInteraction, updateLead } = useLeadsContext();
   const [filter, setFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -58,17 +79,37 @@ export function FollowUpPanel() {
 
   const excludedStages = ["implantado", "declinado", "cancelado"];
 
-  const idleLeads = useMemo(() => {
-    return leads
-      .filter((l) => !excludedStages.includes(l.stage))
-      .map(getIdleInfo)
-      .sort((a, b) => b.idleHours - a.idleHours);
+  const operators = useMemo(() => {
+    const ops = new Set(leads.map((l) => l.operator).filter(Boolean));
+    return Array.from(ops) as string[];
   }, [leads]);
 
+  const idleLeads = useMemo(() => {
+    let base = leads.filter((l) => !excludedStages.includes(l.stage));
+    if (singleLeadId) base = base.filter((l) => l.id === singleLeadId);
+    return base
+      .map(getIdleInfo)
+      .sort((a, b) => {
+        if (b.idleDays !== a.idleDays) return b.idleDays - a.idleDays;
+        return (stagePriority[a.lead.stage] || 99) - (stagePriority[b.lead.stage] || 99);
+      });
+  }, [leads, singleLeadId]);
+
   const filtered = useMemo(() => {
-    if (filter === "all") return idleLeads;
-    return idleLeads.filter((il) => il.urgency === filter);
-  }, [idleLeads, filter]);
+    let result = idleLeads;
+    if (filter !== "all") result = result.filter((il) => il.urgency === filter);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((il) =>
+        il.lead.name.toLowerCase().includes(q) ||
+        il.lead.phone.includes(q) ||
+        (il.lead.email && il.lead.email.toLowerCase().includes(q))
+      );
+    }
+    if (typeFilter !== "all") result = result.filter((il) => il.lead.type === typeFilter);
+    if (operatorFilter !== "all") result = result.filter((il) => il.lead.operator === operatorFilter);
+    return result;
+  }, [idleLeads, filter, searchQuery, typeFilter, operatorFilter]);
 
   const stats = useMemo(() => ({
     critical: idleLeads.filter((l) => l.urgency === "critical").length,
@@ -80,16 +121,25 @@ export function FollowUpPanel() {
   const generateMessage = async (il: IdleLead) => {
     setGeneratingFor(il.lead.id);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
+        setGeneratingFor(null);
+        return;
+      }
       const userContext = contexts[il.lead.id]?.trim() || "";
-      const resp = await fetch(FOLLOW_UP_URL, {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ lead: il.lead, idleHours: il.idleHours, idleDays: il.idleDays, userContext }),
+        body: JSON.stringify({ leadId: il.lead.id, userContext }),
       });
-      if (!resp.ok) throw new Error("Erro ao gerar mensagem");
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Erro ao gerar mensagem" }));
+        throw new Error(err.error || "Erro ao gerar mensagem");
+      }
       const data = await resp.json();
       setMessages((prev) => ({ ...prev, [il.lead.id]: data.message }));
       setEditingId(null);
@@ -114,8 +164,14 @@ export function FollowUpPanel() {
 
       if (resp.error) throw new Error(resp.error.message);
 
+      // Register interaction
+      await addInteraction({
+        lead_id: lead.id,
+        type: "whatsapp",
+        description: `[Follow-up enviado] ${message.slice(0, 120)}${message.length > 120 ? "..." : ""}`,
+      });
+
       toast({ title: "✅ Enviado!", description: `Mensagem enviada para ${lead.name} via WhatsApp` });
-      // Limpa a mensagem após envio
       setMessages((prev) => {
         const copy = { ...prev };
         delete copy[lead.id];
@@ -139,31 +195,68 @@ export function FollowUpPanel() {
   const stageLabel = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.label || key;
   const stageColor = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.color || "hsl(0,0%,50%)";
 
+  const isSingle = !!singleLeadId;
+
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total pendentes" value={stats.total} variant="default" />
-        <StatCard label="Críticos (7d+)" value={stats.critical} variant="critical" />
-        <StatCard label="Urgentes (3-7d)" value={stats.high} variant="high" />
-        <StatCard label="Atenção (1-3d)" value={stats.medium} variant="medium" />
-      </div>
+      {!isSingle && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Total pendentes" value={stats.total} variant="default" />
+          <StatCard label="Críticos (5d+)" value={stats.critical} variant="critical" />
+          <StatCard label="Urgentes (3-4d)" value={stats.high} variant="high" />
+          <StatCard label="Atenção (1-2d)" value={stats.medium} variant="medium" />
+        </div>
+      )}
 
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="h-8 w-[160px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos ({idleLeads.length})</SelectItem>
-            <SelectItem value="critical">Críticos ({stats.critical})</SelectItem>
-            <SelectItem value="high">Urgentes ({stats.high})</SelectItem>
-            <SelectItem value="medium">Atenção ({stats.medium})</SelectItem>
-            <SelectItem value="low">OK</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Filters */}
+      {!isSingle && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar nome, telefone, email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-xs"
+            />
+          </div>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos ({idleLeads.length})</SelectItem>
+              <SelectItem value="critical">Críticos ({stats.critical})</SelectItem>
+              <SelectItem value="high">Urgentes ({stats.high})</SelectItem>
+              <SelectItem value="medium">Atenção ({stats.medium})</SelectItem>
+              <SelectItem value="low">OK</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="h-8 w-[100px] text-xs">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos tipos</SelectItem>
+              <SelectItem value="PF">PF</SelectItem>
+              <SelectItem value="ADESAO">Adesão</SelectItem>
+              <SelectItem value="PME">PME</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={operatorFilter} onValueChange={setOperatorFilter}>
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Operadora" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas operadoras</SelectItem>
+              {operators.map((op) => (
+                <SelectItem key={op} value={op}>{op}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Lead list */}
       <div className="space-y-3">
@@ -178,6 +271,7 @@ export function FollowUpPanel() {
           const cfg = urgencyConfig[il.urgency];
           const Icon = cfg.icon;
           const msg = messages[il.lead.id];
+          const lastActivity = il.lead.last_contact_at || il.lead.updated_at || il.lead.created_at;
 
           return (
             <Card key={il.lead.id} className="overflow-hidden">
@@ -190,11 +284,18 @@ export function FollowUpPanel() {
                       <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: stageColor(il.lead.stage), color: stageColor(il.lead.stage) }}>
                         {stageLabel(il.lead.stage)}
                       </Badge>
+                      <Badge variant="secondary" className="text-[10px] shrink-0">
+                        {il.lead.type}
+                      </Badge>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                       <span>{il.lead.phone}</span>
                       {il.lead.operator && <span>• {il.lead.operator}</span>}
                       {il.lead.lives && <span>• {il.lead.lives} vidas</span>}
+                      {il.lead.email && <span>• {il.lead.email}</span>}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Último contato: {formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: ptBR })}
                     </div>
                   </div>
                   <Badge className={`${cfg.color} text-[10px] shrink-0 gap-1`}>
@@ -206,7 +307,7 @@ export function FollowUpPanel() {
                 {/* Context input */}
                 <div className="space-y-1.5">
                   <Textarea
-                    placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto', 'Tentei ligar 2x sem resposta')"
+                    placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto')"
                     value={contexts[il.lead.id] || ""}
                     onChange={(e) => setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
                     className="text-xs min-h-[48px] resize-none"
@@ -248,7 +349,7 @@ export function FollowUpPanel() {
                     ) : (
                       <Sparkles className="h-3.5 w-3.5" />
                     )}
-                    {msg ? "Gerar outra" : "Gerar mensagem IA"}
+                    {msg ? "Regenerar" : "Gerar mensagem IA"}
                   </Button>
 
                   {msg && (

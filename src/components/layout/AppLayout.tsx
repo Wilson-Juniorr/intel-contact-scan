@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle } from "lucide-react";
+import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle, Clock } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const navItems = [
   { title: "Leads", url: "/leads", icon: Users },
   { title: "Funil", url: "/funnel", icon: Columns3 },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
+  { title: "Follow-Up", url: "/follow-up", icon: Clock },
   { title: "Assistente IA", url: "/assistant", icon: Bot },
 ];
 

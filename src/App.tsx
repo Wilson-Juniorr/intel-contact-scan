@@ -12,6 +12,7 @@ import FunnelPage from "@/pages/FunnelPage";
 import AssistantPage from "@/pages/AssistantPage";
 import AuthPage from "@/pages/AuthPage";
 import WhatsAppPage from "@/pages/WhatsAppPage";
+import FollowUpPage from "@/pages/FollowUpPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ function ProtectedRoutes() {
           <Route path="/funnel" element={<FunnelPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/whatsapp" element={<WhatsAppPage />} />
+          <Route path="/follow-up" element={<FollowUpPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
