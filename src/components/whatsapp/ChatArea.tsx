@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Loader2, User, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
+import TemplateSelector from "./TemplateSelector";
 
 interface WhatsAppMessage {
   id: string;
@@ -28,6 +29,9 @@ interface Props {
   onSend: () => void;
   onBack: () => void;
   formatPhone: (phone: string) => string;
+  leadStage?: string;
+  leadOperator?: string;
+  leadLives?: number;
 }
 
 export default function ChatArea({
@@ -40,6 +44,9 @@ export default function ChatArea({
   onSend,
   onBack,
   formatPhone,
+  leadStage,
+  leadOperator,
+  leadLives,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +118,13 @@ export default function ChatArea({
 
             {/* Input area */}
             <div className="bg-[#202c33] px-4 py-2.5 flex items-end gap-2">
+              <TemplateSelector
+                leadStage={leadStage}
+                leadName={selectedName || undefined}
+                leadOperator={leadOperator}
+                leadLives={leadLives}
+                onSelect={(text) => onNewMessageChange(text)}
+              />
               <Textarea
                 placeholder="Mensagem"
                 value={newMessage}

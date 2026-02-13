@@ -213,11 +213,23 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
                 <Clock className="h-3 w-3 text-[#ffffff80]" />
               </motion.span>
             )}
+            {isOutbound && msg.status === "queued" && (
+              <Clock className="h-3 w-3 text-[#ffffff60]" />
+            )}
             {isOutbound && msg.status === "failed" && (
               <span className="text-[10px] text-red-400">✕</span>
             )}
-            {isOutbound && msg.status !== "sending" && msg.status !== "failed" && (
+            {isOutbound && msg.status === "sent" && (
+              <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
+            )}
+            {isOutbound && msg.status === "delivered" && (
+              <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
+            )}
+            {isOutbound && msg.status === "read" && (
               <CheckCheck className="h-[14px] w-[14px] text-[#53bdeb]" />
+            )}
+            {isOutbound && !["sending", "queued", "failed", "sent", "delivered", "read"].includes(msg.status || "") && msg.status !== "sending" && msg.status !== "failed" && (
+              <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
             )}
           </div>
         </div>

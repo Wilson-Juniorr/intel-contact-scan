@@ -184,6 +184,45 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log("Webhook RAW payload:", JSON.stringify(body).slice(0, 2000));
 
+    // ===== Handle STATUS UPDATES (message_status / ack events) =====
+    if (body.EventType === "message_status" || body.EventType === "ack" || body.event === "messages.update") {
+      const msgId = body.message?.id || body.id || body.key?.id || body.data?.key?.id || null;
+      const ackValue = body.ack ?? body.message?.ack ?? body.data?.update?.status ?? null;
+      
+      if (msgId && ackValue !== null) {
+        // UaZapi ack values: 0=error, 1=pending, 2=sent(server), 3=delivered, 4=read, 5=played
+        const statusMap: Record<number, string> = {
+          0: "failed",
+          1: "queued",
+          2: "sent",
+          3: "delivered",
+          4: "read",
+          5: "read",
+        };
+        const newStatus = typeof ackValue === "number" ? (statusMap[ackValue] || "sent") : String(ackValue);
+        
+        const { data: updated, error: updateErr } = await supabase
+          .from("whatsapp_messages")
+          .update({ status: newStatus })
+          .eq("uazapi_message_id", msgId)
+          .select("id")
+          .maybeSingle();
+
+        if (updateErr) {
+          console.error("Status update error:", updateErr.message);
+        } else if (updated) {
+          console.log(`Message ${msgId} status updated to: ${newStatus}`);
+        } else {
+          console.log(`Message ${msgId} not found for status update`);
+        }
+
+        return new Response(
+          JSON.stringify({ status: "ok", action: "status_update", newStatus }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     let phone: string | null = null;
     let content: string | null = null;
     let messageType = "text";
