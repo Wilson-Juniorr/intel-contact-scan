@@ -22,6 +22,7 @@ export interface ClosingStep {
   step_number: number;
   step_type: string;
   scheduled_at: string;
+  recommended_due_at: string | null;
   status: string;
   ai_analysis: string | null;
   generated_message: string | null;
@@ -99,6 +100,7 @@ export function useClosingSequence(leadId: string | undefined) {
     if (data?.error) throw new Error(data.error);
     queryClient.invalidateQueries({ queryKey: ["closing-sequence", leadId] });
     queryClient.invalidateQueries({ queryKey: ["closing-steps", leadId] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
     return data;
   };
 
@@ -134,6 +136,16 @@ export function useClosingSequence(leadId: string | undefined) {
     },
   });
 
+  // Compute next due step for UI
+  const nextDueStep = (stepsQuery.data || []).find(
+    (s) => (s.status === "ready" || s.status === "pending") && s.recommended_due_at
+  );
+
+  // Check if sequence is paused and idle (no inbound for X days)
+  const pausedIdleDays = sequenceQuery.data?.status === "paused" && sequenceQuery.data?.paused_at
+    ? Math.floor((Date.now() - new Date(sequenceQuery.data.paused_at).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
   return {
     sequence: sequenceQuery.data,
     steps: stepsQuery.data || [],
@@ -145,5 +157,7 @@ export function useClosingSequence(leadId: string | undefined) {
     markSent,
     regenerateStep,
     updateMessage,
+    nextDueStep,
+    pausedIdleDays,
   };
 }

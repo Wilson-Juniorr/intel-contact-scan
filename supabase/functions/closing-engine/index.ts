@@ -13,6 +13,13 @@ const STEP_CONFIG = [
   { step: 4, type: "encerramento_elegante", label: "Encerramento Elegante", dayOffset: 7 },
 ];
 
+const STEP_LABELS: Record<string, string> = {
+  reforco_valor: "Reforço de Valor",
+  tratamento_objecao: "Tratamento de Objeção",
+  direcionar_decisao: "Direcionamento de Decisão",
+  encerramento_elegante: "Encerramento Elegante",
+};
+
 const stageLabels: Record<string, string> = {
   novo: "Novo Negócio", tentativa_contato: "Tentativa de Contato",
   contato_realizado: "Contato Realizado", cotacao_enviada: "Cotação Enviada",
@@ -72,19 +79,28 @@ serve(async (req) => {
         .single();
       if (seqErr) throw seqErr;
 
-      // Create steps with scheduled dates
+      // Create steps with scheduled dates and recommended_due_at
       const now = new Date();
-      const steps = STEP_CONFIG.map((cfg) => ({
-        sequence_id: seq.id,
-        user_id: userId,
-        step_number: cfg.step,
-        step_type: cfg.type,
-        scheduled_at: new Date(now.getTime() + cfg.dayOffset * 24 * 60 * 60 * 1000).toISOString(),
-        status: cfg.step === 1 ? "ready" : "pending",
-      }));
+      const steps = STEP_CONFIG.map((cfg) => {
+        const dueDate = new Date(now.getTime() + cfg.dayOffset * 24 * 60 * 60 * 1000).toISOString();
+        return {
+          sequence_id: seq.id,
+          user_id: userId,
+          step_number: cfg.step,
+          step_type: cfg.type,
+          scheduled_at: dueDate,
+          recommended_due_at: dueDate,
+          status: cfg.step === 1 ? "ready" : "pending",
+        };
+      });
 
       const { error: stepsErr } = await supabase.from("closing_steps").insert(steps);
       if (stepsErr) throw stepsErr;
+
+      // Auto-create task for step 1
+      const lead = await supabase.from("leads").select("name").eq("id", lead_id).single();
+      const leadName = lead.data?.name || "Lead";
+      await createClosingTask(supabase, userId, lead_id, 1, "reforco_valor", steps[0].recommended_due_at, leadName);
 
       // Generate AI content for step 1
       await generateStepContent(supabase, userId, lead_id, seq.id, 1);
@@ -121,10 +137,10 @@ serve(async (req) => {
 
     // === ACTION: resume — Resume a paused sequence ===
     if (action === "resume" && sequence_id) {
-      const { data: seq } = await supabase.from("closing_sequences").select("*").eq("id", sequence_id).single();
+      const { data: seq } = await supabase.from("closing_sequences").select("*, leads!closing_sequences_lead_id_fkey(name)").eq("id", sequence_id).single();
       if (!seq) throw new Error("Sequence not found");
 
-      // Recalculate scheduled_at for pending steps based on current date
+      // Recalculate scheduled_at and recommended_due_at for pending steps
       const { data: steps } = await supabase
         .from("closing_steps")
         .select("*")
@@ -135,12 +151,18 @@ serve(async (req) => {
       if (steps && steps.length > 0) {
         const now = new Date();
         for (let i = 0; i < steps.length; i++) {
-          const cfg = STEP_CONFIG.find(c => c.step === steps[i].step_number);
-          if (cfg) {
-            const newSchedule = new Date(now.getTime() + (i + 1) * 2 * 24 * 60 * 60 * 1000).toISOString();
-            await supabase.from("closing_steps").update({ scheduled_at: newSchedule }).eq("id", steps[i].id);
-          }
+          const newSchedule = new Date(now.getTime() + (i + 1) * 2 * 24 * 60 * 60 * 1000).toISOString();
+          await supabase.from("closing_steps").update({ 
+            scheduled_at: newSchedule,
+            recommended_due_at: newSchedule,
+          }).eq("id", steps[i].id);
         }
+
+        // Create task for the first pending/ready step if none exists
+        const firstStep = steps[0];
+        const leadName = (seq as any).leads?.name || "Lead";
+        await createClosingTask(supabase, userId, seq.lead_id, firstStep.step_number, firstStep.step_type, 
+          new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(), leadName);
       }
 
       await supabase.from("closing_sequences").update({ status: "active", paused_at: null }).eq("id", sequence_id);
@@ -150,6 +172,14 @@ serve(async (req) => {
     // === ACTION: cancel ===
     if (action === "cancel" && sequence_id) {
       await supabase.from("closing_sequences").update({ status: "cancelled" }).eq("id", sequence_id);
+      
+      // Clean up open closing tasks
+      await supabase.from("tasks")
+        .delete()
+        .eq("user_id", userId)
+        .eq("status", "open")
+        .like("title", "🎯 Fechamento:%");
+      
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -157,24 +187,34 @@ serve(async (req) => {
     if (action === "mark_sent" && step_id) {
       await supabase.from("closing_steps").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", step_id);
       
-      // Advance sequence current_step
-      const { data: step } = await supabase.from("closing_steps").select("sequence_id, step_number").eq("id", step_id).single();
+      // Get step info
+      const { data: step } = await supabase.from("closing_steps").select("sequence_id, step_number, step_type").eq("id", step_id).single();
       if (step) {
+        // Mark associated task as done
+        await supabase.from("tasks")
+          .update({ status: "done" })
+          .eq("user_id", userId)
+          .eq("status", "open")
+          .like("title", `🎯 Fechamento: Etapa ${step.step_number}%`);
+
         const nextStep = step.step_number + 1;
         if (nextStep <= 4) {
           await supabase.from("closing_sequences").update({ current_step: nextStep }).eq("id", step.sequence_id);
           // Mark next step as ready and generate content
           const { data: nextStepData } = await supabase
             .from("closing_steps")
-            .select("id")
+            .select("id, step_type, recommended_due_at")
             .eq("sequence_id", step.sequence_id)
             .eq("step_number", nextStep)
             .single();
           if (nextStepData) {
             await supabase.from("closing_steps").update({ status: "ready" }).eq("id", nextStepData.id);
-            // Get lead_id for content generation
-            const { data: seqData } = await supabase.from("closing_sequences").select("lead_id").eq("id", step.sequence_id).single();
+            // Get lead_id for content generation and task creation
+            const { data: seqData } = await supabase.from("closing_sequences").select("lead_id, leads!closing_sequences_lead_id_fkey(name)").eq("id", step.sequence_id).single();
             if (seqData) {
+              const leadName = (seqData as any).leads?.name || "Lead";
+              await createClosingTask(supabase, userId, seqData.lead_id, nextStep, nextStepData.step_type, 
+                nextStepData.recommended_due_at, leadName);
               await generateStepContent(supabase, userId, seqData.lead_id, step.sequence_id, nextStep);
             }
           }
@@ -195,6 +235,31 @@ serve(async (req) => {
     });
   }
 });
+
+/** Create a closing task, avoiding duplicates */
+async function createClosingTask(supabase: any, userId: string, leadId: string, stepNumber: number, stepType: string, dueAt: string, leadName: string) {
+  const taskTitle = `🎯 Fechamento: Etapa ${stepNumber} — ${STEP_LABELS[stepType] || stepType}`;
+  
+  // Check for existing open task with same prefix to avoid duplicates
+  const { data: existing } = await supabase.from("tasks")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("user_id", userId)
+    .eq("status", "open")
+    .like("title", `🎯 Fechamento: Etapa ${stepNumber}%`)
+    .maybeSingle();
+
+  if (existing) return; // Already exists
+
+  await supabase.from("tasks").insert({
+    user_id: userId,
+    lead_id: leadId,
+    title: taskTitle,
+    notes: `Enviar mensagem de "${STEP_LABELS[stepType] || stepType}" para ${leadName}`,
+    due_at: dueAt,
+    status: "open",
+  });
+}
 
 async function generateStepContent(supabase: any, userId: string, leadId: string, sequenceId: string, stepNumber: number) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

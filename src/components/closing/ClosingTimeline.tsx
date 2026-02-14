@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useClosingSequence, getStepLabel } from "@/hooks/useClosingSequence";
+import { useTasks } from "@/hooks/useTasks";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, Pause, RotateCcw, Send, Edit3, Check, X, Sparkles, Target, Ban } from "lucide-react";
+import { Loader2, Play, Pause, RotateCcw, Send, Edit3, Check, X, Sparkles, Target, Ban, CalendarClock, Bell } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -28,7 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ClosingTimeline({ leadId, leadStage }: Props) {
-  const { sequence, steps, isLoading, startSequence, pauseSequence, resumeSequence, cancelSequence, markSent, regenerateStep, updateMessage } = useClosingSequence(leadId);
+  const { sequence, steps, isLoading, startSequence, pauseSequence, resumeSequence, cancelSequence, markSent, regenerateStep, updateMessage, nextDueStep, pausedIdleDays } = useClosingSequence(leadId);
+  const { addTask, completeTask } = useTasks(leadId);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
@@ -110,6 +112,38 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
         </div>
       </div>
 
+      {/* Next recommended action banner */}
+      {nextDueStep && nextDueStep.recommended_due_at && (
+        <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5 flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-medium text-primary">
+              Próximo envio recomendado: {format(new Date(nextDueStep.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {formatDistanceToNow(new Date(nextDueStep.recommended_due_at), { addSuffix: true, locale: ptBR })} — {getStepLabel(nextDueStep.step_type)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Paused idle suggestion */}
+      {sequence.status === "paused" && pausedIdleDays >= 3 && (
+        <div className="rounded-md border border-orange-500/20 bg-orange-500/5 p-2.5">
+          <p className="text-[11px] font-medium text-orange-600">
+            ⚠️ Pausado há {pausedIdleDays} dias sem resposta do cliente
+          </p>
+          <p className="text-[10px] text-muted-foreground mb-1.5">
+            Considere retomar a sequência com uma abordagem diferente.
+          </p>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1 border-orange-500/30 text-orange-600 hover:bg-orange-500/10"
+            onClick={() => resumeSequence.mutate(undefined, { onSuccess: () => toast.success("Retomada!"), onError: (e) => toast.error(e.message) })}
+            disabled={resumeSequence.isPending}>
+            <Play className="h-3 w-3" /> Retomar agora
+          </Button>
+        </div>
+      )}
+
       {/* Steps Timeline */}
       <div className="space-y-2">
         {steps.map((step, idx) => {
@@ -117,6 +151,7 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
           const isCurrent = step.step_number === sequence.current_step;
           const isPast = step.status === "sent";
           const isFuture = step.status === "pending";
+          const isOverdue = step.recommended_due_at && new Date(step.recommended_due_at) < new Date() && step.status !== "sent";
 
           return (
             <div
@@ -134,6 +169,11 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">{STEP_ICONS[step.step_type] || "📌"}</span>
                 <span className="text-xs font-semibold flex-1">{getStepLabel(step.step_type)}</span>
+                {isOverdue && (
+                  <Badge variant="outline" className="text-[9px] bg-destructive/10 text-destructive border-destructive/30">
+                    Atrasado
+                  </Badge>
+                )}
                 <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[step.status] || ""}`}>
                   {step.status === "sent" ? "Enviado" : step.status === "ready" ? "Pronto" : step.status === "pending" ? "Agendado" : step.status}
                 </Badge>
@@ -143,7 +183,9 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
               <div className="text-[10px] text-muted-foreground mb-2">
                 {step.sent_at
                   ? `Enviado ${format(new Date(step.sent_at), "dd/MM HH:mm", { locale: ptBR })}`
-                  : `Agendado: ${format(new Date(step.scheduled_at), "dd/MM HH:mm", { locale: ptBR })} (${formatDistanceToNow(new Date(step.scheduled_at), { addSuffix: true, locale: ptBR })})`}
+                  : step.recommended_due_at
+                  ? `Recomendado: ${format(new Date(step.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })} (${formatDistanceToNow(new Date(step.recommended_due_at), { addSuffix: true, locale: ptBR })})`
+                  : `Agendado: ${format(new Date(step.scheduled_at), "dd/MM HH:mm", { locale: ptBR })}`}
               </div>
 
               {/* AI Analysis */}
@@ -213,6 +255,31 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                       </Button>
                     </>
                   )}
+                </div>
+              )}
+
+              {/* Reminder button for pending/ready steps */}
+              {step.status !== "sent" && !isEditing && (
+                <div className="flex gap-1 mt-1.5">
+                  <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-1 text-muted-foreground hover:text-primary"
+                    onClick={async () => {
+                      try {
+                        await addTask({
+                          lead_id: leadId,
+                          title: `🎯 Fechamento: Etapa ${step.step_number} — ${getStepLabel(step.step_type)}`,
+                          due_at: step.recommended_due_at || step.scheduled_at,
+                        });
+                        toast.success("Lembrete criado!");
+                      } catch (e: any) {
+                        if (e.message?.includes("duplicate")) {
+                          toast.info("Lembrete já existe");
+                        } else {
+                          toast.error(e.message);
+                        }
+                      }
+                    }}>
+                    <Bell className="h-2.5 w-2.5" /> Criar lembrete
+                  </Button>
                 </div>
               )}
 
