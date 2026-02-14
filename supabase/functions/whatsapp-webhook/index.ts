@@ -564,6 +564,30 @@ Deno.serve(async (req) => {
         messageId,
       });
       console.log(`Lead ensured: ${leadId} for phone ${normalizedPhone}`);
+
+      // ═══ CONTACT NAME ENRICHMENT ═══
+      // If lead name is still the phone fallback, enrich from contact name
+      if (leadId && cleanContactName) {
+        const { data: currentLead } = await supabase
+          .from("leads")
+          .select("name, phone")
+          .eq("id", leadId)
+          .single();
+        if (currentLead) {
+          const leadNameDigits = currentLead.name.replace(/\D/g, "");
+          const leadPhoneNorm = normalizePhone(currentLead.phone.replace(/\D/g, ""));
+          const isPhoneFallback = leadNameDigits.length >= 10 && (
+            leadNameDigits === leadPhoneNorm ||
+            leadNameDigits === leadPhoneNorm.slice(2) ||
+            leadPhoneNorm.endsWith(leadNameDigits) ||
+            leadNameDigits.endsWith(leadPhoneNorm.slice(2))
+          );
+          if (isPhoneFallback) {
+            await supabase.from("leads").update({ name: cleanContactName }).eq("id", leadId);
+            console.log(`Lead ${leadId} name enriched: "${currentLead.name}" → "${cleanContactName}"`);
+          }
+        }
+      }
     } catch (e) {
       console.error("ensureLeadExists FAILED:", e);
       // Non-blocking: message is saved even if lead creation fails
