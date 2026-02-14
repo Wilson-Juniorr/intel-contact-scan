@@ -761,38 +761,34 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   return (
     <Tabs defaultValue="info" className="mt-4 flex flex-col flex-1 min-h-0">
-      <div className="overflow-x-auto -mx-1 px-1 pb-1">
-        <TabsList className={`inline-flex ${isEditing ? "w-auto" : "w-auto"} h-9 gap-0.5`}>
-          <TabsTrigger value="info" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-            <Info className="h-3 w-3 shrink-0" /> {isEditing ? "Editando" : "Info"}
+      {!isEditing && (
+        <div className="grid grid-cols-3 gap-1 mb-3">
+          {[
+            { value: "info", icon: <Info className="h-3.5 w-3.5" />, label: "Info" },
+            { value: "playbook", icon: <BookOpen className="h-3.5 w-3.5" />, label: "Playbook" },
+            { value: "observations", icon: <StickyNote className="h-3.5 w-3.5" />, label: "Notas" },
+            { value: "followup", icon: <PhoneCall className="h-3.5 w-3.5" />, label: "Follow-Up" },
+            { value: "closing", icon: <Target className="h-3.5 w-3.5" />, label: "Fechamento" },
+            { value: "conversation", icon: <MessageCircle className="h-3.5 w-3.5" />, label: "Conversa" },
+          ].map((tab) => (
+            <TabsList key={tab.value} className="h-auto p-0 bg-transparent">
+              <TabsTrigger
+                value={tab.value}
+                className="w-full text-[11px] gap-1.5 px-2 py-1.5 rounded-md border border-transparent data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-accent/50"
+              >
+                {tab.icon} {tab.label}
+              </TabsTrigger>
+            </TabsList>
+          ))}
+        </div>
+      )}
+      {isEditing && (
+        <TabsList className="w-full h-9 mb-3">
+          <TabsTrigger value="info" className="w-full text-xs gap-1">
+            <Info className="h-3 w-3" /> Editando
           </TabsTrigger>
-          {!isEditing && (
-            <TabsTrigger value="playbook" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-              <BookOpen className="h-3 w-3 shrink-0" /> Playbook
-            </TabsTrigger>
-          )}
-          {!isEditing && (
-            <TabsTrigger value="observations" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-              <StickyNote className="h-3 w-3 shrink-0" /> Notas
-            </TabsTrigger>
-          )}
-          {!isEditing && (
-            <TabsTrigger value="followup" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-              <PhoneCall className="h-3 w-3 shrink-0" /> Follow-Up
-            </TabsTrigger>
-          )}
-          {!isEditing && (
-            <TabsTrigger value="closing" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-              <Target className="h-3 w-3 shrink-0" /> Fechamento
-            </TabsTrigger>
-          )}
-          {!isEditing && (
-            <TabsTrigger value="conversation" className="text-[11px] gap-1 px-2.5 whitespace-nowrap">
-              <MessageCircle className="h-3 w-3 shrink-0" /> Conversa
-            </TabsTrigger>
-          )}
         </TabsList>
-      </div>
+      )}
 
       <TabsContent value="info">
         {isEditing ? (
