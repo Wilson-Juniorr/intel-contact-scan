@@ -99,6 +99,7 @@ export type Database = {
           created_at: string
           generated_message: string | null
           id: string
+          recommended_due_at: string | null
           scheduled_at: string
           sent_at: string | null
           sequence_id: string
@@ -113,6 +114,7 @@ export type Database = {
           created_at?: string
           generated_message?: string | null
           id?: string
+          recommended_due_at?: string | null
           scheduled_at: string
           sent_at?: string | null
           sequence_id: string
@@ -127,6 +129,7 @@ export type Database = {
           created_at?: string
           generated_message?: string | null
           id?: string
+          recommended_due_at?: string | null
           scheduled_at?: string
           sent_at?: string | null
           sequence_id?: string
