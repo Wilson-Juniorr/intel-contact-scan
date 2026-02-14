@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     // Get existing leads to deduplicate by phone
     const { data: existingLeads } = await supabase
       .from("leads")
-      .select("id, phone")
+      .select("id, phone, name")
       .eq("user_id", userId);
 
     const leadPhoneMap = new Map<string, string>();
@@ -88,7 +88,20 @@ Deno.serve(async (req) => {
       let leadId = leadPhoneMap.get(normalized);
 
       if (leadId) {
-        // Lead exists, just link
+        // Lead exists — enrich name if still phone fallback
+        if (contact.contact_name) {
+          const existingLead = existingLeads?.find(l => l.id === leadId);
+          if (existingLead) {
+            const nameDigits = existingLead.phone ? normalizePhone(existingLead.phone.replace(/\D/g, "")) : "";
+            const leadNameDigits = (existingLead as any).name?.replace(/\D/g, "") || "";
+            const isPhoneFallback = leadNameDigits.length >= 10 && (
+              leadNameDigits === nameDigits || nameDigits.endsWith(leadNameDigits) || leadNameDigits.endsWith(nameDigits.slice(2))
+            );
+            if (isPhoneFallback) {
+              await supabase.from("leads").update({ name: contact.contact_name }).eq("id", leadId);
+            }
+          }
+        }
         linked++;
       } else {
         // Determine initial stage based on message history

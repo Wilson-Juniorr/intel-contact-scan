@@ -540,10 +540,14 @@ Deno.serve(async (req) => {
     }
 
     // =============================================
-    // STEP 6: Backfill names + update contacts with pushNames
+    // STEP 6: Backfill names + update contacts with pushNames + ENRICH LEAD NAMES
     // =============================================
     let namesUpdated = 0;
+    let leadsEnriched = 0;
     const contactUpdates: any[] = [];
+
+    // Reload leads to get current state after auto-creation
+    const { data: allLeads } = await supabase.from("leads").select("id, phone, name");
     
     for (const [phone, info] of contactMap) {
       if (!info.name) continue;
@@ -564,6 +568,30 @@ Deno.serve(async (req) => {
         contact_name: info.name,
         updated_at: new Date().toISOString(),
       });
+
+      // ═══ LEAD NAME ENRICHMENT ═══
+      // Find lead with this phone whose name is still the phone fallback
+      if (allLeads) {
+        const normalized = normalizePhone(phone);
+        for (const lead of allLeads) {
+          const leadPhoneNorm = normalizePhone(lead.phone.replace(/\D/g, ""));
+          if (leadPhoneNorm !== normalized) continue;
+          
+          const leadNameDigits = lead.name.replace(/\D/g, "");
+          const isPhoneFallback = leadNameDigits.length >= 10 && (
+            leadNameDigits === leadPhoneNorm ||
+            leadNameDigits === leadPhoneNorm.slice(2) ||
+            leadPhoneNorm.endsWith(leadNameDigits) ||
+            leadNameDigits.endsWith(leadPhoneNorm.slice(2))
+          );
+          if (isPhoneFallback) {
+            await supabase.from("leads").update({ name: info.name }).eq("id", lead.id);
+            leadsEnriched++;
+            console.log(`Lead ${lead.id} name enriched: "${lead.name}" → "${info.name}"`);
+          }
+          break;
+        }
+      }
     }
 
     // Batch update contacts with new names
@@ -581,6 +609,7 @@ Deno.serve(async (req) => {
       totalImported: insertedCount,
       totalSkipped,
       namesUpdated,
+      leadsEnriched,
       contactsSaved,
       mediaProcessed,
       totalMediaFound: allMediaMessages.length,
