@@ -489,7 +489,7 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
       method: "POST",
       headers: aiHeaders,
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: allMessages,
         tools: userId ? CRM_TOOLS : undefined,
         stream: false,
@@ -547,7 +547,7 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
           method: "POST",
           headers: aiHeaders,
           body: JSON.stringify({
-            model: "gemini-2.0-flash-lite",
+            model: "gemini-2.5-flash-lite",
             messages: currentMessages,
             tools: CRM_TOOLS,
             stream: false,

@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [{
           role: "system",
           content: `Você é um analista de CRM de planos de saúde. Analise todo o contexto abaixo e gere:
