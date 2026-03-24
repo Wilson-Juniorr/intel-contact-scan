@@ -1,6 +1,7 @@
 import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle, Clock, Zap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { useCadence } from "@/hooks/useCadence";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
