@@ -29,6 +29,7 @@ const navItems = [
 function AppSidebarContent() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
+  const { pendingCount } = useCadence();
   const collapsed = state === "collapsed";
 
   return (
