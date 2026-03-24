@@ -69,6 +69,11 @@ function AppSidebarContent() {
                     >
                       <item.icon className="h-4.5 w-4.5 shrink-0" />
                       <span className="text-sm">{item.title}</span>
+                      {item.url === "/today" && pendingCount > 0 && (
+                        <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                          {pendingCount}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
