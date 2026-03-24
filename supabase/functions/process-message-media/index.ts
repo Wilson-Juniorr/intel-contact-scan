@@ -140,8 +140,8 @@ Texto/conteúdo extraído:
 }
 
 async function extractTextWithAI(base64: string, mimetype: string, type: "audio" | "image" | "document"): Promise<{ extractedText: string | null; semanticSummary: string | null; entities: Record<string, any> }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return { extractedText: null, semanticSummary: null, entities: {} };
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) return { extractedText: null, semanticSummary: null, entities: {} };
 
   const dataUri = `data:${mimetype};base64,${base64}`;
 
