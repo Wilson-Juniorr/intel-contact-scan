@@ -295,8 +295,8 @@ serve(async (req) => {
 
     const contextSummary = buildContextSummary(ctx);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     // Build AI prompt - either full generation or single message regeneration
     const systemPrompt = isRegenSingle
@@ -425,14 +425,14 @@ NÃO retorne nada além do JSON.`;
       ? `Contexto do lead:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nGere uma nova versão da mensagem ${regenerateIndex + 1}. Responda APENAS com o JSON.`
       : `Analise e gere follow-up Brain Pro:\n\n${contextSummary}${userContext ? `\n\nCONTEXTO DO VENDEDOR:\n${userContext}` : ""}\n\nResponda APENAS com o JSON.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.0-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

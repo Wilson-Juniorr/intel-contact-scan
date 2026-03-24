@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { text, lead_id } = body;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "AI not configured" }), { status: 500, headers: corsHeaders });
     }
 
@@ -204,14 +204,14 @@ Campos que não encontrar = null. Confidence: 0.9+ claro, 0.5-0.8 inferido, 0 n�
 HISTÓRICO COMPLETO DO LEAD:
 ${contextText.slice(0, 20000)}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.0-flash-lite",
         messages: [{ role: "user", content: prompt }],
       }),
     });

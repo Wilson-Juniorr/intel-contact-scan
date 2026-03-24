@@ -373,8 +373,8 @@ serve(async (req) => {
 
   try {
     const { messages, crmContext, fileInfo } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     const userToken = req.headers.get("x-user-token");
 
@@ -480,16 +480,16 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     ];
 
     const aiHeaders = {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${GEMINI_API_KEY}`,
       "Content-Type": "application/json",
     };
 
     // Non-streaming request with tools to detect actions
-    const firstResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const firstResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: aiHeaders,
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.0-flash-lite",
         messages: allMessages,
         tools: userId ? CRM_TOOLS : undefined,
         stream: false,
@@ -543,11 +543,11 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
         currentMessages = [...currentMessages, currentChoice.message, ...toolResults];
 
         // Check if AI wants to call more tools (non-streaming)
-        const nextResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const nextResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
           headers: aiHeaders,
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gemini-2.0-flash-lite",
             messages: currentMessages,
             tools: CRM_TOOLS,
             stream: false,
