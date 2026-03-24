@@ -480,7 +480,7 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     ];
 
     const aiHeaders = {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${GEMINI_API_KEY}`,
       "Content-Type": "application/json",
     };
 
