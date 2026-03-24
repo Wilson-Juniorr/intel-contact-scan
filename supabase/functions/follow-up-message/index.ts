@@ -295,8 +295,8 @@ serve(async (req) => {
 
     const contextSummary = buildContextSummary(ctx);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     // Build AI prompt - either full generation or single message regeneration
     const systemPrompt = isRegenSingle

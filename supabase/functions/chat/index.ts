@@ -543,11 +543,11 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
         currentMessages = [...currentMessages, currentChoice.message, ...toolResults];
 
         // Check if AI wants to call more tools (non-streaming)
-        const nextResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const nextResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
           headers: aiHeaders,
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gemini-2.0-flash-lite",
             messages: currentMessages,
             tools: CRM_TOOLS,
             stream: false,

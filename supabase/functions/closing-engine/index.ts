@@ -262,8 +262,8 @@ async function createClosingTask(supabase: any, userId: string, leadId: string, 
 }
 
 async function generateStepContent(supabase: any, userId: string, leadId: string, sequenceId: string, stepNumber: number) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return;
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) return;
 
   // Load lead + context
   const [leadRes, memoryRes, msgsRes, prevStepsRes] = await Promise.all([
