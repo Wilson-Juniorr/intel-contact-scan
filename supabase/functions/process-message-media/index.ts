@@ -105,7 +105,7 @@ async function classifyWithAI(extractedText: string, mediaType: string): Promise
       method: "POST",
       headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [{
           role: "user",
           content: `Classifique esta mensagem de WhatsApp (tipo: ${mediaType}). Retorne APENAS um JSON:
@@ -223,7 +223,7 @@ Retorne APENAS o JSON.`;
   }
 
   try {
-    const model = "gemini-2.0-flash-lite";
+    const model = "gemini-2.5-flash-lite";
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {

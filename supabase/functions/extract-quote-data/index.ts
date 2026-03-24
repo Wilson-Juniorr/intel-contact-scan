@@ -211,7 +211,7 @@ ${contextText.slice(0, 20000)}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [{ role: "user", content: prompt }],
       }),
     });
