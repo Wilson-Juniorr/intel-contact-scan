@@ -182,9 +182,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={setType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                   <SelectContent>
+                  <SelectContent>
                     <SelectItem value="PF">Pessoa Física</SelectItem>
-                    <SelectItem value="ADESAO">Adesão</SelectItem>
+                    <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>
