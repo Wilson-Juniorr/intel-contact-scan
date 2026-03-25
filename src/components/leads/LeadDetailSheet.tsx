@@ -138,7 +138,7 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
               <SelectItem value="_none">Nenhum</SelectItem>
               <SelectItem value="Individual">Individual</SelectItem>
               <SelectItem value="Familiar">Familiar</SelectItem>
-              <SelectItem value="Adesão">Adesão</SelectItem>
+              <SelectItem value="Empresarial">Empresarial</SelectItem>
               <SelectItem value="PME">PME</SelectItem>
             </SelectContent>
           </Select>

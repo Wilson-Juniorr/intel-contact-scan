@@ -217,7 +217,7 @@ export default function FunnelPage() {
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
-              <SelectItem value="ADESAO">Adesão</SelectItem>
+              <SelectItem value="PJ">PJ</SelectItem>
               <SelectItem value="PME">PME</SelectItem>
             </SelectContent>
           </Select>

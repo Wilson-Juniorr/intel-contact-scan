@@ -23,7 +23,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
     ? formatDistanceToNow(new Date(lead.last_contact_at), { addSuffix: false, locale: ptBR })
     : null;
 
-  const typeLabel = lead.type === "ADESAO" ? "Adesão" : lead.type === "PME" ? "PME" : "PF";
+  const typeLabel = lead.type === "PJ" ? "PJ" : lead.type === "PME" ? "PME" : "PF";
   const estimatedValue = lead.lives ? lead.lives * 120 : null;
 
   const goal = 6;
