@@ -153,6 +153,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Lead</DialogTitle>
+          <DialogDescription>Cadastre um novo lead manualmente ou por imagem.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="manual" value={activeTab} onValueChange={setActiveTab}>
