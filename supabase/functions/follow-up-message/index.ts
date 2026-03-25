@@ -52,7 +52,7 @@ interface LeadContext {
 
 function buildContextSummary(ctx: LeadContext): string {
   const lines: string[] = [];
-  lines.push(`LEAD: ${ctx.name} | Etapa: ${ctx.stageLabel} | Tipo: ${ctx.type === "PF" ? "Pessoa Física" : ctx.type === "PME" ? "PME" : "Adesão"}`);
+  lines.push(`LEAD: ${ctx.name} | Etapa: ${ctx.stageLabel} | Tipo: ${ctx.type === "PF" ? "Pessoa Física" : ctx.type === "PJ" ? "Pessoa Jurídica" : "PME"}`);
   lines.push(`Operadora: ${ctx.operator || "não definida"} | Vidas: ${ctx.lives || "?"} | Parado: ${ctx.idleDays}d (${ctx.idleHours}h)`);
   lines.push(`Aguardando resposta: ${ctx.waitingReply ? "SIM" : "NÃO"}`);
   
