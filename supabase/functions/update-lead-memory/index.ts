@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
 2. Um JSON ESTRUTURADO (structured_json) com:
 {
-  "modalidade": "PF|PME|Adesão",
+  "modalidade": "PF|PJ|PME",
   "vidas": number|null,
   "orcamento": "faixa ou valor mencionado"|null,
   "rede_hospitais": ["hospitais/redes pedidos"],

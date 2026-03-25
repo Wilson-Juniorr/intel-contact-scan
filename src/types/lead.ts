@@ -1,6 +1,6 @@
-export type LeadType = "PF" | "ADESAO" | "PME";
+export type LeadType = "PF" | "PJ" | "PME";
 
-export type PlanType = "Individual" | "Familiar" | "Adesão" | "PME";
+export type PlanType = "Individual" | "Familiar" | "Empresarial" | "PME";
 
 export type FunnelStage =
   | "novo"

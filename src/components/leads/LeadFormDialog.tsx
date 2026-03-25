@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -152,6 +153,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo Lead</DialogTitle>
+          <DialogDescription>Cadastre um novo lead manualmente ou por imagem.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="manual" value={activeTab} onValueChange={setActiveTab}>
@@ -180,9 +182,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={setType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                   <SelectContent>
+                  <SelectContent>
                     <SelectItem value="PF">Pessoa Física</SelectItem>
-                    <SelectItem value="ADESAO">Adesão</SelectItem>
+                    <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>
@@ -194,7 +196,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                   <SelectContent>
                     <SelectItem value="Individual">Individual</SelectItem>
                     <SelectItem value="Familiar">Familiar</SelectItem>
-                    <SelectItem value="Adesão">Adesão</SelectItem>
+                    <SelectItem value="Empresarial">Empresarial</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>

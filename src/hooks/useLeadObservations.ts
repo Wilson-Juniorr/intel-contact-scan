@@ -23,7 +23,7 @@ export const DOC_CATEGORIES = [
 
 const CHECKLIST_BY_TYPE: Record<string, string[]> = {
   PF: ["RG / CPF", "Comprovante de Residência", "Cartão SUS", "Declaração de Saúde", "Proposta Assinada"],
-  ADESAO: ["RG / CPF", "Comprovante de Residência", "Cartão SUS", "Declaração de Saúde", "Carta de Adesão", "Comprovante de Vínculo"],
+  PJ: ["Contrato Social", "Cartão CNPJ", "RG / CPF dos Titulares", "Declaração de Saúde", "Carta de Adesão", "Comprovante de Vínculo", "Proposta Assinada"],
   PME: ["Contrato Social", "Cartão CNPJ", "RG / CPF dos Titulares", "Declaração de Saúde", "Relação de Beneficiários", "Proposta Assinada"],
 };
 

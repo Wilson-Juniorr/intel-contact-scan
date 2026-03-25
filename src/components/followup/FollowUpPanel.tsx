@@ -373,7 +373,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             <SelectContent>
               <SelectItem value="all">Todos tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
-              <SelectItem value="ADESAO">Adesão</SelectItem>
+              <SelectItem value="PJ">PJ</SelectItem>
               <SelectItem value="PME">PME</SelectItem>
             </SelectContent>
           </Select>
