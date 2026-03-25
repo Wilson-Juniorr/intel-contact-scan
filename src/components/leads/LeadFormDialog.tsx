@@ -196,7 +196,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                   <SelectContent>
                     <SelectItem value="Individual">Individual</SelectItem>
                     <SelectItem value="Familiar">Familiar</SelectItem>
-                    <SelectItem value="Adesão">Adesão</SelectItem>
+                    <SelectItem value="Empresarial">Empresarial</SelectItem>
                     <SelectItem value="PME">PME</SelectItem>
                   </SelectContent>
                 </Select>
