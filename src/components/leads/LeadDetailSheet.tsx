@@ -123,9 +123,9 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
           <Label className="text-xs">Tipo</Label>
           <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
             <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
+             <SelectContent>
               <SelectItem value="PF">Pessoa Física</SelectItem>
-              <SelectItem value="ADESAO">Adesão</SelectItem>
+              <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
               <SelectItem value="PME">PME</SelectItem>
             </SelectContent>
           </Select>
