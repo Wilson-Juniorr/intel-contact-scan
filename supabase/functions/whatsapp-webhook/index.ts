@@ -32,9 +32,24 @@ async function ensureLeadExists(
     isFromMe: boolean;
     messageId?: string;
   }
-): Promise<string> {
+): Promise<string | null> {
   const normalized = normalizePhone(phone);
   const variants = phoneVariants(phone);
+
+  // Check if contact is marked as personal — skip lead creation
+  for (const v of variants) {
+    const { data: personalContact } = await supabase
+      .from("whatsapp_contacts")
+      .select("is_personal")
+      .eq("phone", v)
+      .eq("user_id", userId)
+      .eq("is_personal", true)
+      .maybeSingle();
+    if (personalContact) {
+      console.log(`Skipping lead creation for personal contact: ${normalized}`);
+      return null;
+    }
+  }
 
   // Step 1: Find existing lead (check all phone variants)
   const { data: leads } = await supabase

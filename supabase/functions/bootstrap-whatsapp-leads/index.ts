@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     // Get all contacts without lead_id
     const { data: contacts, error: contactsError } = await supabase
       .from("whatsapp_contacts")
-      .select("id, phone, contact_name, lead_id")
+      .select("id, phone, contact_name, lead_id, is_personal")
       .eq("user_id", userId);
 
     if (contactsError) throw new Error(contactsError.message);
