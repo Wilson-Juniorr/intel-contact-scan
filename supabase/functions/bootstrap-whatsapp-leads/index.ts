@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
           totalContacts: allContacts.length,
           withLeadId: withLead.length,
           toCreate: withoutLead.length,
+          personal: personalCount,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
