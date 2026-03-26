@@ -621,6 +621,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           id: string
+          is_personal: boolean
           lead_id: string | null
           phone: string
           updated_at: string
@@ -630,6 +631,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           id?: string
+          is_personal?: boolean
           lead_id?: string | null
           phone: string
           updated_at?: string
@@ -639,6 +641,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           id?: string
+          is_personal?: boolean
           lead_id?: string | null
           phone?: string
           updated_at?: string

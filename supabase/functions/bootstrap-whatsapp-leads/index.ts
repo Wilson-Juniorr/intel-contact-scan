@@ -43,14 +43,15 @@ Deno.serve(async (req) => {
     // Get all contacts without lead_id
     const { data: contacts, error: contactsError } = await supabase
       .from("whatsapp_contacts")
-      .select("id, phone, contact_name, lead_id")
+      .select("id, phone, contact_name, lead_id, is_personal")
       .eq("user_id", userId);
 
     if (contactsError) throw new Error(contactsError.message);
 
     const allContacts = contacts || [];
     const withLead = allContacts.filter((c) => c.lead_id);
-    const withoutLead = allContacts.filter((c) => !c.lead_id);
+    const withoutLead = allContacts.filter((c) => !c.lead_id && !c.is_personal);
+    const personalCount = allContacts.filter((c) => c.is_personal).length;
 
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dryRun === true;
@@ -61,6 +62,7 @@ Deno.serve(async (req) => {
           totalContacts: allContacts.length,
           withLeadId: withLead.length,
           toCreate: withoutLead.length,
+          personal: personalCount,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

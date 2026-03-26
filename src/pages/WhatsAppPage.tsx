@@ -25,6 +25,7 @@ interface WhatsAppMessage {
 interface WhatsAppContact {
   phone: string;
   contact_name: string | null;
+  is_personal: boolean;
 }
 
 interface ConversationSummary {
@@ -35,6 +36,7 @@ interface ConversationSummary {
   lastMessageAt: string;
   messageCount: number;
   unreadCount: number;
+  isPersonal: boolean;
 }
 
 export default function WhatsAppPage() {
@@ -95,12 +97,12 @@ export default function WhatsAppPage() {
     while (true) {
       const { data, error } = await supabase
         .from("whatsapp_contacts")
-        .select("phone, contact_name")
+        .select("phone, contact_name, is_personal")
         .order("contact_name", { ascending: true })
         .range(offset, offset + pageSize - 1);
       
       if (error) { console.error("Error fetching contacts:", error); break; }
-      if (data && data.length > 0) allContacts.push(...data);
+      if (data && data.length > 0) allContacts.push(...(data as WhatsAppContact[]));
       if (!data || data.length < pageSize) break;
       offset += pageSize;
     }
@@ -150,11 +152,15 @@ export default function WhatsAppPage() {
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
     
-    // Build a contact name lookup
+    // Build contact name + personal lookup
     const contactNameMap = new Map<string, string>();
+    const personalSet = new Set<string>();
     for (const contact of contacts) {
       if (contact.contact_name) {
         contactNameMap.set(contact.phone, contact.contact_name);
+      }
+      if (contact.is_personal) {
+        personalSet.add(contact.phone);
       }
     }
 
@@ -174,6 +180,7 @@ export default function WhatsAppPage() {
         lastMessageAt: new Date(0).toISOString(),
         messageCount: 0,
         unreadCount: 0,
+        isPersonal: contact.is_personal,
       });
     }
 
@@ -197,6 +204,7 @@ export default function WhatsAppPage() {
           lastMessageAt: msg.created_at,
           messageCount: 1,
           unreadCount: msg.direction === "inbound" && msg.status !== "read" ? 1 : 0,
+          isPersonal: personalSet.has(msg.phone),
         });
       } else {
         existing.messageCount++;
@@ -250,6 +258,27 @@ export default function WhatsAppPage() {
   const selectedLead = selectedConversation?.leadId
     ? leads.find((l) => l.id === selectedConversation.leadId)
     : null;
+
+  const handleTogglePersonal = async (phone: string, isPersonal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("whatsapp_contacts")
+        .update({ is_personal: isPersonal })
+        .eq("phone", phone);
+      if (error) throw error;
+      setContacts((prev) =>
+        prev.map((c) => (c.phone === phone ? { ...c, is_personal: isPersonal } : c))
+      );
+      toast({
+        title: isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal",
+        description: isPersonal
+          ? "Este contato não será criado como lead automaticamente"
+          : "Este contato poderá ser criado como lead",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedPhone) return;
@@ -378,6 +407,8 @@ export default function WhatsAppPage() {
           leadLives={selectedLead?.lives || undefined}
           leadId={selectedConversation?.leadId}
           leadType={selectedLead?.type}
+          isPersonal={selectedConversation?.isPersonal || false}
+          onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
         />
       </div>
     </motion.div>

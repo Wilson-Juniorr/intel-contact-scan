@@ -12,6 +12,7 @@ interface ConversationSummary {
   lastMessageAt: string;
   messageCount: number;
   unreadCount: number;
+  isPersonal: boolean;
 }
 
 interface Props {
@@ -83,6 +84,11 @@ export default function ConversationList({
                     <span className="text-[#e9edef] text-[15px] truncate">
                       {conv.leadName || formatPhone(conv.phone)}
                     </span>
+                    {conv.isPersonal && (
+                      <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-medium shrink-0">
+                        Pessoal
+                      </span>
+                    )}
                     <span className="text-[11px] text-[#8696a0] shrink-0">
                       {conv.messageCount > 0
                         ? formatDistanceToNow(new Date(conv.lastMessageAt), {
