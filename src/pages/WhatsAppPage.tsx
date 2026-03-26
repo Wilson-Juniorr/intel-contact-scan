@@ -204,6 +204,7 @@ export default function WhatsAppPage() {
           lastMessageAt: msg.created_at,
           messageCount: 1,
           unreadCount: msg.direction === "inbound" && msg.status !== "read" ? 1 : 0,
+          isPersonal: personalSet.has(msg.phone),
         });
       } else {
         existing.messageCount++;
