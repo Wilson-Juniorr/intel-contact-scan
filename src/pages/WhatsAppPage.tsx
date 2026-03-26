@@ -149,6 +149,14 @@ export default function WhatsAppPage() {
   // Build conversation summaries - include ALL contacts
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
+    
+    // Build a contact name lookup
+    const contactNameMap = new Map<string, string>();
+    for (const contact of contacts) {
+      if (contact.contact_name) {
+        contactNameMap.set(contact.phone, contact.contact_name);
+      }
+    }
 
     // First, add all contacts (even without messages)
     for (const contact of contacts) {
