@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
 
     const allContacts = contacts || [];
     const withLead = allContacts.filter((c) => c.lead_id);
-    const withoutLead = allContacts.filter((c) => !c.lead_id);
+    const withoutLead = allContacts.filter((c) => !c.lead_id && !c.is_personal);
+    const personalCount = allContacts.filter((c) => c.is_personal).length;
 
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dryRun === true;
