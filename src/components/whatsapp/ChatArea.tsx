@@ -35,6 +35,8 @@ interface Props {
   leadLives?: number;
   leadId?: string | null;
   leadType?: string;
+  isPersonal?: boolean;
+  onTogglePersonal?: (val: boolean) => void;
 }
 
 export default function ChatArea({
