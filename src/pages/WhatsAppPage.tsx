@@ -152,11 +152,15 @@ export default function WhatsAppPage() {
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
     
-    // Build a contact name lookup
+    // Build contact name + personal lookup
     const contactNameMap = new Map<string, string>();
+    const personalSet = new Set<string>();
     for (const contact of contacts) {
       if (contact.contact_name) {
         contactNameMap.set(contact.phone, contact.contact_name);
+      }
+      if (contact.is_personal) {
+        personalSet.add(contact.phone);
       }
     }
 
