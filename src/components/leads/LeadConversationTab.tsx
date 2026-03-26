@@ -16,7 +16,7 @@ interface Props {
   leadId?: string | null;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 1000;
 
 export function LeadConversationTab({ leadPhone, leadName, compact = false, leadId }: Props) {
   const { user } = useAuth();
@@ -26,28 +26,37 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [allMessages, setAllMessages] = useState<any[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
 
   const { totalAttempts, responseRate, avgResponseTimeMin, isLoading: attemptsLoading } =
     useContactAttempts(leadPhone);
 
-  // Initial load: last PAGE_SIZE messages
+  // Load ALL messages using pagination
   const messagesQuery = useQuery({
-    queryKey: ["lead_conversation", normalizedPhone, 0],
+    queryKey: ["lead_conversation", normalizedPhone, "all"],
     queryFn: async () => {
-      const { data, error, count } = await supabase
-        .from("whatsapp_messages")
-        .select("*", { count: "exact" })
-        .eq("phone", normalizedPhone)
-        .order("created_at", { ascending: false })
-        .range(0, PAGE_SIZE - 1);
-      if (error) throw error;
-      const msgs = (data || []).reverse();
-      setAllMessages(msgs);
-      setHasMore((count || 0) > PAGE_SIZE);
-      return msgs;
+      const allMsgs: any[] = [];
+      let offset = 0;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from("whatsapp_messages")
+          .select("*")
+          .eq("phone", normalizedPhone)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        
+        if (error) throw error;
+        if (data && data.length > 0) allMsgs.push(...data);
+        if (!data || data.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      
+      setAllMessages(allMsgs);
+      setHasMore(false);
+      return allMsgs;
     },
     enabled: !!user && !!cleanPhone,
   });
