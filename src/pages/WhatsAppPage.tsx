@@ -192,7 +192,7 @@ export default function WhatsAppPage() {
         map.set(msg.phone, {
           phone: msg.phone,
           leadId: msg.lead_id || lead?.id || null,
-          leadName: lead?.name || msg.contact_name || null,
+          leadName: lead?.name || contactNameMap.get(msg.phone) || msg.contact_name || null,
           lastMessage: msg.content,
           lastMessageAt: msg.created_at,
           messageCount: 1,
