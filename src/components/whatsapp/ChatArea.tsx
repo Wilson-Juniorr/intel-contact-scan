@@ -54,6 +54,8 @@ export default function ChatArea({
   leadLives,
   leadId,
   leadType,
+  isPersonal = false,
+  onTogglePersonal,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAIRewrite, setShowAIRewrite] = useState(false);
