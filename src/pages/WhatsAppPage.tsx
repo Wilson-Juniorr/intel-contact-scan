@@ -88,14 +88,24 @@ export default function WhatsAppPage() {
   };
 
   const fetchContacts = async () => {
-    const { data, error } = await supabase
-      .from("whatsapp_contacts")
-      .select("phone, contact_name")
-      .order("contact_name", { ascending: true });
+    const allContacts: WhatsAppContact[] = [];
+    let offset = 0;
+    const pageSize = 1000;
     
-    if (!error && data) {
-      setContacts(data);
+    while (true) {
+      const { data, error } = await supabase
+        .from("whatsapp_contacts")
+        .select("phone, contact_name")
+        .order("contact_name", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      
+      if (error) { console.error("Error fetching contacts:", error); break; }
+      if (data && data.length > 0) allContacts.push(...data);
+      if (!data || data.length < pageSize) break;
+      offset += pageSize;
     }
+    
+    setContacts(allContacts);
   };
 
   useEffect(() => {
@@ -139,6 +149,14 @@ export default function WhatsAppPage() {
   // Build conversation summaries - include ALL contacts
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
+    
+    // Build a contact name lookup
+    const contactNameMap = new Map<string, string>();
+    for (const contact of contacts) {
+      if (contact.contact_name) {
+        contactNameMap.set(contact.phone, contact.contact_name);
+      }
+    }
 
     // First, add all contacts (even without messages)
     for (const contact of contacts) {
@@ -174,7 +192,7 @@ export default function WhatsAppPage() {
         map.set(msg.phone, {
           phone: msg.phone,
           leadId: msg.lead_id || lead?.id || null,
-          leadName: lead?.name || msg.contact_name || null,
+          leadName: lead?.name || contactNameMap.get(msg.phone) || msg.contact_name || null,
           lastMessage: msg.content,
           lastMessageAt: msg.created_at,
           messageCount: 1,
