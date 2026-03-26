@@ -92,15 +92,35 @@ export default function ChatArea({
                 <User className="h-5 w-5 text-[#cfd9df]" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[#e9edef] text-[15px] font-medium truncate">
-                  {selectedName || formatPhone(selectedPhone)}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[#e9edef] text-[15px] font-medium truncate">
+                    {selectedName || formatPhone(selectedPhone)}
+                  </p>
+                  {isPersonal && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
+                      Pessoal
+                    </span>
+                  )}
+                </div>
                 <p className="text-[12px] text-[#8696a0]">
                   {selectedName
                     ? formatPhone(selectedPhone)
                     : `${messages.length} mensagens`}
                 </p>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 shrink-0 rounded-full transition-colors ${
+                  isPersonal
+                    ? "text-amber-400 hover:text-amber-300 hover:bg-[#2a3942]"
+                    : "text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                }`}
+                title={isPersonal ? "Desmarcar como pessoal" : "Marcar como pessoal (não cria lead)"}
+                onClick={() => onTogglePersonal?.(!isPersonal)}
+              >
+                {isPersonal ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+              </Button>
             </div>
 
             {/* Messages area with WhatsApp wallpaper pattern */}
