@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Loader2, User, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Send, Loader2, User, MessageCircle, Sparkles, UserX, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
 import TemplateSelector from "./TemplateSelector";
