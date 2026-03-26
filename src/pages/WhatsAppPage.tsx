@@ -180,6 +180,7 @@ export default function WhatsAppPage() {
         lastMessageAt: new Date(0).toISOString(),
         messageCount: 0,
         unreadCount: 0,
+        isPersonal: contact.is_personal,
       });
     }
 
