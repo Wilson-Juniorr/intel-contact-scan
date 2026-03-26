@@ -96,12 +96,12 @@ export default function WhatsAppPage() {
     while (true) {
       const { data, error } = await supabase
         .from("whatsapp_contacts")
-        .select("phone, contact_name")
+        .select("phone, contact_name, is_personal")
         .order("contact_name", { ascending: true })
         .range(offset, offset + pageSize - 1);
       
       if (error) { console.error("Error fetching contacts:", error); break; }
-      if (data && data.length > 0) allContacts.push(...data);
+      if (data && data.length > 0) allContacts.push(...(data as WhatsAppContact[]));
       if (!data || data.length < pageSize) break;
       offset += pageSize;
     }
