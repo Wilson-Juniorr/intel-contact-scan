@@ -407,6 +407,8 @@ export default function WhatsAppPage() {
           leadLives={selectedLead?.lives || undefined}
           leadId={selectedConversation?.leadId}
           leadType={selectedLead?.type}
+          isPersonal={selectedConversation?.isPersonal || false}
+          onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
         />
       </div>
     </motion.div>
