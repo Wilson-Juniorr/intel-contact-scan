@@ -259,6 +259,27 @@ export default function WhatsAppPage() {
     ? leads.find((l) => l.id === selectedConversation.leadId)
     : null;
 
+  const handleTogglePersonal = async (phone: string, isPersonal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("whatsapp_contacts")
+        .update({ is_personal: isPersonal })
+        .eq("phone", phone);
+      if (error) throw error;
+      setContacts((prev) =>
+        prev.map((c) => (c.phone === phone ? { ...c, is_personal: isPersonal } : c))
+      );
+      toast({
+        title: isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal",
+        description: isPersonal
+          ? "Este contato não será criado como lead automaticamente"
+          : "Este contato poderá ser criado como lead",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedPhone) return;
     const messageText = newMessage.trim();
