@@ -12,6 +12,7 @@ interface ConversationSummary {
   lastMessageAt: string;
   messageCount: number;
   unreadCount: number;
+  isPersonal: boolean;
 }
 
 interface Props {
