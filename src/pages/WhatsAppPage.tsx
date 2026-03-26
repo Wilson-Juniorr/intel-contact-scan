@@ -25,6 +25,7 @@ interface WhatsAppMessage {
 interface WhatsAppContact {
   phone: string;
   contact_name: string | null;
+  is_personal: boolean;
 }
 
 interface ConversationSummary {
