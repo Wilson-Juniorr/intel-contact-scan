@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { checkAndTrackUsage, recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
@@ -27,6 +28,13 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const userId = claimsData.claims.sub;
+
+    const usageCheck = await checkAndTrackUsage(userId, "suggest-tasks");
+    if (!usageCheck.allowed) {
+      return new Response(JSON.stringify({ error: usageCheck.error, code: "AI_LIMIT_REACHED" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { leadId } = await req.json();
     if (!leadId) throw new Error("leadId é obrigatório");
@@ -124,6 +132,7 @@ Responda APENAS em JSON válido, sem markdown:
     }
 
     const aiData = await response.json();
+    await recordUsage(usageCheck.supabaseAdmin, userId, "suggest-tasks", aiData);
     let content = aiData.choices?.[0]?.message?.content || "{}";
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 
