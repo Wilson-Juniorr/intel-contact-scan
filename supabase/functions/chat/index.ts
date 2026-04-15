@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkAndTrackUsage, recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
@@ -403,6 +404,15 @@ serve(async (req) => {
     }
     userId = claimsData.claims.sub;
 
+    // Check usage limits
+    const usageCheck = await checkAndTrackUsage(userId, "chat");
+    if (!usageCheck.allowed) {
+      return new Response(JSON.stringify({ error: usageCheck.error, code: "AI_LIMIT_REACHED" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const usageAdmin = usageCheck.supabaseAdmin;
+
     const fileContext = fileInfo
       ? `\n\n## ARQUIVO ENVIADO PELO USUÁRIO:\nNome: ${fileInfo.file_name}\nTipo: ${fileInfo.file_type}\nTamanho: ${fileInfo.file_size ? Math.round(fileInfo.file_size / 1024) + "KB" : "?"}\n\nPergunte ao usuário a qual lead este documento pertence e qual a categoria (RG/CPF, Comprovante de Residência, Cartão SUS, Contrato Social, Proposta, Declaração de Saúde, Outros).`
       : "";
@@ -527,6 +537,7 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     }
 
     const firstResult = await firstResponse.json();
+    await recordUsage(usageAdmin, userId!, "chat", firstResult);
     const choice = firstResult.choices?.[0];
 
     // Tool calls detected - execute in a loop (supports multi-step: search → confirm → execute)

@@ -2,6 +2,7 @@ import { FunnelCard } from "./FunnelCard";
 import type { FunnelStage } from "@/types/lead";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatBRLShort } from "@/lib/currency";
+import { useMemo, memo } from "react";
 
 interface StageInfo {
   key: FunnelStage;
@@ -39,12 +40,13 @@ export function FunnelColumn({
   onDeleteLead,
   onMoveStage,
 }: Props) {
-  const totalValue = leads.reduce((sum, l) => {
-    if (l.approved_value) return sum + Number(l.approved_value);
-    if (l.quote_min_value) return sum + Number(l.quote_min_value);
-    return sum + (l.lives ? l.lives * 120 : 0);
-  }, 0);
-  const weightedValue = Math.round((totalValue * stage.weight) / 100);
+  const totalValue = useMemo(() =>
+    leads.reduce((sum, l) => {
+      if (l.approved_value) return sum + Number(l.approved_value);
+      if (l.quote_min_value) return sum + Number(l.quote_min_value);
+      return sum + (l.lives ? l.lives * 120 : 0);
+    }, 0), [leads]);
+  const weightedValue = useMemo(() => Math.round((totalValue * stage.weight) / 100), [totalValue, stage.weight]);
 
   const formatCurrency = (v: number) => formatBRLShort(v);
 

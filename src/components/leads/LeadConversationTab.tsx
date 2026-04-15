@@ -25,7 +25,7 @@ interface Props {
   leadId?: string | null;
 }
 
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 50;
 
 export function LeadConversationTab({ leadPhone, leadName, compact = false, leadId }: Props) {
   const { user } = useAuth();
@@ -35,9 +35,9 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [allMessages, setAllMessages] = useState<any[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
+  const [initialLoad, setInitialLoad] = useState(true);
 
   const {
     totalAttempts,
@@ -46,32 +46,34 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
     isLoading: attemptsLoading,
   } = useContactAttempts(leadPhone);
 
-  // Load ALL messages using pagination
+  // Load latest PAGE_SIZE messages initially
   const messagesQuery = useQuery({
-    queryKey: ["lead_conversation", normalizedPhone, "all"],
+    queryKey: ["lead_conversation", normalizedPhone, "initial"],
     queryFn: async () => {
-      const allMsgs: any[] = [];
-      let offset = 0;
+      // Get total count first
+      const { count } = await supabase
+        .from("whatsapp_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("phone", normalizedPhone);
 
-      while (true) {
-        const { data, error } = await supabase
-          .from("whatsapp_messages")
-          .select("*")
-          .eq("phone", normalizedPhone)
-          .order("created_at", { ascending: true })
-          .range(offset, offset + PAGE_SIZE - 1);
+      const total = count || 0;
+      const from = Math.max(0, total - PAGE_SIZE);
 
-        if (error) throw error;
-        if (data && data.length > 0) allMsgs.push(...data);
-        if (!data || data.length < PAGE_SIZE) break;
-        offset += PAGE_SIZE;
-      }
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .select("*")
+        .eq("phone", normalizedPhone)
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
 
-      setAllMessages(allMsgs);
-      setHasMore(false);
-      return allMsgs;
+      if (error) throw error;
+      const msgs = data || [];
+      setAllMessages(msgs);
+      setHasMore(from > 0);
+      setInitialLoad(false);
+      return msgs;
     },
-    enabled: !!user && !!cleanPhone,
+    enabled: !!user && !!clean,
   });
 
   // Scroll to bottom on initial load
@@ -124,29 +126,40 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
     };
   }, [user, normalizedPhone]);
 
-  // Load older messages
+  // Load older messages with scroll position preservation
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const nextPage = page + 1;
-    const from = nextPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+
+    const container = containerRef.current;
+    const prevScrollHeight = container?.scrollHeight || 0;
+
+    // Get the oldest message we have and load PAGE_SIZE before it
+    const oldestDate = allMessages[0]?.created_at;
+    if (!oldestDate) { setLoadingMore(false); return; }
 
     const { data, error } = await supabase
       .from("whatsapp_messages")
       .select("*")
       .eq("phone", normalizedPhone)
+      .lt("created_at", oldestDate)
       .order("created_at", { ascending: false })
-      .range(from, to);
+      .limit(PAGE_SIZE);
 
     if (!error && data) {
       const older = data.reverse();
       setAllMessages((prev) => [...older, ...prev]);
       setHasMore(data.length === PAGE_SIZE);
-      setPage(nextPage);
+
+      // Preserve scroll position after prepending
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - prevScrollHeight;
+        }
+      });
     }
     setLoadingMore(false);
-  }, [loadingMore, hasMore, page, normalizedPhone]);
+  }, [loadingMore, hasMore, allMessages, normalizedPhone]);
 
   if (messagesQuery.isLoading) {
     return (

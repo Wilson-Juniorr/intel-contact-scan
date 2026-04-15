@@ -49,6 +49,39 @@ export type Database = {
           },
         ]
       }
+      api_usage: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number | null
+          function_name: string
+          id: string
+          input_tokens: number | null
+          model: string | null
+          output_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number | null
+          function_name: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number | null
+          function_name?: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       closing_sequences: {
         Row: {
           completed_at: string | null
@@ -633,6 +666,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_settings: {
+        Row: {
+          ai_enabled: boolean | null
+          created_at: string
+          daily_token_limit: number | null
+          display_name: string | null
+          id: string
+          monthly_token_limit: number | null
+          notification_browser: boolean | null
+          notification_sound: boolean | null
+          onboarding_completed: boolean | null
+          onboarding_step: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          created_at?: string
+          daily_token_limit?: number | null
+          display_name?: string | null
+          id?: string
+          monthly_token_limit?: number | null
+          notification_browser?: boolean | null
+          notification_sound?: boolean | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          created_at?: string
+          daily_token_limit?: number | null
+          display_name?: string | null
+          id?: string
+          monthly_token_limit?: number | null
+          notification_browser?: boolean | null
+          notification_sound?: boolean | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       whatsapp_contacts: {
         Row: {
