@@ -1,4 +1,5 @@
 import type { FunnelStage } from "@/types/lead";
+import { cleanPhone, buildWhatsAppUrl as buildWaUrl } from "@/lib/phone";
 
 export const CADENCE_RULES: Record<string, number> = {
   novo: 0,
@@ -88,10 +89,8 @@ export function classifyLeads(leads: any[]): {
 }
 
 export function buildWhatsAppUrl(phone: string, stage: string, name: string): string {
-  const { cleanPhone, normalizePhone } = require("@/lib/phone");
-  const clean = phone.replace(/\D/g, "");
   const template = WHATSAPP_MESSAGES[stage] || WHATSAPP_MESSAGES.novo;
   const firstName = name.split(" ")[0];
   const message = template.replace("{nome}", firstName);
-  return `https://wa.me/55${clean}?text=${encodeURIComponent(message)}`;
+  return buildWaUrl(phone, message);
 }
