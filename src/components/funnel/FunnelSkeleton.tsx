@@ -13,8 +13,11 @@ export function FunnelSkeleton() {
           </div>
           {/* Card skeletons */}
           <div className="flex-1 px-1.5 py-1.5 space-y-1.5">
-            {Array.from({ length: 3 - colIdx % 2 }).map((_, cardIdx) => (
-              <div key={cardIdx} className="mx-1 rounded-lg border border-border bg-card p-3 space-y-2">
+            {Array.from({ length: 3 - (colIdx % 2) }).map((_, cardIdx) => (
+              <div
+                key={cardIdx}
+                className="mx-1 rounded-lg border border-border bg-card p-3 space-y-2"
+              >
                 <div className="flex items-start justify-between">
                   <div className="h-4 w-32 rounded skeleton-shimmer" />
                   <div className="h-4 w-8 rounded skeleton-shimmer" />

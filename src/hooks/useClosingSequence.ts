@@ -51,14 +51,25 @@ export function useClosingSequence(leadId: string | undefined) {
     if (!leadId) return;
     const channel = supabase
       .channel(`closing-${leadId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "closing_sequences", filter: `lead_id=eq.${leadId}` }, () => {
-        queryClient.invalidateQueries({ queryKey: ["closing-sequence", leadId] });
-      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "closing_sequences",
+          filter: `lead_id=eq.${leadId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["closing-sequence", leadId] });
+        }
+      )
       .on("postgres_changes", { event: "*", schema: "public", table: "closing_steps" }, () => {
         queryClient.invalidateQueries({ queryKey: ["closing-steps", leadId] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [leadId, queryClient]);
 
   const sequenceQuery = useQuery({
@@ -130,7 +141,10 @@ export function useClosingSequence(leadId: string | undefined) {
 
   const updateMessage = useMutation({
     mutationFn: async ({ stepId, message }: { stepId: string; message: string }) => {
-      const { error } = await supabase.from("closing_steps").update({ generated_message: message }).eq("id", stepId);
+      const { error } = await supabase
+        .from("closing_steps")
+        .update({ generated_message: message })
+        .eq("id", stepId);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["closing-steps", leadId] });
     },
@@ -142,9 +156,12 @@ export function useClosingSequence(leadId: string | undefined) {
   );
 
   // Check if sequence is paused and idle (no inbound for X days)
-  const pausedIdleDays = sequenceQuery.data?.status === "paused" && sequenceQuery.data?.paused_at
-    ? Math.floor((Date.now() - new Date(sequenceQuery.data.paused_at).getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
+  const pausedIdleDays =
+    sequenceQuery.data?.status === "paused" && sequenceQuery.data?.paused_at
+      ? Math.floor(
+          (Date.now() - new Date(sequenceQuery.data.paused_at).getTime()) / (1000 * 60 * 60 * 24)
+        )
+      : 0;
 
   return {
     sequence: sequenceQuery.data,

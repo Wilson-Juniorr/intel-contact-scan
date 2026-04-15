@@ -4,7 +4,18 @@ import { useTasks } from "@/hooks/useTasks";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, Handshake, TrendingUp, AlertTriangle, Phone, CheckSquare } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  Handshake,
+  TrendingUp,
+  AlertTriangle,
+  Phone,
+  CheckSquare,
+  Plus,
+  MessageCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,14 +34,18 @@ export default function Dashboard() {
 
     const newToday = leads.filter((l) => new Date(l.created_at) >= today).length;
     const newWeek = leads.filter((l) => new Date(l.created_at) >= weekAgo).length;
-    const negotiating = leads.filter((l) => l.stage === "cotacao_enviada" || l.stage === "cotacao_aprovada").length;
+    const negotiating = leads.filter(
+      (l) => l.stage === "cotacao_enviada" || l.stage === "cotacao_aprovada"
+    ).length;
     const converted = leads.filter((l) => l.stage === "implantado").length;
     const lost = leads.filter((l) => l.stage === "cancelado" || l.stage === "declinado").length;
 
     const needsFollowUp = leads.filter((l) => {
-      if (l.stage === "implantado" || l.stage === "cancelado" || l.stage === "declinado") return false;
+      if (l.stage === "implantado" || l.stage === "cancelado" || l.stage === "declinado")
+        return false;
       if (!l.last_contact_at) return true;
-      const daysSince = (Date.now() - new Date(l.last_contact_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysSince =
+        (Date.now() - new Date(l.last_contact_at).getTime()) / (1000 * 60 * 60 * 24);
       return daysSince >= 2;
     });
 
@@ -38,15 +53,19 @@ export default function Dashboard() {
   }, [leads]);
 
   const funnelData = useMemo(() => {
-    return FUNNEL_STAGES.filter((s) => s.key !== "cancelado" && s.key !== "declinado").map((stage) => ({
-      name: stage.label,
-      value: leads.filter((l) => l.stage === stage.key).length,
-      color: stage.color,
-    }));
+    return FUNNEL_STAGES.filter((s) => s.key !== "cancelado" && s.key !== "declinado").map(
+      (stage) => ({
+        name: stage.label,
+        value: leads.filter((l) => l.stage === stage.key).length,
+        color: stage.color,
+      })
+    );
   }, [leads]);
 
   const recentLeads = useMemo(() => {
-    return [...leads].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 5);
+    return [...leads]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 5);
   }, [leads]);
 
   const statCards = [
@@ -58,6 +77,28 @@ export default function Dashboard() {
     { label: "Follow-up", value: stats.needsFollowUp.length, icon: Phone, accent: "text-warning" },
     { label: "Tarefas hoje", value: todayTasks.length, icon: CheckSquare, accent: "text-primary" },
   ];
+
+  if (leads.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+        <Users className="h-16 w-16 text-muted-foreground/30" />
+        <div>
+          <h2 className="text-xl font-semibold">Nenhum lead ainda</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Comece criando seu primeiro lead ou sincronizando o WhatsApp.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate("/leads")} className="gap-2">
+            <Plus className="h-4 w-4" /> Criar Lead
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/whatsapp")} className="gap-2">
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -89,9 +130,19 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={funnelData} layout="vertical" margin={{ left: 10 }}>
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={120}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                />
                 <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    color: "hsl(var(--foreground))",
+                  }}
                 />
                 <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                   {funnelData.map((entry, i) => (
@@ -111,17 +162,27 @@ export default function Dashboard() {
             {recentLeads.map((lead) => {
               const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
               return (
-                <div key={lead.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div
+                  key={lead.id}
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                >
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{lead.name}</p>
                     <p className="text-xs text-muted-foreground">{lead.phone}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className="text-[10px] px-2" style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-2"
+                      style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}
+                    >
                       {stageInfo?.label}
                     </Badge>
                     <span className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true, locale: ptBR })}
+                      {formatDistanceToNow(new Date(lead.updated_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
                     </span>
                   </div>
                 </div>
@@ -132,7 +193,10 @@ export default function Dashboard() {
       </div>
 
       {todayTasks.length > 0 && (
-        <Card className="border-primary/30 cursor-pointer hover:bg-accent/10 transition-colors" onClick={() => navigate("/today")}>
+        <Card
+          className="border-primary/30 cursor-pointer hover:bg-accent/10 transition-colors"
+          onClick={() => navigate("/today")}
+        >
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CheckSquare className="h-5 w-5 text-primary" />
@@ -150,7 +214,9 @@ export default function Dashboard() {
                 )}
               </div>
             ))}
-            {todayTasks.length > 5 && <p className="text-xs text-muted-foreground">+{todayTasks.length - 5} mais...</p>}
+            {todayTasks.length > 5 && (
+              <p className="text-xs text-muted-foreground">+{todayTasks.length - 5} mais...</p>
+            )}
           </CardContent>
         </Card>
       )}

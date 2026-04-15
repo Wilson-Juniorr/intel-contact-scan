@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MessageCircle, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { cleanPhone, normalizePhone } from "@/lib/phone";
 import ConversationList from "@/components/whatsapp/ConversationList";
 import ChatArea from "@/components/whatsapp/ChatArea";
 
@@ -56,13 +57,12 @@ export default function WhatsAppPage() {
     try {
       const { data, error } = await supabase.functions.invoke("sync-whatsapp");
       if (error) throw new Error(error.message);
-      toast({
-        title: "Sincronização concluída",
-        description: `${data.totalImported || 0} novas mensagens, ${data.contactsSaved || 0} contatos salvos, ${data.contactsWithNames || 0} com nome`,
-      });
+      toast.success(
+        `Sincronização concluída: ${data.totalImported || 0} novas mensagens, ${data.contactsSaved || 0} contatos salvos`
+      );
       await Promise.all([fetchMessages(), fetchContacts()]);
     } catch (e: any) {
-      toast({ title: "Erro na sincronização", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSyncing(false);
     }
@@ -72,7 +72,7 @@ export default function WhatsAppPage() {
     const allMessages: WhatsAppMessage[] = [];
     let offset = 0;
     const pageSize = 1000;
-    
+
     while (true) {
       const { data, error } = await supabase
         .from("whatsapp_messages")
@@ -80,12 +80,15 @@ export default function WhatsAppPage() {
         .order("created_at", { ascending: true })
         .range(offset, offset + pageSize - 1);
 
-      if (error) { console.error("Error fetching messages:", error); break; }
+      if (error) {
+        console.error("Error fetching messages:", error);
+        break;
+      }
       if (data && data.length > 0) allMessages.push(...data);
       if (!data || data.length < pageSize) break;
       offset += pageSize;
     }
-    
+
     setMessages(allMessages);
   };
 
@@ -93,20 +96,23 @@ export default function WhatsAppPage() {
     const allContacts: WhatsAppContact[] = [];
     let offset = 0;
     const pageSize = 1000;
-    
+
     while (true) {
       const { data, error } = await supabase
         .from("whatsapp_contacts")
         .select("phone, contact_name, is_personal")
         .order("contact_name", { ascending: true })
         .range(offset, offset + pageSize - 1);
-      
-      if (error) { console.error("Error fetching contacts:", error); break; }
+
+      if (error) {
+        console.error("Error fetching contacts:", error);
+        break;
+      }
       if (data && data.length > 0) allContacts.push(...(data as WhatsAppContact[]));
       if (!data || data.length < pageSize) break;
       offset += pageSize;
     }
-    
+
     setContacts(allContacts);
   };
 
@@ -136,9 +142,7 @@ export default function WhatsAppPage() {
         { event: "UPDATE", schema: "public", table: "whatsapp_messages" },
         (payload) => {
           const updated = payload.new as WhatsAppMessage;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === updated.id ? updated : m))
-          );
+          setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
         }
       )
       .subscribe();
@@ -151,7 +155,7 @@ export default function WhatsAppPage() {
   // Build conversation summaries - include ALL contacts
   const conversations = useMemo(() => {
     const map = new Map<string, ConversationSummary>();
-    
+
     // Build contact name + personal lookup
     const contactNameMap = new Map<string, string>();
     const personalSet = new Set<string>();
@@ -167,8 +171,8 @@ export default function WhatsAppPage() {
     // First, add all contacts (even without messages)
     for (const contact of contacts) {
       const lead = leads.find((l) => {
-        const cleanLeadPhone = l.phone.replace(/\D/g, "");
-        const normalizedLeadPhone = cleanLeadPhone.startsWith("55") ? cleanLeadPhone : `55${cleanLeadPhone}`;
+        const cleanLeadPhone = cleanPhone(l.phone);
+        const normalizedLeadPhone = normalizePhone(l.phone);
         return normalizedLeadPhone === contact.phone || cleanLeadPhone === contact.phone;
       });
 
@@ -188,10 +192,8 @@ export default function WhatsAppPage() {
     messages.forEach((msg) => {
       const existing = map.get(msg.phone);
       const lead = leads.find((l) => {
-        const cleanLeadPhone = l.phone.replace(/\D/g, "");
-        const normalizedLeadPhone = cleanLeadPhone.startsWith("55")
-          ? cleanLeadPhone
-          : `55${cleanLeadPhone}`;
+        const cleanLeadPhone = cleanPhone(l.phone);
+        const normalizedLeadPhone = normalizePhone(l.phone);
         return normalizedLeadPhone === msg.phone || cleanLeadPhone === msg.phone;
       });
 
@@ -226,14 +228,14 @@ export default function WhatsAppPage() {
     return Array.from(map.values()).sort((a, b) => {
       const aHasMessages = a.messageCount > 0;
       const bHasMessages = b.messageCount > 0;
-      
+
       if (aHasMessages && !bHasMessages) return -1;
       if (!aHasMessages && bHasMessages) return 1;
-      
+
       if (aHasMessages && bHasMessages) {
         return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
       }
-      
+
       // Both without messages - sort by name
       return (a.leadName || a.phone).localeCompare(b.leadName || b.phone);
     });
@@ -269,14 +271,11 @@ export default function WhatsAppPage() {
       setContacts((prev) =>
         prev.map((c) => (c.phone === phone ? { ...c, is_personal: isPersonal } : c))
       );
-      toast({
-        title: isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal",
-        description: isPersonal
-          ? "Este contato não será criado como lead automaticamente"
-          : "Este contato poderá ser criado como lead",
-      });
+      toast.success(
+        isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal"
+      );
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   };
 
@@ -311,9 +310,7 @@ export default function WhatsAppPage() {
 
       if (error) throw new Error(error.message);
 
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: "sent" } : m))
-      );
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sent" } : m)));
 
       // Register interaction if linked to a lead
       if (selectedConversation?.leadId) {
@@ -324,10 +321,8 @@ export default function WhatsAppPage() {
         }).catch(() => {}); // Non-blocking
       }
     } catch (e: any) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
-      );
-      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)));
+      toast.error(e.message);
     } finally {
       setSending(false);
     }
@@ -371,46 +366,57 @@ export default function WhatsAppPage() {
             {contacts.length} contatos · {messages.length} mensagens
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSync}
-          disabled={syncing}
-        >
+        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
           <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Sincronizando..." : "Sincronizar conversas"}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] h-[calc(100vh-180px)] rounded-lg overflow-hidden border border-[#2a3942] shadow-xl">
-        <ConversationList
-          conversations={filteredConversations}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          selectedPhone={selectedPhone}
-          onSelectPhone={setSelectedPhone}
-          formatPhone={formatPhone}
-        />
+      {contacts.length === 0 && messages.length === 0 && !loading ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+          <MessageCircle className="h-16 w-16 text-muted-foreground/30" />
+          <div>
+            <h2 className="text-xl font-semibold">Nenhuma conversa ainda</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sincronize seu WhatsApp para começar a ver as conversas.
+            </p>
+          </div>
+          <Button onClick={handleSync} disabled={syncing} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar agora"}
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] h-[calc(100vh-180px)] rounded-lg overflow-hidden border border-[#2a3942] shadow-xl">
+          <ConversationList
+            conversations={filteredConversations}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            selectedPhone={selectedPhone}
+            onSelectPhone={setSelectedPhone}
+            formatPhone={formatPhone}
+          />
 
-        <ChatArea
-          selectedPhone={selectedPhone}
-          selectedName={selectedConversation?.leadName || null}
-          messages={conversationMessages}
-          newMessage={newMessage}
-          sending={sending}
-          onNewMessageChange={setNewMessage}
-          onSend={handleSend}
-          onBack={() => setSelectedPhone(null)}
-          formatPhone={formatPhone}
-          leadStage={selectedLead?.stage}
-          leadOperator={selectedLead?.operator || undefined}
-          leadLives={selectedLead?.lives || undefined}
-          leadId={selectedConversation?.leadId}
-          leadType={selectedLead?.type}
-          isPersonal={selectedConversation?.isPersonal || false}
-          onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
-        />
-      </div>
+          <ChatArea
+            selectedPhone={selectedPhone}
+            selectedName={selectedConversation?.leadName || null}
+            messages={conversationMessages}
+            newMessage={newMessage}
+            sending={sending}
+            onNewMessageChange={setNewMessage}
+            onSend={handleSend}
+            onBack={() => setSelectedPhone(null)}
+            formatPhone={formatPhone}
+            leadStage={selectedLead?.stage}
+            leadOperator={selectedLead?.operator || undefined}
+            leadLives={selectedLead?.lives || undefined}
+            leadId={selectedConversation?.leadId}
+            leadType={selectedLead?.type}
+            isPersonal={selectedConversation?.isPersonal || false}
+            onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }

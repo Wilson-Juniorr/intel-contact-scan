@@ -42,10 +42,7 @@ export function CadenceSection({ title, items, status, defaultOpen = true, onMar
 
   return (
     <div className={`rounded-lg border p-3 ${sectionStyles[status]}`}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full text-left"
-      >
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 w-full text-left">
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <span className={`font-semibold text-sm ${titleStyles[status]}`}>
           {emojis[status]} {items.length} leads {subtitles[status]}

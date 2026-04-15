@@ -2,7 +2,16 @@ import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Loader2, User, MessageCircle, Sparkles, UserX, UserCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  User,
+  MessageCircle,
+  Sparkles,
+  UserX,
+  UserCheck,
+} from "lucide-react";
 import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
 import TemplateSelector from "./TemplateSelector";
@@ -67,7 +76,9 @@ export default function ChatArea({
   }, [selectedPhone, messages]);
 
   return (
-    <div className={`flex flex-col overflow-hidden bg-[#0b141a] ${!selectedPhone ? "hidden lg:flex" : "flex"}`}>
+    <div
+      className={`flex flex-col overflow-hidden bg-[#0b141a] ${!selectedPhone ? "hidden lg:flex" : "flex"}`}
+    >
       <AnimatePresence mode="wait">
         {selectedPhone ? (
           <motion.div
@@ -103,9 +114,7 @@ export default function ChatArea({
                   )}
                 </div>
                 <p className="text-[12px] text-[#8696a0]">
-                  {selectedName
-                    ? formatPhone(selectedPhone)
-                    : `${messages.length} mensagens`}
+                  {selectedName ? formatPhone(selectedPhone) : `${messages.length} mensagens`}
                 </p>
               </div>
               <Button
@@ -116,7 +125,9 @@ export default function ChatArea({
                     ? "text-amber-400 hover:text-amber-300 hover:bg-[#2a3942]"
                     : "text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
                 }`}
-                title={isPersonal ? "Desmarcar como pessoal" : "Marcar como pessoal (não cria lead)"}
+                title={
+                  isPersonal ? "Desmarcar como pessoal" : "Marcar como pessoal (não cria lead)"
+                }
                 onClick={() => onTogglePersonal?.(!isPersonal)}
               >
                 {isPersonal ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
@@ -138,9 +149,7 @@ export default function ChatArea({
                     format(new Date(msg.created_at), "dd/MM/yyyy") !==
                       format(new Date(messages[i - 1].created_at), "dd/MM/yyyy");
 
-                  return (
-                    <ChatBubble key={msg.id} msg={msg} showDate={showDate} index={i} />
-                  );
+                  return <ChatBubble key={msg.id} msg={msg} showDate={showDate} index={i} />;
                 })}
                 <div ref={messagesEndRef} />
               </div>
@@ -215,9 +224,7 @@ export default function ChatArea({
               </motion.div>
               <div>
                 <p className="text-[#e9edef] text-xl font-light">WhatsApp Web</p>
-                <p className="text-[#8696a0] text-sm mt-1">
-                  Selecione uma conversa para começar
-                </p>
+                <p className="text-[#8696a0] text-sm mt-1">Selecione uma conversa para começar</p>
               </div>
             </div>
           </motion.div>

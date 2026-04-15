@@ -3,9 +3,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText, ArrowRightLeft, Phone, CalendarClock, StickyNote, FileUp, CheckCircle2, Image } from "lucide-react";
+import {
+  Bot,
+  Send,
+  User,
+  Bell,
+  Mic,
+  MicOff,
+  Paperclip,
+  X,
+  FileText,
+  ArrowRightLeft,
+  Phone,
+  CalendarClock,
+  StickyNote,
+  FileUp,
+  CheckCircle2,
+  Image,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES } from "@/types/lead";
@@ -28,7 +45,10 @@ const ACTION_BADGE_MAP: Record<string, { label: string; icon: string }> = {
 };
 
 type PendingFile = {
-  file_name: string; file_path: string; file_type: string; file_size: number;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
   previewUrl?: string;
 };
 
@@ -50,7 +70,10 @@ export default function AssistantPage() {
   const notesQuery = useQuery({
     queryKey: ["lead_notes", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("lead_notes").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("lead_notes")
+        .select("*")
+        .order("created_at", { ascending: false });
       return data || [];
     },
     enabled: !!user,
@@ -59,7 +82,10 @@ export default function AssistantPage() {
   const docsQuery = useQuery({
     queryKey: ["lead_documents", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("lead_documents").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("lead_documents")
+        .select("*")
+        .order("created_at", { ascending: false });
       return data || [];
     },
     enabled: !!user,
@@ -77,7 +103,10 @@ export default function AssistantPage() {
   const remindersQuery = useQuery({
     queryKey: ["reminders", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("reminders").select("*").order("date", { ascending: true });
+      const { data } = await supabase
+        .from("reminders")
+        .select("*")
+        .order("date", { ascending: true });
       return data || [];
     },
     enabled: !!user,
@@ -96,45 +125,80 @@ export default function AssistantPage() {
       const label = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
       stageCounts[label] = (stageCounts[label] || 0) + 1;
     });
-    const stagesSummary = Object.entries(stageCounts).map(([s, c]) => `  - ${s}: ${c}`).join("\n");
+    const stagesSummary = Object.entries(stageCounts)
+      .map(([s, c]) => `  - ${s}: ${c}`)
+      .join("\n");
     const now = Date.now();
     const totalValue = leads.reduce((sum, l) => sum + (l.lives || 0), 0);
 
-    const leadsDetail = leads.map((l) => {
-      const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
-      const lastActivity = l.last_contact_at || l.updated_at;
-      const idleDays = Math.floor((now - new Date(lastActivity || l.created_at).getTime()) / 86400000);
-      const leadInt = interactions.filter((i) => i.lead_id === l.id);
-      const intSum = leadInt.length
-        ? leadInt.slice(0, 5).map((i) => `      [${i.type}] ${new Date(i.created_at).toLocaleDateString("pt-BR")}: ${i.description}`).join("\n")
-        : "      Nenhuma interação";
-      const leadNotes = notes.filter((n) => n.lead_id === l.id);
-      const notesSum = leadNotes.length
-        ? leadNotes.slice(0, 5).map((n) => `      [${n.category}] ${n.content}${n.tags?.length ? ` (tags: ${n.tags.join(", ")})` : ""}`).join("\n")
-        : "      Nenhuma observação";
-      const leadDocs = docs.filter((d) => d.lead_id === l.id);
-      const docsSum = leadDocs.length
-        ? leadDocs.map((d) => `      [${d.category}] ${d.file_name}${d.ocr_text ? ` | OCR: ${d.ocr_text.slice(0, 150)}...` : ""}`).join("\n")
-        : "      Nenhum documento";
-      const leadCheck = checklist.filter((c) => c.lead_id === l.id);
-      const checkSum = leadCheck.length
-        ? leadCheck.map((c) => `      [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
-        : "      Nenhum checklist";
-      const leadRem = reminders.filter((r) => r.lead_id === l.id);
-      const remSum = leadRem.length
-        ? leadRem.map((r) => `      [${r.completed ? "✅" : "⏰"}] ${new Date(r.date).toLocaleDateString("pt-BR")}: ${r.description}`).join("\n")
-        : "      Nenhum lembrete";
+    const leadsDetail = leads
+      .map((l) => {
+        const stageLabel = FUNNEL_STAGES.find((s) => s.key === l.stage)?.label || l.stage;
+        const lastActivity = l.last_contact_at || l.updated_at;
+        const idleDays = Math.floor(
+          (now - new Date(lastActivity || l.created_at).getTime()) / 86400000
+        );
+        const leadInt = interactions.filter((i) => i.lead_id === l.id);
+        const intSum = leadInt.length
+          ? leadInt
+              .slice(0, 5)
+              .map(
+                (i) =>
+                  `      [${i.type}] ${new Date(i.created_at).toLocaleDateString("pt-BR")}: ${i.description}`
+              )
+              .join("\n")
+          : "      Nenhuma interação";
+        const leadNotes = notes.filter((n) => n.lead_id === l.id);
+        const notesSum = leadNotes.length
+          ? leadNotes
+              .slice(0, 5)
+              .map(
+                (n) =>
+                  `      [${n.category}] ${n.content}${n.tags?.length ? ` (tags: ${n.tags.join(", ")})` : ""}`
+              )
+              .join("\n")
+          : "      Nenhuma observação";
+        const leadDocs = docs.filter((d) => d.lead_id === l.id);
+        const docsSum = leadDocs.length
+          ? leadDocs
+              .map(
+                (d) =>
+                  `      [${d.category}] ${d.file_name}${d.ocr_text ? ` | OCR: ${d.ocr_text.slice(0, 150)}...` : ""}`
+              )
+              .join("\n")
+          : "      Nenhum documento";
+        const leadCheck = checklist.filter((c) => c.lead_id === l.id);
+        const checkSum = leadCheck.length
+          ? leadCheck.map((c) => `      [${c.completed ? "✅" : "❌"}] ${c.item_name}`).join("\n")
+          : "      Nenhum checklist";
+        const leadRem = reminders.filter((r) => r.lead_id === l.id);
+        const remSum = leadRem.length
+          ? leadRem
+              .map(
+                (r) =>
+                  `      [${r.completed ? "✅" : "⏰"}] ${new Date(r.date).toLocaleDateString("pt-BR")}: ${r.description}`
+              )
+              .join("\n")
+          : "      Nenhum lembrete";
 
-      return `  📋 ${l.name} | Tel: ${l.phone} | Email: ${l.email || "-"} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | ${idleDays}d sem contato
+        return `  📋 ${l.name} | Tel: ${l.phone} | Email: ${l.email || "-"} | ${l.type} | ${stageLabel} | ${l.operator || "-"} | ${l.lives || "?"} vidas | ${idleDays}d sem contato
     Interações (${leadInt.length}):\n${intSum}
     Observações (${leadNotes.length}):\n${notesSum}
     Documentos (${leadDocs.length}):\n${docsSum}
     Checklist:\n${checkSum}
     Lembretes:\n${remSum}`;
-    }).join("\n\n");
+      })
+      .join("\n\n");
 
     return `\n=== DADOS COMPLETOS DO CRM ===\nTotal de leads: ${leads.length}\nTotal de vidas: ${totalValue}\nTotal de interações: ${interactions.length}\nTotal de observações: ${notes.length}\nTotal de documentos: ${docs.length}\nLembretes pendentes: ${reminders.filter((r) => !r.completed).length}\n\nFUNIL DE VENDAS:\n${stagesSummary}\n\nDETALHES DE CADA LEAD:\n${leadsDetail}\n===`;
-  }, [leads, interactions, notesQuery.data, docsQuery.data, checklistQuery.data, remindersQuery.data]);
+  }, [
+    leads,
+    interactions,
+    notesQuery.data,
+    docsQuery.data,
+    checklistQuery.data,
+    remindersQuery.data,
+  ]);
 
   // Chat state
   const [messages, setMessages] = useState<Message[]>([
@@ -143,10 +207,10 @@ export default function AssistantPage() {
       content:
         "Olá! Sou seu assistente CRM Saúde IA. Posso **executar ações** no sistema — sempre com **confirmação** antes!\n\n" +
         "🎯 **Comandos que entendo:**\n" +
-        "• *\"Move o lead João para cotação enviada\"*\n" +
-        "• *\"Registra uma ligação com a Maria: falamos sobre plano PME\"*\n" +
-        "• *\"Cria um lembrete para ligar pro Carlos amanhã às 10h\"*\n" +
-        "• *\"Adiciona uma nota no lead Ana: cliente prefere Unimed\"*\n" +
+        '• *"Move o lead João para cotação enviada"*\n' +
+        '• *"Registra uma ligação com a Maria: falamos sobre plano PME"*\n' +
+        '• *"Cria um lembrete para ligar pro Carlos amanhã às 10h"*\n' +
+        '• *"Adiciona uma nota no lead Ana: cliente prefere Unimed"*\n' +
         "• 📎 Envie ou cole (Ctrl+V) um documento e diga a qual lead pertence\n" +
         "• 🎤 Use o microfone para falar!\n\n" +
         "🔒 Antes de qualquer ação, vou mostrar os dados do lead e pedir sua confirmação.",
@@ -188,7 +252,7 @@ export default function AssistantPage() {
     }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      toast({ title: "Navegador não suporta entrada por voz", variant: "destructive" });
+      toast.error("Navegador não suporta entrada por voz");
       return;
     }
     const recognition = new SR();
@@ -217,38 +281,61 @@ export default function AssistantPage() {
         const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
         if (error) throw error;
         const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
-        toast({ title: `📎 "${file.name}" pronto para enviar` });
+        setPendingFiles((prev) => [
+          ...prev,
+          {
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+            previewUrl,
+          },
+        ]);
+        toast.success(`📎 "${file.name}" pronto para enviar`);
       } catch (err: any) {
-        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+        toast.error(err.message);
       }
     }
     if (chatFileRef.current) chatFileRef.current.value = "";
   };
 
   // Paste from clipboard
-  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items || !user) return;
-    for (const item of Array.from(items)) {
-      if (item.kind === "file") {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (!file) continue;
-        const fileName = file.name === "image.png" ? `captura_${Date.now()}.png` : file.name;
-        try {
-          const filePath = `${user.id}/chat_uploads/${Date.now()}_${fileName}`;
-          const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
-          if (error) throw error;
-          const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-          setPendingFiles((prev) => [...prev, { file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
-        } catch (err: any) {
-          toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items || !user) return;
+      for (const item of Array.from(items)) {
+        if (item.kind === "file") {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (!file) continue;
+          const fileName = file.name === "image.png" ? `captura_${Date.now()}.png` : file.name;
+          try {
+            const filePath = `${user.id}/chat_uploads/${Date.now()}_${fileName}`;
+            const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+            if (error) throw error;
+            const previewUrl = file.type.startsWith("image/")
+              ? URL.createObjectURL(file)
+              : undefined;
+            setPendingFiles((prev) => [
+              ...prev,
+              {
+                file_name: fileName,
+                file_path: filePath,
+                file_type: file.type,
+                file_size: file.size,
+                previewUrl,
+              },
+            ]);
+          } catch (err: any) {
+            toast.error(err.message);
+          }
+          break;
         }
-        break;
       }
-    }
-  }, [user]);
+    },
+    [user]
+  );
 
   // Drag and drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -263,25 +350,37 @@ export default function AssistantPage() {
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (!files?.length || !user) return;
-    for (const file of Array.from(files)) {
-      try {
-        const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
-        const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
-        if (error) throw error;
-        const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-        setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
-        toast({ title: `📎 "${file.name}" pronto para enviar` });
-      } catch (err: any) {
-        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      const files = e.dataTransfer.files;
+      if (!files?.length || !user) return;
+      for (const file of Array.from(files)) {
+        try {
+          const filePath = `${user.id}/chat_uploads/${Date.now()}_${file.name}`;
+          const { error } = await supabase.storage.from("lead-images").upload(filePath, file);
+          if (error) throw error;
+          const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+          setPendingFiles((prev) => [
+            ...prev,
+            {
+              file_name: file.name,
+              file_path: filePath,
+              file_type: file.type,
+              file_size: file.size,
+              previewUrl,
+            },
+          ]);
+          toast.success(`📎 "${file.name}" pronto para enviar`);
+        } catch (err: any) {
+          toast.error(err.message);
+        }
       }
-    }
-  }, [user]);
+    },
+    [user]
+  );
 
   // Send message
   const send = async () => {
@@ -289,8 +388,16 @@ export default function AssistantPage() {
     if (loading) return;
 
     const fileNames = pendingFiles.map((f) => f.file_name).join(", ");
-    const userContent = input.trim() || (pendingFiles.length ? `📎 Enviando ${pendingFiles.length} documento(s): ${fileNames}` : "");
-    const userMsg: Message = { role: "user", content: userContent, fileInfo: pendingFiles.length ? pendingFiles.map((f) => ({ file_name: f.file_name })) : undefined };
+    const userContent =
+      input.trim() ||
+      (pendingFiles.length ? `📎 Enviando ${pendingFiles.length} documento(s): ${fileNames}` : "");
+    const userMsg: Message = {
+      role: "user",
+      content: userContent,
+      fileInfo: pendingFiles.length
+        ? pendingFiles.map((f) => ({ file_name: f.file_name }))
+        : undefined,
+    };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
@@ -302,7 +409,9 @@ export default function AssistantPage() {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant" && prev.length === allMessages.length + 1) {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: assistantSoFar } : m
+          );
         }
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
@@ -384,10 +493,10 @@ export default function AssistantPage() {
           return updated;
         });
         invalidateAll();
-        toast({ title: "✅ Ação executada no CRM" });
+        toast.success("✅ Ação executada no CRM");
       }
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setPendingFiles([]);
     setLoading(false);
@@ -397,7 +506,9 @@ export default function AssistantPage() {
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       <div className="mb-4 shrink-0">
         <h1 className="text-2xl font-bold">Assistente IA</h1>
-        <p className="text-sm text-muted-foreground">Especialista em planos de saúde — agora com ações no CRM e voz</p>
+        <p className="text-sm text-muted-foreground">
+          Especialista em planos de saúde — agora com ações no CRM e voz
+        </p>
       </div>
 
       <Tabs defaultValue="followup" className="flex-1 flex flex-col min-h-0">
@@ -445,7 +556,9 @@ export default function AssistantPage() {
                     {msg.fileInfo && msg.fileInfo.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 mb-1.5 text-xs opacity-80">
                         {msg.fileInfo.map((f, fi) => (
-                          <span key={fi} className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> {f.file_name}</span>
+                          <span key={fi} className="inline-flex items-center gap-1">
+                            <FileText className="h-3 w-3" /> {f.file_name}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -453,16 +566,25 @@ export default function AssistantPage() {
                       <div className="flex flex-wrap gap-1.5 mb-2 animate-fade-in">
                         {msg.actionBadges.map((badge, bi) => {
                           const IconComp =
-                            badge.icon === "move" ? ArrowRightLeft :
-                            badge.icon === "interaction" ? Phone :
-                            badge.icon === "reminder" ? CalendarClock :
-                            badge.icon === "note" ? StickyNote :
-                            badge.icon === "document" ? FileUp : CheckCircle2;
+                            badge.icon === "move"
+                              ? ArrowRightLeft
+                              : badge.icon === "interaction"
+                                ? Phone
+                                : badge.icon === "reminder"
+                                  ? CalendarClock
+                                  : badge.icon === "note"
+                                    ? StickyNote
+                                    : badge.icon === "document"
+                                      ? FileUp
+                                      : CheckCircle2;
                           return (
                             <span
                               key={bi}
                               className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary px-2.5 py-0.5 text-xs font-medium animate-scale-in"
-                              style={{ animationDelay: `${bi * 100}ms`, animationFillMode: "backwards" }}
+                              style={{
+                                animationDelay: `${bi * 100}ms`,
+                                animationFillMode: "backwards",
+                              }}
                             >
                               <IconComp className="h-3 w-3" />
                               {badge.label}
@@ -507,30 +629,61 @@ export default function AssistantPage() {
             {pendingFiles.length > 0 && (
               <div className="px-4 py-2 border-t border-border flex flex-wrap items-center gap-2 bg-muted/50">
                 {pendingFiles.map((pf, idx) => (
-                  <div key={idx} className="inline-flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border border-border">
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border border-border"
+                  >
                     {pf.previewUrl ? (
-                      <img src={pf.previewUrl} alt={pf.file_name} className="h-8 w-8 rounded object-cover" />
+                      <img
+                        src={pf.previewUrl}
+                        alt={pf.file_name}
+                        className="h-8 w-8 rounded object-cover"
+                      />
                     ) : (
                       <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
-                    <span className="text-xs text-muted-foreground max-w-[120px] truncate">{pf.file_name}</span>
-                    <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={() => {
-                      if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl);
-                      setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
-                    }}>
+                    <span className="text-xs text-muted-foreground max-w-[120px] truncate">
+                      {pf.file_name}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-4 w-4 p-0"
+                      onClick={() => {
+                        if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl);
+                        setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+                      }}
+                    >
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 ))}
-                <Button size="sm" variant="ghost" className="text-xs h-6" onClick={() => setPendingFiles([])}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs h-6"
+                  onClick={() => setPendingFiles([])}
+                >
                   Limpar todos
                 </Button>
               </div>
             )}
 
             <div className="p-4 border-t border-border">
-              <input ref={chatFileRef} type="file" multiple className="hidden" onChange={handleChatFileUpload} />
-              <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
+              <input
+                ref={chatFileRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleChatFileUpload}
+              />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
+                className="flex gap-2"
+              >
                 <Button
                   type="button"
                   size="icon"
@@ -559,7 +712,11 @@ export default function AssistantPage() {
                   disabled={loading}
                   className={isRecording ? "border-destructive" : ""}
                 />
-                <Button type="submit" size="icon" disabled={loading || (!input.trim() && !pendingFiles.length)}>
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={loading || (!input.trim() && !pendingFiles.length)}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </form>

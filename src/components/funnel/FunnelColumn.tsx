@@ -1,6 +1,7 @@
 import { FunnelCard } from "./FunnelCard";
 import type { FunnelStage } from "@/types/lead";
 import { AnimatePresence, motion } from "framer-motion";
+import { formatBRLShort } from "@/lib/currency";
 
 interface StageInfo {
   key: FunnelStage;
@@ -43,12 +44,9 @@ export function FunnelColumn({
     if (l.quote_min_value) return sum + Number(l.quote_min_value);
     return sum + (l.lives ? l.lives * 120 : 0);
   }, 0);
-  const weightedValue = Math.round(totalValue * stage.weight / 100);
+  const weightedValue = Math.round((totalValue * stage.weight) / 100);
 
-  const formatCurrency = (v: number) => {
-    if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")} mi`;
-    return `R$ ${v.toLocaleString("pt-BR")}`;
-  };
+  const formatCurrency = (v: number) => formatBRLShort(v);
 
   return (
     <div

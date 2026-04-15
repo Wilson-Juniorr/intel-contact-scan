@@ -94,7 +94,8 @@ export function useLeadMembers(leadId: string | undefined) {
     dependentes: members.filter((m) => m.role === "dependente"),
     isLoading: query.isLoading,
     addMember: addMember.mutateAsync,
-    updateMember: (id: string, updates: Record<string, unknown>) => updateMember.mutateAsync({ id, updates }),
+    updateMember: (id: string, updates: Record<string, unknown>) =>
+      updateMember.mutateAsync({ id, updates }),
     deleteMember: deleteMember.mutateAsync,
   };
 }

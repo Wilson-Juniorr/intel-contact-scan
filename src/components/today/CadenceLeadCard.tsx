@@ -23,8 +23,8 @@ export function CadenceLeadCard({ lead, diasSemContato, status, onMarkDone }: Pr
     status === "atrasado"
       ? "text-destructive font-bold"
       : status === "hoje"
-      ? "text-yellow-600 font-semibold"
-      : "text-muted-foreground";
+        ? "text-yellow-600 font-semibold"
+        : "text-muted-foreground";
 
   const handleDone = async () => {
     setLoading(true);
@@ -43,7 +43,9 @@ export function CadenceLeadCard({ lead, diasSemContato, status, onMarkDone }: Pr
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-sm truncate">{lead.name}</span>
-              <Badge variant="secondary" className="text-[10px]">{lead.type}</Badge>
+              <Badge variant="secondary" className="text-[10px]">
+                {lead.type}
+              </Badge>
               <Badge
                 variant="outline"
                 className="text-[10px]"

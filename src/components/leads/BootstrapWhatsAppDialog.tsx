@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, Link, Plus, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -28,19 +35,22 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
     if (!session) return;
     setLoading(true);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bootstrap-whatsapp-leads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ dryRun: true }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bootstrap-whatsapp-leads`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ dryRun: true }),
+        }
+      );
       if (!resp.ok) throw new Error("Erro ao buscar dados");
       const data = await resp.json();
       setStats(data);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setLoading(false);
   };
@@ -49,28 +59,34 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
     if (!session) return;
     setExecuting(true);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bootstrap-whatsapp-leads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ dryRun: false }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bootstrap-whatsapp-leads`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ dryRun: false }),
+        }
+      );
       if (!resp.ok) throw new Error("Erro ao executar bootstrap");
       const data = await resp.json();
       setResult(data);
-      toast({ title: `${data.created} negócios criados com sucesso!` });
+      toast.success(`${data.created} negócios criados com sucesso!`);
       onComplete();
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setExecuting(false);
   };
 
   const handleOpenChange = (v: boolean) => {
     if (v && !stats && !loading) fetchStats();
-    if (!v) { setStats(null); setResult(null); }
+    if (!v) {
+      setStats(null);
+      setResult(null);
+    }
     onOpenChange(v);
   };
 
@@ -94,10 +110,28 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
         ) : result ? (
           <div className="space-y-3 py-4">
             <div className="grid grid-cols-2 gap-3">
-              <Stat icon={<Plus className="h-4 w-4 text-primary" />} label="Criados" value={result.created} />
-              <Stat icon={<Link className="h-4 w-4 text-secondary" />} label="Vinculados" value={result.linked} />
-              <Stat icon={<Users className="h-4 w-4 text-muted-foreground" />} label="Já tinham lead" value={result.alreadyLinked} />
-              {result.skipped > 0 && <Stat icon={<Users className="h-4 w-4 text-destructive" />} label="Ignorados" value={result.skipped} />}
+              <Stat
+                icon={<Plus className="h-4 w-4 text-primary" />}
+                label="Criados"
+                value={result.created}
+              />
+              <Stat
+                icon={<Link className="h-4 w-4 text-secondary" />}
+                label="Vinculados"
+                value={result.linked}
+              />
+              <Stat
+                icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                label="Já tinham lead"
+                value={result.alreadyLinked}
+              />
+              {result.skipped > 0 && (
+                <Stat
+                  icon={<Users className="h-4 w-4 text-destructive" />}
+                  label="Ignorados"
+                  value={result.skipped}
+                />
+              )}
             </div>
             <p className="text-xs text-muted-foreground text-center">
               Todos os negócios foram criados e vinculados. Recarregue o funil para visualizar.
@@ -106,12 +140,26 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
         ) : stats ? (
           <div className="space-y-3 py-4">
             <div className="grid grid-cols-3 gap-3">
-              <Stat icon={<Users className="h-4 w-4 text-primary" />} label="Total contatos" value={stats.totalContacts} />
-              <Stat icon={<Link className="h-4 w-4 text-secondary" />} label="Com lead" value={stats.withLeadId} />
-              <Stat icon={<Plus className="h-4 w-4 text-accent-foreground" />} label="A criar" value={stats.toCreate} />
+              <Stat
+                icon={<Users className="h-4 w-4 text-primary" />}
+                label="Total contatos"
+                value={stats.totalContacts}
+              />
+              <Stat
+                icon={<Link className="h-4 w-4 text-secondary" />}
+                label="Com lead"
+                value={stats.withLeadId}
+              />
+              <Stat
+                icon={<Plus className="h-4 w-4 text-accent-foreground" />}
+                label="A criar"
+                value={stats.toCreate}
+              />
             </div>
             {stats.toCreate === 0 && (
-              <p className="text-xs text-muted-foreground text-center">Todos os contatos já possuem negócio vinculado.</p>
+              <p className="text-xs text-muted-foreground text-center">
+                Todos os contatos já possuem negócio vinculado.
+              </p>
             )}
           </div>
         ) : null}
@@ -119,13 +167,15 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
         <DialogFooter>
           {!result && stats && stats.toCreate > 0 && (
             <Button onClick={execute} disabled={executing} className="gap-2">
-              {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+              {executing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
               {executing ? "Criando..." : `Criar ${stats.toCreate} negócios`}
             </Button>
           )}
-          {result && (
-            <Button onClick={() => handleOpenChange(false)}>Fechar</Button>
-          )}
+          {result && <Button onClick={() => handleOpenChange(false)}>Fechar</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

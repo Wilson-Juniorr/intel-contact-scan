@@ -1,4 +1,14 @@
-import { LayoutDashboard, Users, Columns3, Bot, Menu, LogOut, MessageCircle, Clock, Zap } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  Columns3,
+  Bot,
+  Menu,
+  LogOut,
+  MessageCircle,
+  Clock,
+  Zap,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCadence } from "@/hooks/useCadence";
@@ -42,8 +52,12 @@ function AppSidebarContent() {
               <span className="text-primary-foreground font-bold text-sm">CS</span>
             </div>
             <div>
-              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">CRM Saúde</h1>
-              <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">{user?.email}</p>
+              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">
+                CRM Saúde
+              </h1>
+              <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">
+                {user?.email}
+              </p>
             </div>
           </div>
         )}

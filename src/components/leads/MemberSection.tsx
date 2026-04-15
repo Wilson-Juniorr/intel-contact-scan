@@ -5,13 +5,33 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  ChevronDown, ChevronRight, User, Users, Plus, Trash2, Upload, Loader2,
-  Eye, Download, File, Image as ImageIcon, X, Pencil, Check, UserPlus,
+  ChevronDown,
+  ChevronRight,
+  User,
+  Users,
+  Plus,
+  Trash2,
+  Upload,
+  Loader2,
+  Eye,
+  Download,
+  File,
+  Image as ImageIcon,
+  X,
+  Pencil,
+  Check,
+  UserPlus,
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface MemberDoc {
@@ -28,7 +48,11 @@ interface Props {
   role: "titular" | "dependente";
   members: LeadMember[];
   documents: MemberDoc[];
-  onAddMember: (m: { role: "titular" | "dependente"; name: string; vinculo?: string }) => Promise<unknown>;
+  onAddMember: (m: {
+    role: "titular" | "dependente";
+    name: string;
+    vinculo?: string;
+  }) => Promise<unknown>;
   onDeleteMember: (id: string) => Promise<unknown>;
   onUpdateMember: (id: string, updates: Record<string, unknown>) => Promise<unknown>;
   onUploadDoc: (params: { file: File; category: string; memberId: string }) => Promise<unknown>;
@@ -38,8 +62,16 @@ interface Props {
 }
 
 export function MemberSection({
-  role, members, documents, onAddMember, onDeleteMember, onUpdateMember,
-  onUploadDoc, onDeleteDoc, onPreview, onDownload,
+  role,
+  members,
+  documents,
+  onAddMember,
+  onDeleteMember,
+  onUpdateMember,
+  onUploadDoc,
+  onDeleteDoc,
+  onPreview,
+  onDownload,
 }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const [addingName, setAddingName] = useState("");
@@ -65,9 +97,9 @@ export function MemberSection({
       });
       setAddingName("");
       setShowAddForm(false);
-      toast({ title: `${isTitular ? "Titular" : "Dependente"} adicionado!` });
+      toast.success(`${isTitular ? "Titular" : "Dependente"} adicionado!`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSaving(false);
   };
@@ -80,7 +112,9 @@ export function MemberSection({
             <Icon className="h-3.5 w-3.5 text-primary" />
           </div>
           <span className="text-xs font-semibold tracking-wide flex-1 text-left">{label}</span>
-          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">{members.length}</Badge>
+          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">
+            {members.length}
+          </Badge>
           <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </motion.div>
@@ -134,17 +168,36 @@ export function MemberSection({
                       </SelectTrigger>
                       <SelectContent>
                         {VINCULO_OPTIONS.map((v) => (
-                          <SelectItem key={v} value={v}>{v}</SelectItem>
+                          <SelectItem key={v} value={v}>
+                            {v}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
                   <div className="flex gap-2">
-                    <Button size="sm" className="h-7 text-xs flex-1 gap-1" onClick={handleAdd} disabled={saving || !addingName.trim()}>
-                      {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs flex-1 gap-1"
+                      onClick={handleAdd}
+                      disabled={saving || !addingName.trim()}
+                    >
+                      {saving ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
                       Salvar
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddForm(false); setAddingName(""); }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setAddingName("");
+                      }}
+                    >
                       Cancelar
                     </Button>
                   </div>
@@ -173,7 +226,14 @@ export function MemberSection({
 /* ─── Individual Member Card ─── */
 
 function MemberCard({
-  member, docs, onDelete, onUpdate, onUploadDoc, onDeleteDoc, onPreview, onDownload,
+  member,
+  docs,
+  onDelete,
+  onUpdate,
+  onUploadDoc,
+  onDeleteDoc,
+  onPreview,
+  onDownload,
 }: {
   member: LeadMember;
   docs: MemberDoc[];
@@ -200,9 +260,9 @@ function MemberCard({
       for (const file of Array.from(files)) {
         await onUploadDoc({ file, category: docCategory, memberId: member.id });
       }
-      toast({ title: `${files.length} arquivo(s) enviado(s)!` });
+      toast.success(`${files.length} arquivo(s) enviado(s)!`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -212,9 +272,9 @@ function MemberCard({
     try {
       await onUpdate(member.id, { name: editName.trim(), cpf: editCpf.trim() || null });
       setEditing(false);
-      toast({ title: "Atualizado!" });
+      toast.success("Atualizado!");
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   };
 
@@ -262,28 +322,59 @@ function MemberCard({
                   exit={{ opacity: 0 }}
                   className="space-y-2"
                 >
-                  <Input placeholder="Nome" value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 text-xs" autoFocus />
-                  <Input placeholder="CPF" value={editCpf} onChange={(e) => setEditCpf(e.target.value)} className="h-8 text-xs font-mono" />
+                  <Input
+                    placeholder="Nome"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-8 text-xs"
+                    autoFocus
+                  />
+                  <Input
+                    placeholder="CPF"
+                    value={editCpf}
+                    onChange={(e) => setEditCpf(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
                   <div className="flex gap-2">
                     <Button size="sm" className="h-7 text-xs flex-1 gap-1" onClick={handleSaveEdit}>
                       <Check className="h-3 w-3" /> Salvar
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(false)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs"
+                      onClick={() => setEditing(false)}
+                    >
                       Cancelar
                     </Button>
                   </div>
                 </motion.div>
               ) : (
-                <motion.div key="actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex gap-2">
+                <motion.div
+                  key="actions"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex gap-2"
+                >
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 text-[10px] gap-1 flex-1"
-                    onClick={() => { setEditName(member.name); setEditCpf(member.cpf || ""); setEditing(true); }}
+                    onClick={() => {
+                      setEditName(member.name);
+                      setEditCpf(member.cpf || "");
+                      setEditing(true);
+                    }}
                   >
                     <Pencil className="h-3 w-3" /> Editar dados
                   </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={onDelete}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={onDelete}
+                  >
                     <Trash2 className="h-3 w-3" /> Remover
                   </Button>
                 </motion.div>
@@ -299,19 +390,32 @@ function MemberCard({
                 </SelectTrigger>
                 <SelectContent>
                   {DOC_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              <Button
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Upload className="h-3 w-3" />
+                )}
                 Enviar
               </Button>
             </div>
 
             {/* Doc list */}
             {docs.length === 0 && (
-              <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento anexado</p>
+              <p className="text-[10px] text-muted-foreground text-center py-2">
+                Nenhum documento anexado
+              </p>
             )}
             <AnimatePresence>
               {docs.map((doc) => {
@@ -325,22 +429,42 @@ function MemberCard({
                     className="flex items-center gap-2.5 p-2 rounded-md border border-border bg-muted/30 hover:bg-muted/60 transition-colors group"
                   >
                     <div className="h-7 w-7 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
-                      {isImage ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <File className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {isImage ? (
+                        <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <File className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-medium truncate">{doc.file_name}</p>
                       <Badge variant="outline" className="text-[8px] mt-0.5">
-                        {DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category}
+                        {DOC_CATEGORIES.find((c) => c.value === doc.category)?.label ||
+                          doc.category}
                       </Badge>
                     </div>
                     <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onPreview(doc.file_path, doc.file_name, doc.file_type || "")}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => onPreview(doc.file_path, doc.file_name, doc.file_type || "")}
+                      >
                         <Eye className="h-3 w-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onDownload(doc.file_path, doc.file_name)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => onDownload(doc.file_path, doc.file_name)}
+                      >
                         <Download className="h-3 w-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onDeleteDoc({ id: doc.id, file_path: doc.file_path })}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => onDeleteDoc({ id: doc.id, file_path: doc.file_path })}
+                      >
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>

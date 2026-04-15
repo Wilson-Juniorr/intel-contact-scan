@@ -5,9 +5,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useContactAttempts } from "@/hooks/useContactAttempts";
 import ChatBubble from "@/components/whatsapp/ChatBubble";
 import { format } from "date-fns";
-import { Loader2, MessageCircle, PhoneCall, Clock, TrendingUp, ChevronUp, FileText } from "lucide-react";
+import {
+  Loader2,
+  MessageCircle,
+  PhoneCall,
+  Clock,
+  TrendingUp,
+  ChevronUp,
+  FileText,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cleanPhone, normalizePhone } from "@/lib/phone";
 
 interface Props {
   leadPhone: string;
@@ -21,8 +30,8 @@ const PAGE_SIZE = 1000;
 export function LeadConversationTab({ leadPhone, leadName, compact = false, leadId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const cleanPhone = leadPhone.replace(/\D/g, "");
-  const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+  const clean = cleanPhone(leadPhone);
+  const normalizedPhone = normalizePhone(leadPhone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [allMessages, setAllMessages] = useState<any[]>([]);
@@ -30,8 +39,12 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
 
-  const { totalAttempts, responseRate, avgResponseTimeMin, isLoading: attemptsLoading } =
-    useContactAttempts(leadPhone);
+  const {
+    totalAttempts,
+    responseRate,
+    avgResponseTimeMin,
+    isLoading: attemptsLoading,
+  } = useContactAttempts(leadPhone);
 
   // Load ALL messages using pagination
   const messagesQuery = useQuery({
@@ -39,7 +52,7 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
     queryFn: async () => {
       const allMsgs: any[] = [];
       let offset = 0;
-      
+
       while (true) {
         const { data, error } = await supabase
           .from("whatsapp_messages")
@@ -47,13 +60,13 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
           .eq("phone", normalizedPhone)
           .order("created_at", { ascending: true })
           .range(offset, offset + PAGE_SIZE - 1);
-        
+
         if (error) throw error;
         if (data && data.length > 0) allMsgs.push(...data);
         if (!data || data.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
-      
+
       setAllMessages(allMsgs);
       setHasMore(false);
       return allMsgs;
@@ -172,10 +185,10 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
                 {attemptsLoading
                   ? "..."
                   : avgResponseTimeMin !== null
-                  ? avgResponseTimeMin < 60
-                    ? `${avgResponseTimeMin}min`
-                    : `${Math.round(avgResponseTimeMin / 60)}h`
-                  : "—"}
+                    ? avgResponseTimeMin < 60
+                      ? `${avgResponseTimeMin}min`
+                      : `${Math.round(avgResponseTimeMin / 60)}h`
+                    : "—"}
               </p>
             </div>
           </div>
@@ -256,8 +269,8 @@ export function LeadConversationTab({ leadPhone, leadName, compact = false, lead
       )}
 
       <p className="text-[10px] text-muted-foreground text-center">
-        {messages.length} mensagens • {messages.filter((m) => m.direction === "outbound").length} enviadas •{" "}
-        {messages.filter((m) => m.direction === "inbound").length} recebidas
+        {messages.length} mensagens • {messages.filter((m) => m.direction === "outbound").length}{" "}
+        enviadas • {messages.filter((m) => m.direction === "inbound").length} recebidas
       </p>
     </div>
   );

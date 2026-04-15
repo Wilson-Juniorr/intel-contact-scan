@@ -5,8 +5,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, RefreshCw, Loader2, Heart, AlertTriangle, DollarSign, Building2, Users, Target } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import {
+  Brain,
+  RefreshCw,
+  Loader2,
+  Heart,
+  AlertTriangle,
+  DollarSign,
+  Building2,
+  Users,
+  Target,
+} from "lucide-react";
+import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -37,17 +47,22 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
   const updateMemory = async () => {
     setUpdating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Não autenticado");
 
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-lead-memory`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ leadId }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-lead-memory`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ leadId }),
+        }
+      );
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Erro" }));
@@ -55,9 +70,9 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["lead_memory", leadId] });
-      toast({ title: "Memória atualizada", description: `Resumo de ${leadName} foi atualizado com sucesso` });
+      toast.success(`Memória atualizada: ${`Resumo de ${leadName} foi atualizado com sucesso`}`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setUpdating(false);
     }
@@ -65,10 +80,26 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
 
   const sj = (memory?.structured_json || {}) as any;
   const sentimentConfig: Record<string, { label: string; color: string; icon: typeof Heart }> = {
-    positivo: { label: "Positivo", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: Heart },
-    neutro: { label: "Neutro", color: "bg-muted text-muted-foreground border-border", icon: Target },
-    negativo: { label: "Negativo", color: "bg-orange-500/20 text-orange-400 border-orange-500/30", icon: AlertTriangle },
-    frio: { label: "Frio", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: AlertTriangle },
+    positivo: {
+      label: "Positivo",
+      color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+      icon: Heart,
+    },
+    neutro: {
+      label: "Neutro",
+      color: "bg-muted text-muted-foreground border-border",
+      icon: Target,
+    },
+    negativo: {
+      label: "Negativo",
+      color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+      icon: AlertTriangle,
+    },
+    frio: {
+      label: "Frio",
+      color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+      icon: AlertTriangle,
+    },
   };
 
   return (
@@ -95,13 +126,15 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
           </Button>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        {(isLoading || updating) && !memory && (
+          <div className="space-y-2 py-2">
+            <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+            <div className="h-20 w-full rounded bg-muted animate-pulse" />
           </div>
         )}
 
-        {!isLoading && !memory && (
+        {!isLoading && !updating && !memory && (
           <p className="text-xs text-muted-foreground text-center py-2">
             Clique em "Gerar memória" para criar um resumo inteligente deste lead
           </p>
@@ -112,7 +145,10 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
             {/* Structured data badges */}
             <div className="flex flex-wrap gap-1.5">
               {sj.sentimento && sentimentConfig[sj.sentimento] && (
-                <Badge variant="outline" className={`text-[10px] ${sentimentConfig[sj.sentimento].color}`}>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] ${sentimentConfig[sj.sentimento].color}`}
+                >
                   {sentimentConfig[sj.sentimento].label}
                 </Badge>
               )}
@@ -171,7 +207,8 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
             </div>
 
             <p className="text-[9px] text-muted-foreground text-right">
-              Atualizado {formatDistanceToNow(new Date(memory.updated_at), { addSuffix: true, locale: ptBR })}
+              Atualizado{" "}
+              {formatDistanceToNow(new Date(memory.updated_at), { addSuffix: true, locale: ptBR })}
             </p>
           </>
         )}

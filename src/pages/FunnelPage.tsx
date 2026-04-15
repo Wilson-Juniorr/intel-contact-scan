@@ -3,13 +3,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { FunnelColumn } from "@/components/funnel/FunnelColumn";
 import { BootstrapWhatsAppDialog } from "@/components/leads/BootstrapWhatsAppDialog";
 import { QuoteConfirmDialog } from "@/components/leads/QuoteConfirmDialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -23,7 +38,11 @@ import { toast } from "sonner";
 // Stages that require quote_min_value
 const STAGES_REQUIRE_QUOTE: FunnelStage[] = ["cotacao_enviada"];
 // Stages that require approved_value
-const STAGES_REQUIRE_APPROVED: FunnelStage[] = ["cotacao_aprovada", "documentacao_completa", "em_emissao"];
+const STAGES_REQUIRE_APPROVED: FunnelStage[] = [
+  "cotacao_aprovada",
+  "documentacao_completa",
+  "em_emissao",
+];
 
 export default function FunnelPage() {
   const { leads, moveStage, updateLead, deleteLeads } = useLeadsContext();
@@ -37,7 +56,9 @@ export default function FunnelPage() {
   // Quote dialog state
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [quoteDialogMode, setQuoteDialogMode] = useState<"quote" | "approved">("quote");
-  const [pendingMove, setPendingMove] = useState<{ leadId: string; stage: FunnelStage } | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ leadId: string; stage: FunnelStage } | null>(
+    null
+  );
 
   // Filters
   const [search, setSearch] = useState("");
@@ -51,11 +72,18 @@ export default function FunnelPage() {
     return Array.from(ops) as string[];
   }, [leads]);
 
-  const hasActiveFilters = search || typeFilter !== "all" || operatorFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters =
+    search || typeFilter !== "all" || operatorFilter !== "all" || dateFrom || dateTo;
 
   const filteredLeads = useMemo(() => {
     return leads.filter((l) => {
-      if (search && !l.name.toLowerCase().includes(search.toLowerCase()) && !l.phone.includes(search) && !(l.email && l.email.toLowerCase().includes(search.toLowerCase()))) return false;
+      if (
+        search &&
+        !l.name.toLowerCase().includes(search.toLowerCase()) &&
+        !l.phone.includes(search) &&
+        !(l.email && l.email.toLowerCase().includes(search.toLowerCase()))
+      )
+        return false;
       if (typeFilter !== "all" && l.type !== typeFilter) return false;
       if (operatorFilter !== "all" && l.operator !== operatorFilter) return false;
       if (dateFrom && new Date(l.created_at) < dateFrom) return false;
@@ -93,60 +121,70 @@ export default function FunnelPage() {
 
   // Auto-extract quote data state
   const [quoteLoading, setQuoteLoading] = useState(false);
-  const [extractedQuoteData, setExtractedQuoteData] = useState<{ min_value: number | null; operadora: string | null; plan_name: string | null; confidence: number } | null>(null);
+  const [extractedQuoteData, setExtractedQuoteData] = useState<{
+    min_value: number | null;
+    operadora: string | null;
+    plan_name: string | null;
+    confidence: number;
+  } | null>(null);
 
-  const tryMoveStage = useCallback(async (leadId: string, stage: FunnelStage) => {
-    const lead = leads.find((l) => l.id === leadId);
-    if (!lead || lead.stage === stage) return;
+  const tryMoveStage = useCallback(
+    async (leadId: string, stage: FunnelStage) => {
+      const lead = leads.find((l) => l.id === leadId);
+      if (!lead || lead.stage === stage) return;
 
-    // Check if quote_min_value is needed — auto-extract from history
-    if (STAGES_REQUIRE_QUOTE.includes(stage) && !lead.quote_min_value) {
-      setPendingMove({ leadId, stage });
-      setQuoteDialogMode("quote");
-      setExtractedQuoteData(null);
-      setQuoteLoading(true);
-      setQuoteDialogOpen(true);
+      // Check if quote_min_value is needed — auto-extract from history
+      if (STAGES_REQUIRE_QUOTE.includes(stage) && !lead.quote_min_value) {
+        setPendingMove({ leadId, stage });
+        setQuoteDialogMode("quote");
+        setExtractedQuoteData(null);
+        setQuoteLoading(true);
+        setQuoteDialogOpen(true);
 
-      // Fire async extraction from lead history
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          const resp = await supabase.functions.invoke("extract-quote-data", {
-            body: { lead_id: leadId },
-          });
-          if (resp.data) {
-            setExtractedQuoteData(resp.data);
+        // Fire async extraction from lead history
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            const resp = await supabase.functions.invoke("extract-quote-data", {
+              body: { lead_id: leadId },
+            });
+            if (resp.data) {
+              setExtractedQuoteData(resp.data);
+            }
           }
+        } catch (err) {
+          console.error("Auto-extract quote error:", err);
+        } finally {
+          setQuoteLoading(false);
         }
-      } catch (err) {
-        console.error("Auto-extract quote error:", err);
-      } finally {
-        setQuoteLoading(false);
+        return;
       }
-      return;
-    }
 
-    // Check if approved_value is needed
-    if (STAGES_REQUIRE_APPROVED.includes(stage) && !lead.approved_value) {
-      setPendingMove({ leadId, stage });
-      setQuoteDialogMode("approved");
-      setQuoteDialogOpen(true);
-      return;
-    }
-
-    moveStage(leadId, stage);
-
-    // Auto-start closing sequence when moving to cotacao_enviada
-    if (stage === "cotacao_enviada") {
-      try {
-        await supabase.functions.invoke("closing-engine", {
-          body: { action: "create", lead_id: leadId },
-        });
-      } catch (err) {
-        console.error("Auto-start closing sequence error:", err);
+      // Check if approved_value is needed
+      if (STAGES_REQUIRE_APPROVED.includes(stage) && !lead.approved_value) {
+        setPendingMove({ leadId, stage });
+        setQuoteDialogMode("approved");
+        setQuoteDialogOpen(true);
+        return;
       }
-    }
-  }, [leads, moveStage]);
+
+      moveStage(leadId, stage);
+
+      // Auto-start closing sequence when moving to cotacao_enviada
+      if (stage === "cotacao_enviada") {
+        try {
+          await supabase.functions.invoke("closing-engine", {
+            body: { action: "create", lead_id: leadId },
+          });
+        } catch (err) {
+          console.error("Auto-start closing sequence error:", err);
+        }
+      }
+    },
+    [leads, moveStage]
+  );
 
   const handleDrop = (stage: FunnelStage) => {
     if (draggedLeadId) {
@@ -156,7 +194,12 @@ export default function FunnelPage() {
     setDragOverStage(null);
   };
 
-  const handleQuoteConfirm = async (data: { min_value?: number; operadora?: string; plan_name?: string; approved_value?: number }) => {
+  const handleQuoteConfirm = async (data: {
+    min_value?: number;
+    operadora?: string;
+    plan_name?: string;
+    approved_value?: number;
+  }) => {
     if (!pendingMove) return;
     try {
       const updates: Record<string, unknown> = {};
@@ -196,11 +239,21 @@ export default function FunnelPage() {
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-xs text-muted-foreground gap-1"
+              >
                 <X className="h-3 w-3" /> Limpar filtros
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setBootstrapOpen(true)} className="text-xs gap-1.5 h-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBootstrapOpen(true)}
+              className="text-xs gap-1.5 h-8"
+            >
               <Zap className="h-3.5 w-3.5" /> Criar negócios do WhatsApp
             </Button>
           </div>
@@ -210,10 +263,17 @@ export default function FunnelPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[180px] max-w-[280px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar por nome, telefone ou email..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-xs" />
+            <Input
+              placeholder="Buscar por nome, telefone ou email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-xs"
+            />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 w-[110px] text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[110px] text-xs">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
@@ -222,32 +282,58 @@ export default function FunnelPage() {
             </SelectContent>
           </Select>
           <Select value={operatorFilter} onValueChange={setOperatorFilter}>
-            <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Operadora" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue placeholder="Operadora" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas operadoras</SelectItem>
-              {operators.map((op) => (<SelectItem key={op} value={op}>{op}</SelectItem>))}
+              {operators.map((op) => (
+                <SelectItem key={op} value={op}>
+                  {op}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-8 text-xs gap-1.5", dateFrom && "text-foreground")}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-8 text-xs gap-1.5", dateFrom && "text-foreground")}
+              >
                 <CalendarIcon className="h-3 w-3" />
                 {dateFrom ? format(dateFrom, "dd/MM/yy", { locale: ptBR }) : "De"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+              <Calendar
+                mode="single"
+                selected={dateFrom}
+                onSelect={setDateFrom}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
             </PopoverContent>
           </Popover>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-8 text-xs gap-1.5", dateTo && "text-foreground")}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("h-8 text-xs gap-1.5", dateTo && "text-foreground")}
+              >
                 <CalendarIcon className="h-3 w-3" />
                 {dateTo ? format(dateTo, "dd/MM/yy", { locale: ptBR }) : "Até"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+              <Calendar
+                mode="single"
+                selected={dateTo}
+                onSelect={setDateTo}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
             </PopoverContent>
           </Popover>
         </div>
@@ -278,8 +364,12 @@ export default function FunnelPage() {
       </div>
 
       <LeadDetailSheet lead={selectedLead} onClose={() => setSelectedLeadId(null)} />
-      <BootstrapWhatsAppDialog open={bootstrapOpen} onOpenChange={setBootstrapOpen} onComplete={() => queryClient.invalidateQueries({ queryKey: ["leads"] })} />
-      
+      <BootstrapWhatsAppDialog
+        open={bootstrapOpen}
+        onOpenChange={setBootstrapOpen}
+        onComplete={() => queryClient.invalidateQueries({ queryKey: ["leads"] })}
+      />
+
       <QuoteConfirmDialog
         open={quoteDialogOpen}
         onOpenChange={(open) => {
@@ -292,12 +382,18 @@ export default function FunnelPage() {
         onConfirm={handleQuoteConfirm}
       />
 
-      <AlertDialog open={!!deleteLeadId} onOpenChange={(open) => { if (!open) setDeleteLeadId(null); }}>
+      <AlertDialog
+        open={!!deleteLeadId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteLeadId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir negócio</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir "{leads.find(l => l.id === deleteLeadId)?.name}"? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir "{leads.find((l) => l.id === deleteLeadId)?.name}"?
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Heart } from "lucide-react";
 
 export default function AuthPage() {
@@ -18,22 +18,22 @@ export default function AuthPage() {
     if (!email || !password) return;
     setLoading(true);
     const { error } = await signIn(email, password);
-    if (error) toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+    if (error) toast.error(error.message);
     setLoading(false);
   };
 
   const handleSignUp = async () => {
     if (!email || !password) return;
     if (password.length < 6) {
-      toast({ title: "Senha muito curta", description: "Mínimo de 6 caracteres", variant: "destructive" });
+      toast.error("Mínimo de 6 caracteres");
       return;
     }
     setLoading(true);
     const { error } = await signUp(email, password);
     if (error) {
-      toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
+      toast.error(error.message);
     } else {
-      toast({ title: "Cadastro realizado!", description: "Verifique seu email para confirmar a conta." });
+      toast.success("Cadastro realizado!: Verifique seu email para confirmar a conta.");
     }
     setLoading(false);
   };
@@ -51,18 +51,58 @@ export default function AuthPage() {
         <CardContent>
           <Tabs defaultValue="login">
             <TabsList className="w-full">
-              <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1">Cadastrar</TabsTrigger>
+              <TabsTrigger value="login" className="flex-1">
+                Entrar
+              </TabsTrigger>
+              <TabsTrigger value="register" className="flex-1">
+                Cadastrar
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="login" className="space-y-4 mt-4">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" /></div>
-              <div><Label>Senha</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" /></div>
-              <Button onClick={handleSignIn} disabled={loading} className="w-full">{loading ? "Entrando..." : "Entrar"}</Button>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div>
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                />
+              </div>
+              <Button onClick={handleSignIn} disabled={loading} className="w-full">
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
             </TabsContent>
             <TabsContent value="register" className="space-y-4 mt-4">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" /></div>
-              <div><Label>Senha</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
-              <Button onClick={handleSignUp} disabled={loading} className="w-full">{loading ? "Cadastrando..." : "Criar Conta"}</Button>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div>
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+              <Button onClick={handleSignUp} disabled={loading} className="w-full">
+                {loading ? "Cadastrando..." : "Criar Conta"}
+              </Button>
             </TabsContent>
           </Tabs>
         </CardContent>
