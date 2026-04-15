@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { MessageCircle, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { cleanPhone, normalizePhone } from "@/lib/phone";
 import ConversationList from "@/components/whatsapp/ConversationList";
 import ChatArea from "@/components/whatsapp/ChatArea";
 
@@ -164,8 +165,8 @@ export default function WhatsAppPage() {
     // First, add all contacts (even without messages)
     for (const contact of contacts) {
       const lead = leads.find((l) => {
-        const cleanLeadPhone = l.phone.replace(/\D/g, "");
-        const normalizedLeadPhone = cleanLeadPhone.startsWith("55") ? cleanLeadPhone : `55${cleanLeadPhone}`;
+        const cleanLeadPhone = cleanPhone(l.phone);
+        const normalizedLeadPhone = normalizePhone(l.phone);
         return normalizedLeadPhone === contact.phone || cleanLeadPhone === contact.phone;
       });
 
@@ -185,10 +186,8 @@ export default function WhatsAppPage() {
     messages.forEach((msg) => {
       const existing = map.get(msg.phone);
       const lead = leads.find((l) => {
-        const cleanLeadPhone = l.phone.replace(/\D/g, "");
-        const normalizedLeadPhone = cleanLeadPhone.startsWith("55")
-          ? cleanLeadPhone
-          : `55${cleanLeadPhone}`;
+        const cleanLeadPhone = cleanPhone(l.phone);
+        const normalizedLeadPhone = normalizePhone(l.phone);
         return normalizedLeadPhone === msg.phone || cleanLeadPhone === msg.phone;
       });
 
