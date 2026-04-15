@@ -10,6 +10,7 @@ import { Search, Plus, MessageCircle, ChevronRight, Trash2 } from "lucide-react"
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { toast } from "sonner";
+import { buildWhatsAppUrl } from "@/lib/phone";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -137,7 +138,7 @@ export default function LeadsPage() {
                     {stageInfo?.label}
                   </Badge>
                   <a
-                    href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`}
+                    href={buildWhatsAppUrl(lead.phone)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
