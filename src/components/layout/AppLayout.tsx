@@ -49,6 +49,8 @@ function AppSidebarContent() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { pendingCount } = useCadence();
+  const location = useLocation();
+  const collapsed = state === "collapsed";
   const collapsed = state === "collapsed";
 
   return (
