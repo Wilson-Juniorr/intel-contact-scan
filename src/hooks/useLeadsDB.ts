@@ -114,7 +114,7 @@ export function useLeadsDB() {
           .eq("id", data.id);
       }
 
-      return data;
+      return data as unknown as Lead;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
