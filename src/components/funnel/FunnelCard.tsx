@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { useContactAttempts } from "@/hooks/useContactAttempts";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { buildWhatsAppUrl, cleanPhone } from "@/lib/phone";
+import { formatBRLValue } from "@/lib/currency";
 
 interface Props {
   lead: any;
@@ -16,7 +18,7 @@ interface Props {
 }
 
 export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, onMoveStage }: Props) {
-  const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
+  const whatsappUrl = buildWhatsAppUrl(lead.phone);
   const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
 
   const timeSince = lead.last_contact_at
@@ -62,11 +64,11 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
         {/* Quote / Approved value */}
         {lead.approved_value ? (
           <p className="text-xs font-medium text-emerald-600">
-            ✓ R$ {Number(lead.approved_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            ✓ {formatBRLValue(Number(lead.approved_value))}
           </p>
         ) : lead.quote_min_value ? (
           <p className="text-xs text-muted-foreground">
-            Cotação: R$ {Number(lead.quote_min_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            Cotação: {formatBRLValue(Number(lead.quote_min_value))}
             {lead.quote_operadora && <span className="ml-1 opacity-70">· {lead.quote_operadora}</span>}
           </p>
         ) : estimatedValue ? (
@@ -128,7 +130,7 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
 
       {/* Action icons – visible on hover */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+55${lead.phone.replace(/\D/g, "")}`} />
+        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+${cleanPhone(lead.phone)}`} />
         <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} />
         <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} disabled={!lead.email} />
         
