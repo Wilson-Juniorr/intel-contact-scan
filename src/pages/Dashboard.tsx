@@ -4,7 +4,8 @@ import { useTasks } from "@/hooks/useTasks";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserPlus, Handshake, TrendingUp, AlertTriangle, Phone, CheckSquare } from "lucide-react";
+import { Users, UserPlus, Handshake, TrendingUp, AlertTriangle, Phone, CheckSquare, Plus, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -58,6 +59,28 @@ export default function Dashboard() {
     { label: "Follow-up", value: stats.needsFollowUp.length, icon: Phone, accent: "text-warning" },
     { label: "Tarefas hoje", value: todayTasks.length, icon: CheckSquare, accent: "text-primary" },
   ];
+
+  if (leads.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+        <Users className="h-16 w-16 text-muted-foreground/30" />
+        <div>
+          <h2 className="text-xl font-semibold">Nenhum lead ainda</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Comece criando seu primeiro lead ou sincronizando o WhatsApp.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate("/leads")} className="gap-2">
+            <Plus className="h-4 w-4" /> Criar Lead
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/whatsapp")} className="gap-2">
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
