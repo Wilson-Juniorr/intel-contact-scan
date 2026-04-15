@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { FileText, ChevronDown } from "lucide-react";
-import { getTemplatesForStage, fillTemplateVariables, type MessageTemplate } from "@/data/whatsappTemplates";
+import {
+  getTemplatesForStage,
+  fillTemplateVariables,
+  type MessageTemplate,
+} from "@/data/whatsappTemplates";
 import { FUNNEL_STAGES } from "@/types/lead";
 
 interface Props {
@@ -14,7 +18,13 @@ interface Props {
   onSelect: (message: string) => void;
 }
 
-export default function TemplateSelector({ leadStage, leadName, leadOperator, leadLives, onSelect }: Props) {
+export default function TemplateSelector({
+  leadStage,
+  leadName,
+  leadOperator,
+  leadLives,
+  onSelect,
+}: Props) {
   const [open, setOpen] = useState(false);
   const templates = getTemplatesForStage(leadStage);
 
@@ -64,31 +74,31 @@ export default function TemplateSelector({ leadStage, leadName, leadOperator, le
           )}
         </div>
         <div className="p-1 max-h-[280px] overflow-y-auto">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => handleSelect(t)}
-                className="w-full text-left px-3 py-2 rounded-md hover:bg-[#2a3942] transition-colors group"
-              >
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[13px] text-[#e9edef] font-medium">{t.label}</span>
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] px-1 py-0 h-4"
-                    style={{ borderColor: stageColor(t.stage), color: stageColor(t.stage) }}
-                  >
-                    {stageLabel(t.stage)}
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-[#8696a0] line-clamp-2 group-hover:text-[#aebac1]">
-                  {fillTemplateVariables(t.text, {
-                    nome: leadName || "{nome}",
-                    operadora: leadOperator || "{operadora}",
-                    vidas: leadLives,
-                  })}
-                </p>
-              </button>
-            ))}
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => handleSelect(t)}
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-[#2a3942] transition-colors group"
+            >
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[13px] text-[#e9edef] font-medium">{t.label}</span>
+                <Badge
+                  variant="outline"
+                  className="text-[9px] px-1 py-0 h-4"
+                  style={{ borderColor: stageColor(t.stage), color: stageColor(t.stage) }}
+                >
+                  {stageLabel(t.stage)}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-[#8696a0] line-clamp-2 group-hover:text-[#aebac1]">
+                {fillTemplateVariables(t.text, {
+                  nome: leadName || "{nome}",
+                  operadora: leadOperator || "{operadora}",
+                  vidas: leadLives,
+                })}
+              </p>
+            </button>
+          ))}
         </div>
       </PopoverContent>
     </Popover>

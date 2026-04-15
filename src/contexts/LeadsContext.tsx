@@ -10,7 +10,11 @@ interface LeadsContextType {
   moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => Promise<void>;
   deleteLeads: (ids: string[]) => Promise<void>;
   interactions: any[];
-  addInteraction: (interaction: { lead_id: string; type: string; description: string }) => Promise<void>;
+  addInteraction: (interaction: {
+    lead_id: string;
+    type: string;
+    description: string;
+  }) => Promise<void>;
   getLeadInteractions: (leadId: string) => any[];
 }
 

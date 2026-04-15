@@ -16,15 +16,23 @@ export const CADENCE_RULES: Record<string, number> = {
 
 export const WHATSAPP_MESSAGES: Record<string, string> = {
   novo: "Olá {nome}! Tudo bem? Vi seu interesse em planos de saúde. Posso te ajudar a encontrar a melhor opção para você. Quando podemos conversar?",
-  tentativa_contato: "Olá {nome}! Tentei seu contato anteriormente. Você tem um momento para conversarmos sobre planos de saúde?",
-  contato_realizado: "Olá {nome}! Dando continuidade à nossa conversa, já consegui levantar algumas opções que se encaixam no seu perfil. Posso te enviar?",
-  cotacao_enviada: "Olá {nome}! Enviei a cotação há alguns dias. Conseguiu analisar? Fico à disposição para tirar qualquer dúvida!",
-  cotacao_aprovada: "Olá {nome}! Ótima notícia que gostou da cotação! Podemos avançar com a proposta? Tenho tudo pronto para agilizar a implantação.",
-  documentacao_completa: "Olá {nome}! A documentação está completa. Vamos dar andamento na emissão do plano?",
+  tentativa_contato:
+    "Olá {nome}! Tentei seu contato anteriormente. Você tem um momento para conversarmos sobre planos de saúde?",
+  contato_realizado:
+    "Olá {nome}! Dando continuidade à nossa conversa, já consegui levantar algumas opções que se encaixam no seu perfil. Posso te enviar?",
+  cotacao_enviada:
+    "Olá {nome}! Enviei a cotação há alguns dias. Conseguiu analisar? Fico à disposição para tirar qualquer dúvida!",
+  cotacao_aprovada:
+    "Olá {nome}! Ótima notícia que gostou da cotação! Podemos avançar com a proposta? Tenho tudo pronto para agilizar a implantação.",
+  documentacao_completa:
+    "Olá {nome}! A documentação está completa. Vamos dar andamento na emissão do plano?",
   em_emissao: "Olá {nome}! Seu plano está em processo de emissão. Qualquer novidade te aviso!",
-  aguardando_implantacao: "Olá {nome}! Estamos aguardando a implantação do seu plano. Precisa de algum suporte?",
-  implantado: "Olá {nome}! Passando para saber como está sendo a experiência com o plano. Precisa de algum suporte?",
-  retrabalho: "Olá {nome}! Gostaria de retomar nossa conversa sobre planos de saúde. Posso te apresentar novas opções?",
+  aguardando_implantacao:
+    "Olá {nome}! Estamos aguardando a implantação do seu plano. Precisa de algum suporte?",
+  implantado:
+    "Olá {nome}! Passando para saber como está sendo a experiência com o plano. Precisa de algum suporte?",
+  retrabalho:
+    "Olá {nome}! Gostaria de retomar nossa conversa sobre planos de saúde. Posso te apresentar novas opções?",
 };
 
 export type CadenceStatus = "atrasado" | "hoje" | "agendado";

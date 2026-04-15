@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Lead } from "@/types/lead";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +37,13 @@ interface Props {
   isLoading?: boolean;
 }
 
-const EMAIL_DOMAINS = ["@gmail.com", "@outlook.com", "@hotmail.com", "@yahoo.com.br", "@icloud.com"];
+const EMAIL_DOMAINS = [
+  "@gmail.com",
+  "@outlook.com",
+  "@hotmail.com",
+  "@yahoo.com.br",
+  "@icloud.com",
+];
 
 function formatPhone(value: string): string {
   const digits = cleanPhone(value).slice(0, 11);
@@ -40,7 +52,14 @@ function formatPhone(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, onConfirm, isLoading }: Props) {
+export function EmissionFormDialog({
+  open,
+  onOpenChange,
+  lead,
+  documentsCount,
+  onConfirm,
+  isLoading,
+}: Props) {
   const [vigenciaDate, setVigenciaDate] = useState<Date | undefined>(undefined);
   const [nomePlano, setNomePlano] = useState("");
   const [nomeTitular, setNomeTitular] = useState(lead.name || "");
@@ -102,7 +121,9 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
 
         {/* Lead summary */}
         <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resumo do Lead</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Resumo do Lead
+          </p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1.5">
               <User className="h-3 w-3 text-muted-foreground" />
@@ -130,7 +151,9 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">{lead.type}</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              {lead.type}
+            </Badge>
             <Badge variant="secondary" className="text-[10px]">
               <FileText className="h-2.5 w-2.5 mr-1" />
               {documentsCount} doc(s)
@@ -142,7 +165,9 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
 
         {/* Form fields */}
         <div className="space-y-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dados do Titular</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Dados do Titular
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="nome-titular" className="text-xs flex items-center gap-1.5">
@@ -185,7 +210,8 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
               value={emailTitular}
               onChange={handleEmailChange}
               onFocus={() => {
-                if (!emailTitular.includes("@") && emailTitular.length > 0) setShowEmailSuggestions(true);
+                if (!emailTitular.includes("@") && emailTitular.length > 0)
+                  setShowEmailSuggestions(true);
               }}
               onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
               className="h-9 text-sm"
@@ -198,9 +224,13 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
                     key={domain}
                     type="button"
                     className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-accent transition-colors"
-                    onMouseDown={(e) => { e.preventDefault(); handleEmailDomain(domain); }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleEmailDomain(domain);
+                    }}
                   >
-                    {emailTitular.split("@")[0]}{domain}
+                    {emailTitular.split("@")[0]}
+                    {domain}
                   </button>
                 ))}
               </div>
@@ -208,7 +238,9 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
           </div>
 
           <Separator className="my-1" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Informações do Plano</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Informações do Plano
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="nome-plano" className="text-xs flex items-center gap-1.5">
@@ -239,7 +271,9 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
                   )}
                 >
                   <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                  {vigenciaDate ? format(vigenciaDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecione a data"}
+                  {vigenciaDate
+                    ? format(vigenciaDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                    : "Selecione a data"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -257,10 +291,20 @@ export function EmissionFormDialog({ open, onOpenChange, lead, documentsCount, o
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={isLoading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
             Cancelar
           </Button>
-          <Button size="sm" onClick={handleConfirm} disabled={!canSubmit || isLoading} className="gap-1.5">
+          <Button
+            size="sm"
+            onClick={handleConfirm}
+            disabled={!canSubmit || isLoading}
+            className="gap-1.5"
+          >
             <Send className="h-3 w-3" />
             Gerar Mensagem
           </Button>

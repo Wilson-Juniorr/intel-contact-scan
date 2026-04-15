@@ -4,7 +4,12 @@ import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { useContactAttempts } from "@/hooks/useContactAttempts";
 import { FUNNEL_STAGES, FunnelStage } from "@/types/lead";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { buildWhatsAppUrl, cleanPhone } from "@/lib/phone";
 import { formatBRLValue } from "@/lib/currency";
 
@@ -17,7 +22,14 @@ interface Props {
   onMoveStage?: (id: string, stage: FunnelStage) => void;
 }
 
-export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, onMoveStage }: Props) {
+export function FunnelCard({
+  lead,
+  stageColor,
+  onDragStart,
+  onClick,
+  onDelete,
+  onMoveStage,
+}: Props) {
   const whatsappUrl = buildWhatsAppUrl(lead.phone);
   const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
 
@@ -69,7 +81,9 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
         ) : lead.quote_min_value ? (
           <p className="text-xs text-muted-foreground">
             Cotação: {formatBRLValue(Number(lead.quote_min_value))}
-            {lead.quote_operadora && <span className="ml-1 opacity-70">· {lead.quote_operadora}</span>}
+            {lead.quote_operadora && (
+              <span className="ml-1 opacity-70">· {lead.quote_operadora}</span>
+            )}
           </p>
         ) : estimatedValue ? (
           <p className="text-xs text-muted-foreground">
@@ -94,7 +108,8 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
               <span
                 className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
                 style={{
-                  backgroundColor: (responseRate > 50 ? "hsl(160, 84%, 39%)" : "hsl(38, 92%, 50%)") + "15",
+                  backgroundColor:
+                    (responseRate > 50 ? "hsl(160, 84%, 39%)" : "hsl(38, 92%, 50%)") + "15",
                   color: responseRate > 50 ? "hsl(160, 84%, 39%)" : "hsl(38, 92%, 50%)",
                 }}
               >
@@ -115,25 +130,31 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
 
         {/* Time since */}
         {timeSince && (
-          <p className="text-[10px] text-muted-foreground">
-            Última atividade há {timeSince}
-          </p>
+          <p className="text-[10px] text-muted-foreground">Última atividade há {timeSince}</p>
         )}
 
         {/* Lost reason */}
-        {(lead.stage === "perdido" || lead.stage === "declinado" || lead.stage === "cancelado") && lead.lost_reason && (
-          <div className="text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
-            {lead.lost_reason}
-          </div>
-        )}
+        {(lead.stage === "perdido" || lead.stage === "declinado" || lead.stage === "cancelado") &&
+          lead.lost_reason && (
+            <div className="text-[10px] text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
+              {lead.lost_reason}
+            </div>
+          )}
       </div>
 
       {/* Action icons – visible on hover */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} href={`tel:+${cleanPhone(lead.phone)}`} />
+        <ActionBtn
+          icon={<Phone className="h-3.5 w-3.5" />}
+          href={`tel:+${cleanPhone(lead.phone)}`}
+        />
         <ActionBtn icon={<MessageCircle className="h-3.5 w-3.5" />} href={whatsappUrl} />
-        <ActionBtn icon={<Mail className="h-3.5 w-3.5" />} href={lead.email ? `mailto:${lead.email}` : undefined} disabled={!lead.email} />
-        
+        <ActionBtn
+          icon={<Mail className="h-3.5 w-3.5" />}
+          href={lead.email ? `mailto:${lead.email}` : undefined}
+          disabled={!lead.email}
+        />
+
         {/* Stage change dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -145,7 +166,11 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
               <ArrowRightLeft className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48 max-h-64 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuContent
+            align="start"
+            className="w-48 max-h-64 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             {FUNNEL_STAGES.map((s) => (
               <DropdownMenuItem
                 key={s.key}
@@ -153,9 +178,14 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
                 onClick={() => onMoveStage?.(lead.id, s.key)}
                 className="text-xs gap-2"
               >
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
                 {s.label}
-                {s.key === lead.stage && <span className="ml-auto text-[10px] text-muted-foreground">atual</span>}
+                {s.key === lead.stage && (
+                  <span className="ml-auto text-[10px] text-muted-foreground">atual</span>
+                )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -174,21 +204,42 @@ export function FunnelCard({ lead, stageColor, onDragStart, onClick, onDelete, o
 }
 
 function ActionBtn({
-  icon, href, onClick, disabled = false, className,
+  icon,
+  href,
+  onClick,
+  disabled = false,
+  className,
 }: {
-  icon: React.ReactNode; href?: string; onClick?: () => void; disabled?: boolean; className?: string;
+  icon: React.ReactNode;
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
 }) {
   const cls = `p-1.5 rounded-md transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : className || "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
 
   if (href && !disabled) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={cls}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={cls}
+      >
         {icon}
       </a>
     );
   }
   return (
-    <button onClick={(e) => { e.stopPropagation(); onClick?.(); }} disabled={disabled} className={cls}>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      disabled={disabled}
+      className={cls}
+    >
       {icon}
     </button>
   );

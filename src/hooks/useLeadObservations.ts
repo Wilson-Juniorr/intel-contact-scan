@@ -22,9 +22,30 @@ export const DOC_CATEGORIES = [
 ] as const;
 
 const CHECKLIST_BY_TYPE: Record<string, string[]> = {
-  PF: ["RG / CPF", "Comprovante de Residência", "Cartão SUS", "Declaração de Saúde", "Proposta Assinada"],
-  PJ: ["Contrato Social", "Cartão CNPJ", "RG / CPF dos Titulares", "Declaração de Saúde", "Carta de Adesão", "Comprovante de Vínculo", "Proposta Assinada"],
-  PME: ["Contrato Social", "Cartão CNPJ", "RG / CPF dos Titulares", "Declaração de Saúde", "Relação de Beneficiários", "Proposta Assinada"],
+  PF: [
+    "RG / CPF",
+    "Comprovante de Residência",
+    "Cartão SUS",
+    "Declaração de Saúde",
+    "Proposta Assinada",
+  ],
+  PJ: [
+    "Contrato Social",
+    "Cartão CNPJ",
+    "RG / CPF dos Titulares",
+    "Declaração de Saúde",
+    "Carta de Adesão",
+    "Comprovante de Vínculo",
+    "Proposta Assinada",
+  ],
+  PME: [
+    "Contrato Social",
+    "Cartão CNPJ",
+    "RG / CPF dos Titulares",
+    "Declaração de Saúde",
+    "Relação de Beneficiários",
+    "Proposta Assinada",
+  ],
 };
 
 export function useLeadObservations(leadId: string | undefined) {

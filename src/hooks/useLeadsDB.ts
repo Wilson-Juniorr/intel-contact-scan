@@ -14,13 +14,9 @@ export function useLeadsDB() {
     if (!user) return;
     const channel = supabase
       .channel("leads-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "leads" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["leads"] });
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["leads"] });
+      })
       .subscribe();
 
     return () => {
@@ -93,12 +89,15 @@ export function useLeadsDB() {
         .eq("user_id", user!.id);
 
       // Initialize lead_memory
-      await supabase.from("lead_memory").upsert({
-        user_id: user!.id,
-        lead_id: data.id,
-        summary: null,
-        structured_json: {},
-      }, { onConflict: "lead_id" });
+      await supabase.from("lead_memory").upsert(
+        {
+          user_id: user!.id,
+          lead_id: data.id,
+          summary: null,
+          structured_json: {},
+        },
+        { onConflict: "lead_id" }
+      );
 
       // Update last_contact_at from most recent message
       const { data: lastMsg } = await supabase
@@ -109,7 +108,10 @@ export function useLeadsDB() {
         .limit(1)
         .maybeSingle();
       if (lastMsg) {
-        await supabase.from("leads").update({ last_contact_at: lastMsg.created_at }).eq("id", data.id);
+        await supabase
+          .from("leads")
+          .update({ last_contact_at: lastMsg.created_at })
+          .eq("id", data.id);
       }
 
       return data;
@@ -126,7 +128,15 @@ export function useLeadsDB() {
   });
 
   const moveStageMutation = useMutation({
-    mutationFn: async ({ id, stage, lost_reason }: { id: string; stage: FunnelStage; lost_reason?: string }) => {
+    mutationFn: async ({
+      id,
+      stage,
+      lost_reason,
+    }: {
+      id: string;
+      stage: FunnelStage;
+      lost_reason?: string;
+    }) => {
       const { error } = await supabase.from("leads").update({ stage, lost_reason }).eq("id", id);
       if (error) throw error;
     },
@@ -134,7 +144,16 @@ export function useLeadsDB() {
       await queryClient.cancelQueries({ queryKey: ["leads"] });
       const previous = queryClient.getQueryData(["leads", user?.id]);
       queryClient.setQueryData(["leads", user?.id], (old: any[] | undefined) =>
-        (old || []).map((l) => l.id === id ? { ...l, stage, lost_reason: lost_reason ?? l.lost_reason, updated_at: new Date().toISOString() } : l)
+        (old || []).map((l) =>
+          l.id === id
+            ? {
+                ...l,
+                stage,
+                lost_reason: lost_reason ?? l.lost_reason,
+                updated_at: new Date().toISOString(),
+              }
+            : l
+        )
       );
       return { previous };
     },
@@ -159,7 +178,10 @@ export function useLeadsDB() {
         .insert({ ...interaction, user_id: user!.id });
       if (intError) throw intError;
 
-      await supabase.from("leads").update({ last_contact_at: new Date().toISOString() }).eq("id", interaction.lead_id);
+      await supabase
+        .from("leads")
+        .update({ last_contact_at: new Date().toISOString() })
+        .eq("id", interaction.lead_id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["interactions"] });
@@ -177,8 +199,10 @@ export function useLeadsDB() {
     isLoading: leadsQuery.isLoading,
     interactions: interactionsQuery.data || [],
     addLead: addLeadMutation.mutateAsync,
-    updateLead: (id: string, updates: Record<string, unknown>) => updateLeadMutation.mutateAsync({ id, updates }),
-    moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => moveStageMutation.mutateAsync({ id, stage, lost_reason }),
+    updateLead: (id: string, updates: Record<string, unknown>) =>
+      updateLeadMutation.mutateAsync({ id, updates }),
+    moveStage: (id: string, stage: FunnelStage, lost_reason?: string) =>
+      moveStageMutation.mutateAsync({ id, stage, lost_reason }),
     deleteLeads: (ids: string[]) => deleteLeadsMutation.mutateAsync(ids),
     addInteraction: addInteractionMutation.mutateAsync,
     getLeadInteractions,

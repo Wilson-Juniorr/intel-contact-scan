@@ -64,33 +64,38 @@ export default function AIRewriteModal({
     setVariants([]);
     setSelectedIdx(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) {
         toast.error("Você precisa estar logado");
         return;
       }
 
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rewrite-message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          currentText,
-          leadId: leadId || null,
-          objective: objective.trim(),
-          context: context.trim(),
-          tone,
-          shortMode,
-          naturalMode,
-          leadStage,
-          leadType,
-          leadOperator,
-          leadLives,
-          leadName,
-        }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rewrite-message`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            currentText,
+            leadId: leadId || null,
+            objective: objective.trim(),
+            context: context.trim(),
+            tone,
+            shortMode,
+            naturalMode,
+            leadStage,
+            leadType,
+            leadOperator,
+            leadLives,
+            leadName,
+          }),
+        }
+      );
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Erro ao gerar variações" }));
@@ -157,7 +162,9 @@ export default function AIRewriteModal({
             {/* Original text preview */}
             <div className="bg-[#0b141a] rounded-lg p-3 border border-[#2a3942]">
               <p className="text-[11px] text-[#8696a0] mb-1">Texto original:</p>
-              <p className="text-[13px] text-[#e9edef] whitespace-pre-wrap line-clamp-3">{currentText}</p>
+              <p className="text-[13px] text-[#e9edef] whitespace-pre-wrap line-clamp-3">
+                {currentText}
+              </p>
             </div>
 
             {/* Objective */}
@@ -240,7 +247,11 @@ export default function AIRewriteModal({
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              {loading ? "Gerando variações..." : variants.length > 0 ? "Regenerar" : "Gerar variações"}
+              {loading
+                ? "Gerando variações..."
+                : variants.length > 0
+                  ? "Regenerar"
+                  : "Gerar variações"}
             </Button>
 
             {/* Loading state */}
@@ -278,7 +289,9 @@ export default function AIRewriteModal({
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
-                            <span className={`text-[12px] font-medium ${meta.color}`}>{meta.label}</span>
+                            <span className={`text-[12px] font-medium ${meta.color}`}>
+                              {meta.label}
+                            </span>
                             <span className="text-[10px] text-[#8696a0]">({v.length} chars)</span>
                           </div>
                           <Button
@@ -295,7 +308,9 @@ export default function AIRewriteModal({
                             {isSelected ? "Selecionado" : "Usar esta"}
                           </Button>
                         </div>
-                        <p className="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed">{v}</p>
+                        <p className="text-[13px] text-[#e9edef] whitespace-pre-wrap leading-relaxed">
+                          {v}
+                        </p>
                       </motion.div>
                     );
                   })}

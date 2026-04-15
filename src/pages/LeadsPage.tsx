@@ -31,9 +31,7 @@ export default function LeadsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const filtered = leads.filter(
-    (l) =>
-      l.name.toLowerCase().includes(search.toLowerCase()) ||
-      l.phone.includes(search)
+    (l) => l.name.toLowerCase().includes(search.toLowerCase()) || l.phone.includes(search)
   );
 
   const toggleSelect = (id: string) => {
@@ -115,14 +113,15 @@ export default function LeadsPage() {
             >
               <CardContent className="p-4 flex items-center gap-4">
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => toggleSelect(lead.id)}
-                  />
+                  <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(lead.id)} />
                 </div>
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="text-primary font-semibold text-sm">
-                    {lead.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                    {lead.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .slice(0, 2)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -134,7 +133,11 @@ export default function LeadsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="outline" className="text-[10px]" style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px]"
+                    style={{ borderColor: stageInfo?.color, color: stageInfo?.color }}
+                  >
                     {stageInfo?.label}
                   </Badge>
                   <a
@@ -157,7 +160,9 @@ export default function LeadsPage() {
             <Users className="h-12 w-12 text-muted-foreground/30" />
             <div>
               <p className="font-medium">Nenhum lead cadastrado</p>
-              <p className="text-sm text-muted-foreground">Crie seu primeiro lead para começar a gerenciar.</p>
+              <p className="text-sm text-muted-foreground">
+                Crie seu primeiro lead para começar a gerenciar.
+              </p>
             </div>
             <Button onClick={() => setFormOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Criar Lead
@@ -179,12 +184,16 @@ export default function LeadsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir {selectedIds.size} lead(s)? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir {selectedIds.size} lead(s)? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>

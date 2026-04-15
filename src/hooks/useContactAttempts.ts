@@ -72,7 +72,8 @@ export function useContactAttempts(leadPhone: string | undefined) {
       );
       if (inboundAfter) {
         responded++;
-        const respTime = (new Date(inboundAfter.created_at).getTime() - session.lastMsg.getTime()) / 60000;
+        const respTime =
+          (new Date(inboundAfter.created_at).getTime() - session.lastMsg.getTime()) / 60000;
         responseTimes.push(respTime);
       }
     }

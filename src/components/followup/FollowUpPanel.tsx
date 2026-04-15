@@ -5,9 +5,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Clock, AlertTriangle, Sparkles, Copy, Check, Loader2, RefreshCw, Pencil, Send, Search, SendHorizonal, Brain, Lightbulb, Shield, Zap, Activity, Eye } from "lucide-react";
+import {
+  MessageCircle,
+  Clock,
+  AlertTriangle,
+  Sparkles,
+  Copy,
+  Check,
+  Loader2,
+  RefreshCw,
+  Pencil,
+  Send,
+  Search,
+  SendHorizonal,
+  Brain,
+  Lightbulb,
+  Shield,
+  Zap,
+  Activity,
+  Eye,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -35,20 +60,52 @@ function getIdleInfo(lead: any): IdleLead {
 }
 
 const urgencyConfig = {
-  critical: { label: "Crítico", color: "bg-destructive text-destructive-foreground", icon: AlertTriangle },
+  critical: {
+    label: "Crítico",
+    color: "bg-destructive text-destructive-foreground",
+    icon: AlertTriangle,
+  },
   high: { label: "Urgente", color: "bg-warning text-warning-foreground", icon: Clock },
   medium: { label: "Atenção", color: "bg-accent text-accent-foreground", icon: Clock },
   low: { label: "OK", color: "bg-muted text-muted-foreground", icon: Clock },
 };
 
 const strategyLabels: Record<string, { label: string; emoji: string; color: string }> = {
-  destravar_resposta: { label: "Destravar Resposta", emoji: "🔓", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
-  tratar_objecao: { label: "Tratar Objeção", emoji: "🛡️", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
-  reforcar_valor: { label: "Reforçar Valor", emoji: "💎", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  fechar_proxima_etapa: { label: "Fechar Próxima Etapa", emoji: "🎯", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  recuperar_lead_frio: { label: "Recuperar Lead Frio", emoji: "❄️", color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300" },
-  acompanhar_processo: { label: "Acompanhar Processo", emoji: "📋", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
-  primeira_abordagem: { label: "Primeira Abordagem", emoji: "👋", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  destravar_resposta: {
+    label: "Destravar Resposta",
+    emoji: "🔓",
+    color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  },
+  tratar_objecao: {
+    label: "Tratar Objeção",
+    emoji: "🛡️",
+    color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  },
+  reforcar_valor: {
+    label: "Reforçar Valor",
+    emoji: "💎",
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  },
+  fechar_proxima_etapa: {
+    label: "Fechar Próxima Etapa",
+    emoji: "🎯",
+    color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  },
+  recuperar_lead_frio: {
+    label: "Recuperar Lead Frio",
+    emoji: "❄️",
+    color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
+  },
+  acompanhar_processo: {
+    label: "Acompanhar Processo",
+    emoji: "📋",
+    color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  },
+  primeira_abordagem: {
+    label: "Primeira Abordagem",
+    emoji: "👋",
+    color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  },
 };
 
 function formatIdleTime(hours: number, days: number) {
@@ -58,9 +115,15 @@ function formatIdleTime(hours: number, days: number) {
 }
 
 const stagePriority: Record<string, number> = {
-  tentativa_contato: 1, contato_realizado: 2, cotacao_enviada: 3,
-  novo: 4, cotacao_aprovada: 5, documentacao_completa: 6,
-  em_emissao: 7, aguardando_implantacao: 8, retrabalho: 9,
+  tentativa_contato: 1,
+  contato_realizado: 2,
+  cotacao_enviada: 3,
+  novo: 4,
+  cotacao_aprovada: 5,
+  documentacao_completa: 6,
+  em_emissao: 7,
+  aguardando_implantacao: 8,
+  retrabalho: 9,
 };
 
 interface Timeline {
@@ -109,7 +172,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [regeneratingMsg, setRegeneratingMsg] = useState<{ leadId: string; idx: number } | null>(null);
+  const [regeneratingMsg, setRegeneratingMsg] = useState<{ leadId: string; idx: number } | null>(
+    null
+  );
   const [results, setResults] = useState<Record<string, FollowUpResult>>({});
   const [copiedIdx, setCopiedIdx] = useState<{ leadId: string; idx: number } | null>(null);
   const [editingMsg, setEditingMsg] = useState<{ leadId: string; idx: number } | null>(null);
@@ -127,12 +192,10 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
   const idleLeads = useMemo(() => {
     let base = leads.filter((l) => !excludedStages.includes(l.stage));
     if (singleLeadId) base = base.filter((l) => l.id === singleLeadId);
-    return base
-      .map(getIdleInfo)
-      .sort((a, b) => {
-        if (b.idleDays !== a.idleDays) return b.idleDays - a.idleDays;
-        return (stagePriority[a.lead.stage] || 99) - (stagePriority[b.lead.stage] || 99);
-      });
+    return base.map(getIdleInfo).sort((a, b) => {
+      if (b.idleDays !== a.idleDays) return b.idleDays - a.idleDays;
+      return (stagePriority[a.lead.stage] || 99) - (stagePriority[b.lead.stage] || 99);
+    });
   }, [leads, singleLeadId]);
 
   const filtered = useMemo(() => {
@@ -140,42 +203,52 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     if (filter !== "all") result = result.filter((il) => il.urgency === filter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((il) =>
-        il.lead.name.toLowerCase().includes(q) ||
-        il.lead.phone.includes(q) ||
-        (il.lead.email && il.lead.email.toLowerCase().includes(q))
+      result = result.filter(
+        (il) =>
+          il.lead.name.toLowerCase().includes(q) ||
+          il.lead.phone.includes(q) ||
+          (il.lead.email && il.lead.email.toLowerCase().includes(q))
       );
     }
     if (typeFilter !== "all") result = result.filter((il) => il.lead.type === typeFilter);
-    if (operatorFilter !== "all") result = result.filter((il) => il.lead.operator === operatorFilter);
+    if (operatorFilter !== "all")
+      result = result.filter((il) => il.lead.operator === operatorFilter);
     return result;
   }, [idleLeads, filter, searchQuery, typeFilter, operatorFilter]);
 
-  const stats = useMemo(() => ({
-    critical: idleLeads.filter((l) => l.urgency === "critical").length,
-    high: idleLeads.filter((l) => l.urgency === "high").length,
-    medium: idleLeads.filter((l) => l.urgency === "medium").length,
-    total: idleLeads.length,
-  }), [idleLeads]);
+  const stats = useMemo(
+    () => ({
+      critical: idleLeads.filter((l) => l.urgency === "critical").length,
+      high: idleLeads.filter((l) => l.urgency === "high").length,
+      medium: idleLeads.filter((l) => l.urgency === "medium").length,
+      total: idleLeads.length,
+    }),
+    [idleLeads]
+  );
 
   const generateMessage = async (il: IdleLead) => {
     setGeneratingFor(il.lead.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) {
         toast.error("Você precisa estar logado");
         setGeneratingFor(null);
         return;
       }
       const userContext = contexts[il.lead.id]?.trim() || "";
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ leadId: il.lead.id, userContext }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ leadId: il.lead.id, userContext }),
+        }
+      );
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Erro ao gerar mensagem" }));
         throw new Error(err.error || "Erro ao gerar mensagem");
@@ -191,8 +264,17 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
           silence_stage: data.silence_stage || "early",
           pressure_level: data.pressure_level || "soft",
           flow_pattern: data.flow_pattern || "default",
-          behavior: data.behavior || { decision_style: null, likely_objection: null, energy_level: null, confidence: "low" },
-          guardrails: data.guardrails || { must_confirm_network: false, avoid_discount_promises: false, competitor_mode: false },
+          behavior: data.behavior || {
+            decision_style: null,
+            likely_objection: null,
+            energy_level: null,
+            confidence: "low",
+          },
+          guardrails: data.guardrails || {
+            must_confirm_network: false,
+            avoid_discount_promises: false,
+            competitor_mode: false,
+          },
           urgency_flag: data.urgency_flag || false,
           messages: Array.isArray(data.messages) ? data.messages : [data.message],
           risk_flags: Array.isArray(data.risk_flags) ? data.risk_flags : [],
@@ -220,8 +302,8 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         description: `[Follow-up ${idx + 1}] ${message.slice(0, 100)}${message.length > 100 ? "..." : ""}`,
       });
 
-      toast.success(`✅ Enviado!: ${(`Mensagem ${idx + 1} enviada para ${lead.name}`)}`);
-      
+      toast.success(`✅ Enviado!: ${`Mensagem ${idx + 1} enviada para ${lead.name}`}`);
+
       setResults((prev) => {
         const r = prev[lead.id];
         if (!r) return prev;
@@ -258,7 +340,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         description: `[Follow-up sequência ${msgs.length}x] ${msgs[0].slice(0, 80)}...`,
       });
 
-      toast.success(`✅ Sequência enviada!: ${(`${msgs.length} mensagens enviadas para ${lead.name}`)}`);
+      toast.success(
+        `✅ Sequência enviada!: ${`${msgs.length} mensagens enviadas para ${lead.name}`}`
+      );
       setResults((prev) => {
         const copy = { ...prev };
         delete copy[lead.id];
@@ -300,23 +384,28 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     if (!result) return;
     setRegeneratingMsg({ leadId, idx });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Não autenticado");
       const userContext = contexts[leadId]?.trim() || "";
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          leadId,
-          userContext,
-          regenerateIndex: idx,
-          existingMessages: result.messages,
-          existingAnalysis: result.analysis,
-        }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/follow-up-message`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            leadId,
+            userContext,
+            regenerateIndex: idx,
+            existingMessages: result.messages,
+            existingAnalysis: result.analysis,
+          }),
+        }
+      );
       if (!resp.ok) throw new Error("Erro ao regenerar mensagem");
       const data = await resp.json();
       if (data.message) {
@@ -330,7 +419,8 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     }
   };
   const stageLabel = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.label || key;
-  const stageColor = (key: string) => FUNNEL_STAGES.find((s) => s.key === key)?.color || "hsl(0,0%,50%)";
+  const stageColor = (key: string) =>
+    FUNNEL_STAGES.find((s) => s.key === key)?.color || "hsl(0,0%,50%)";
 
   const isSingle = !!singleLeadId;
 
@@ -359,7 +449,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             />
           </div>
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos ({idleLeads.length})</SelectItem>
               <SelectItem value="critical">Críticos ({stats.critical})</SelectItem>
@@ -369,7 +461,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 w-[100px] text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[100px] text-xs">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos tipos</SelectItem>
               <SelectItem value="PF">PF</SelectItem>
@@ -378,11 +472,15 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
             </SelectContent>
           </Select>
           <Select value={operatorFilter} onValueChange={setOperatorFilter}>
-            <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue placeholder="Operadora" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Operadora" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas operadoras</SelectItem>
               {operators.map((op) => (
-                <SelectItem key={op} value={op}>{op}</SelectItem>
+                <SelectItem key={op} value={op}>
+                  {op}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -414,7 +512,14 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-sm truncate">{il.lead.name}</span>
-                      <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: stageColor(il.lead.stage), color: stageColor(il.lead.stage) }}>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] shrink-0"
+                        style={{
+                          borderColor: stageColor(il.lead.stage),
+                          color: stageColor(il.lead.stage),
+                        }}
+                      >
                         {stageLabel(il.lead.stage)}
                       </Badge>
                       <Badge variant="secondary" className="text-[10px] shrink-0">
@@ -428,7 +533,11 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                       {il.lead.email && <span>• {il.lead.email}</span>}
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-1">
-                      Último contato: {formatDistanceToNow(new Date(lastActivity), { addSuffix: true, locale: ptBR })}
+                      Último contato:{" "}
+                      {formatDistanceToNow(new Date(lastActivity), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
                     </div>
                   </div>
                   <Badge className={`${cfg.color} text-[10px] shrink-0 gap-1`}>
@@ -441,7 +550,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                 <Textarea
                   placeholder="Contexto para a IA (ex: 'Já enviei cotação por email ontem', 'Ele pediu desconto')"
                   value={contexts[il.lead.id] || ""}
-                  onChange={(e) => setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))}
+                  onChange={(e) =>
+                    setContexts((prev) => ({ ...prev, [il.lead.id]: e.target.value }))
+                  }
                   className="text-xs min-h-[48px] resize-none"
                   rows={2}
                 />
@@ -452,7 +563,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                     {/* Header row */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Brain Pro V2</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Brain Pro V2
+                      </span>
                       {strat && (
                         <Badge className={`${strat.color} text-[10px] gap-1`}>
                           <span>{strat.emoji}</span> {strat.label}
@@ -470,7 +583,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                     {result.goal && (
                       <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                         <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
-                        <span><strong>Objetivo:</strong> {result.goal}</span>
+                        <span>
+                          <strong>Objetivo:</strong> {result.goal}
+                        </span>
                       </div>
                     )}
 
@@ -479,10 +594,14 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                       <div className="rounded border border-border/60 bg-background/50 p-2 space-y-1">
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Timeline do lead</span>
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">
+                            Timeline do lead
+                          </span>
                         </div>
                         <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-                          <span>📅 {result.timeline.days_since_first_contact}d desde 1º contato</span>
+                          <span>
+                            📅 {result.timeline.days_since_first_contact}d desde 1º contato
+                          </span>
                           <span>📌 {result.timeline.days_in_current_stage}d na etapa atual</span>
                           <span>🔇 {result.timeline.days_since_last_contact}d sem contato</span>
                           <span>📊 {result.timeline.total_interactions} interações</span>
@@ -490,7 +609,9 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                           <span>📥 {result.timeline.inbound_responses} recebidas</span>
                         </div>
                         {result.timeline.avg_response_time_days !== null && (
-                          <p className="text-[10px] text-muted-foreground">⏱️ Tempo médio de resposta: {result.timeline.avg_response_time_days}d</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            ⏱️ Tempo médio de resposta: {result.timeline.avg_response_time_days}d
+                          </p>
                         )}
                       </div>
                     )}
@@ -507,39 +628,73 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                       <div className="rounded border border-border/60 bg-background/50 p-2 space-y-1">
                         <div className="flex items-center gap-1.5">
                           <Eye className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Leitura comportamental</span>
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">
+                            Leitura comportamental
+                          </span>
                           <Badge variant="outline" className="text-[8px] h-3.5 px-1">
-                            {result.behavior.confidence === "high" ? "Alta confiança" : "Média confiança"}
+                            {result.behavior.confidence === "high"
+                              ? "Alta confiança"
+                              : "Média confiança"}
                           </Badge>
                         </div>
                         <div className="flex gap-2 flex-wrap text-[10px] text-muted-foreground">
-                          {result.behavior.decision_style && <span>🧠 {behaviorLabels.decision[result.behavior.decision_style]}</span>}
-                          {result.behavior.likely_objection && <span>🛡️ {behaviorLabels.objection[result.behavior.likely_objection]}</span>}
-                          {result.behavior.energy_level && <span>⚡ {behaviorLabels.energy[result.behavior.energy_level]}</span>}
+                          {result.behavior.decision_style && (
+                            <span>
+                              🧠 {behaviorLabels.decision[result.behavior.decision_style]}
+                            </span>
+                          )}
+                          {result.behavior.likely_objection && (
+                            <span>
+                              🛡️ {behaviorLabels.objection[result.behavior.likely_objection]}
+                            </span>
+                          )}
+                          {result.behavior.energy_level && (
+                            <span>⚡ {behaviorLabels.energy[result.behavior.energy_level]}</span>
+                          )}
                         </div>
                       </div>
                     )}
 
                     {/* Guardrails */}
-                    {result.guardrails && (result.guardrails.must_confirm_network || result.guardrails.avoid_discount_promises || result.guardrails.competitor_mode) && (
-                      <div className="rounded border border-warning/30 bg-warning/5 p-2 space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <Shield className="h-3 w-3 text-warning" />
-                          <span className="text-[9px] font-semibold uppercase text-warning">Guardrails ativos</span>
+                    {result.guardrails &&
+                      (result.guardrails.must_confirm_network ||
+                        result.guardrails.avoid_discount_promises ||
+                        result.guardrails.competitor_mode) && (
+                        <div className="rounded border border-warning/30 bg-warning/5 p-2 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Shield className="h-3 w-3 text-warning" />
+                            <span className="text-[9px] font-semibold uppercase text-warning">
+                              Guardrails ativos
+                            </span>
+                          </div>
+                          <div className="flex gap-2 flex-wrap text-[10px]">
+                            {result.guardrails.must_confirm_network && (
+                              <Badge variant="outline" className="text-[8px] border-warning/40">
+                                🏥 Confirmar rede
+                              </Badge>
+                            )}
+                            {result.guardrails.avoid_discount_promises && (
+                              <Badge variant="outline" className="text-[8px] border-warning/40">
+                                💰 Sem prometer desconto
+                              </Badge>
+                            )}
+                            {result.guardrails.competitor_mode && (
+                              <Badge variant="outline" className="text-[8px] border-warning/40">
+                                🤝 Modo consultivo
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-2 flex-wrap text-[10px]">
-                          {result.guardrails.must_confirm_network && <Badge variant="outline" className="text-[8px] border-warning/40">🏥 Confirmar rede</Badge>}
-                          {result.guardrails.avoid_discount_promises && <Badge variant="outline" className="text-[8px] border-warning/40">💰 Sem prometer desconto</Badge>}
-                          {result.guardrails.competitor_mode && <Badge variant="outline" className="text-[8px] border-warning/40">🤝 Modo consultivo</Badge>}
-                        </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Risk flags */}
                     {result.risk_flags && result.risk_flags.length > 0 && (
                       <div className="space-y-1">
                         {result.risk_flags.map((flag, i) => (
-                          <div key={i} className="flex items-start gap-1.5 text-[10px] text-destructive/80">
+                          <div
+                            key={i}
+                            className="flex items-start gap-1.5 text-[10px] text-destructive/80"
+                          >
                             <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
                             <span>{flag}</span>
                           </div>
@@ -561,7 +716,10 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                       const isSending = sendingFor === `${il.lead.id}-${idx}`;
 
                       return (
-                        <div key={idx} className="group relative rounded-lg border border-border bg-muted/30 p-3">
+                        <div
+                          key={idx}
+                          className="group relative rounded-lg border border-border bg-muted/30 p-3"
+                        >
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
                               {idx + 1}/{msgs.length}
@@ -579,26 +737,59 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
                             <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg}</p>
                           )}
                           <div className="flex items-center gap-1 mt-2">
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
-                              onClick={() => setEditingMsg(isEditing ? null : { leadId: il.lead.id, idx })}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() =>
+                                setEditingMsg(isEditing ? null : { leadId: il.lead.id, idx })
+                              }
+                            >
                               <Pencil className="h-3 w-3" />
                               {isEditing ? "OK" : "Editar"}
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
-                              onClick={() => copyMessage(il.lead.id, idx, msg)}>
-                              {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5"
+                              onClick={() => copyMessage(il.lead.id, idx, msg)}
+                            >
+                              {isCopied ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5"
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5"
                               onClick={() => regenerateSingleMessage(il.lead.id, idx)}
-                              disabled={regeneratingMsg?.leadId === il.lead.id && regeneratingMsg.idx === idx}>
-                              {regeneratingMsg?.leadId === il.lead.id && regeneratingMsg.idx === idx
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <RefreshCw className="h-3 w-3" />}
+                              disabled={
+                                regeneratingMsg?.leadId === il.lead.id &&
+                                regeneratingMsg.idx === idx
+                              }
+                            >
+                              {regeneratingMsg?.leadId === il.lead.id &&
+                              regeneratingMsg.idx === idx ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
                               Regenerar
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
-                              onClick={() => sendSingleMessage(il.lead, msg, idx)} disabled={!!isSending}>
-                              {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] gap-1 px-1.5 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => sendSingleMessage(il.lead, msg, idx)}
+                              disabled={!!isSending}
+                            >
+                              {isSending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Send className="h-3 w-3" />
+                              )}
                               Enviar
                             </Button>
                           </div>
@@ -610,8 +801,13 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button size="sm" variant="outline" className="text-xs gap-1.5"
-                    onClick={() => generateMessage(il)} disabled={generatingFor === il.lead.id}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1.5"
+                    onClick={() => generateMessage(il)}
+                    disabled={generatingFor === il.lead.id}
+                  >
                     {generatingFor === il.lead.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : result ? (
@@ -624,18 +820,32 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
 
                   {msgs && msgs.length > 0 && (
                     <>
-                      <Button size="sm" className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={() => sendAllMessages(il.lead, msgs)} disabled={sendingAll === il.lead.id}>
+                      <Button
+                        size="sm"
+                        className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => sendAllMessages(il.lead, msgs)}
+                        disabled={sendingAll === il.lead.id}
+                      >
                         {sendingAll === il.lead.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <SendHorizonal className="h-3.5 w-3.5" />
                         )}
-                        {sendingAll === il.lead.id ? "Enviando..." : `Enviar sequência (${msgs.length})`}
+                        {sendingAll === il.lead.id
+                          ? "Enviando..."
+                          : `Enviar sequência (${msgs.length})`}
                       </Button>
-                      <Button size="sm" variant="ghost" className="text-xs gap-1"
-                        onClick={() => copyAll(il.lead.id, msgs)}>
-                        {copiedIdx?.leadId === il.lead.id && copiedIdx.idx === -1 ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs gap-1"
+                        onClick={() => copyAll(il.lead.id, msgs)}
+                      >
+                        {copiedIdx?.leadId === il.lead.id && copiedIdx.idx === -1 ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
                         Copiar tudo
                       </Button>
                     </>
@@ -651,9 +861,22 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
 }
 
 const behaviorLabels = {
-  decision: { analytical: "Analítico", practical: "Prático", emotional: "Emocional", skeptical: "Cético" } as Record<string, string>,
-  objection: { price: "Preço", trust: "Confiança", indecision: "Indecisão", comparison: "Comparação" } as Record<string, string>,
-  energy: { high: "Energia alta", medium: "Energia média", low: "Energia baixa" } as Record<string, string>,
+  decision: {
+    analytical: "Analítico",
+    practical: "Prático",
+    emotional: "Emocional",
+    skeptical: "Cético",
+  } as Record<string, string>,
+  objection: {
+    price: "Preço",
+    trust: "Confiança",
+    indecision: "Indecisão",
+    comparison: "Comparação",
+  } as Record<string, string>,
+  energy: { high: "Energia alta", medium: "Energia média", low: "Energia baixa" } as Record<
+    string,
+    string
+  >,
 };
 
 function SilenceChip({ stage }: { stage: string }) {
@@ -663,7 +886,12 @@ function SilenceChip({ stage }: { stage: string }) {
     late: { label: "Silêncio longo", cls: "bg-destructive/10 text-destructive" },
   };
   const c = cfg[stage] || cfg.early;
-  return <Badge className={`${c.cls} text-[9px] gap-0.5`}><Clock className="h-2.5 w-2.5" />{c.label}</Badge>;
+  return (
+    <Badge className={`${c.cls} text-[9px] gap-0.5`}>
+      <Clock className="h-2.5 w-2.5" />
+      {c.label}
+    </Badge>
+  );
 }
 
 function PressureChip({ level }: { level: string }) {
@@ -673,7 +901,12 @@ function PressureChip({ level }: { level: string }) {
     direct: { label: "Pressão direta", cls: "bg-primary/10 text-primary" },
   };
   const c = cfg[level] || cfg.soft;
-  return <Badge className={`${c.cls} text-[9px] gap-0.5`}><Activity className="h-2.5 w-2.5" />{c.label}</Badge>;
+  return (
+    <Badge className={`${c.cls} text-[9px] gap-0.5`}>
+      <Activity className="h-2.5 w-2.5" />
+      {c.label}
+    </Badge>
+  );
 }
 
 function FlowChip({ pattern }: { pattern: string }) {
@@ -683,7 +916,11 @@ function FlowChip({ pattern }: { pattern: string }) {
     validate_tension_direct: { label: "Validar→Tensão→CTA" },
   };
   const c = cfg[pattern] || cfg.default;
-  return <Badge variant="outline" className="text-[9px]">{c.label}</Badge>;
+  return (
+    <Badge variant="outline" className="text-[9px]">
+      {c.label}
+    </Badge>
+  );
 }
 
 function StatCard({ label, value, variant }: { label: string; value: number; variant: string }) {

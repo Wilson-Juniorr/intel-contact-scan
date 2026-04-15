@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +26,22 @@ interface Props {
   loading?: boolean;
   /** "quote" = confirming a quote, "approved" = entering approved value */
   mode: "quote" | "approved";
-  onConfirm: (data: { min_value?: number; operadora?: string; plan_name?: string; approved_value?: number }) => void;
+  onConfirm: (data: {
+    min_value?: number;
+    operadora?: string;
+    plan_name?: string;
+    approved_value?: number;
+  }) => void;
 }
 
-export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mode, onConfirm }: Props) {
+export function QuoteConfirmDialog({
+  open,
+  onOpenChange,
+  quoteData,
+  loading,
+  mode,
+  onConfirm,
+}: Props) {
   const [minValue, setMinValue] = useState("");
   const [operadora, setOperadora] = useState("");
   const [planName, setPlanName] = useState("");
@@ -38,7 +55,7 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
     }
   }, [quoteData, mode]);
 
-  const isLowConfidence = !quoteData || (quoteData.confidence < 0.5);
+  const isLowConfidence = !quoteData || quoteData.confidence < 0.5;
 
   const handleSubmit = () => {
     if (mode === "approved") {
@@ -72,7 +89,9 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
             <div>
               <Label className="text-xs font-medium">Valor aprovado (R$/mês) *</Label>
               <Input
-                type="number" step="0.01" min="0"
+                type="number"
+                step="0.01"
+                min="0"
                 placeholder="Ex: 450.00"
                 value={approvedValue}
                 onChange={(e) => setApprovedValue(e.target.value)}
@@ -81,8 +100,14 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button size="sm" onClick={handleSubmit} disabled={!approvedValue || parseFloat(approvedValue) <= 0}>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              disabled={!approvedValue || parseFloat(approvedValue) <= 0}
+            >
               Confirmar e Avançar
             </Button>
           </DialogFooter>
@@ -123,7 +148,9 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
             <div>
               <Label className="text-xs font-medium">Menor valor mensal (R$) *</Label>
               <Input
-                type="number" step="0.01" min="0"
+                type="number"
+                step="0.01"
+                min="0"
                 placeholder="Ex: 299.90"
                 value={minValue}
                 onChange={(e) => setMinValue(e.target.value)}
@@ -155,7 +182,9 @@ export function QuoteConfirmDialog({ open, onOpenChange, quoteData, loading, mod
         )}
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
           <Button size="sm" onClick={handleSubmit} disabled={loading}>
             {minValue && parseFloat(minValue) > 0 ? "Confirmar Cotação" : "Avançar sem cotação"}
           </Button>

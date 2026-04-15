@@ -171,16 +171,20 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15 }}
       >
-        <div className={`max-w-[65%] rounded-lg px-2.5 py-1.5 text-[14px] ${bubbleColor} text-[#e9edef] shadow-sm relative`}>
+        <div
+          className={`max-w-[65%] rounded-lg px-2.5 py-1.5 text-[14px] ${bubbleColor} text-[#e9edef] shadow-sm relative`}
+        >
           {/* Media content */}
           {hasMedia && renderMedia()}
 
           {/* Audio indicator */}
           {isAudio && (
             <div className="flex items-center gap-2 mb-1">
-              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                isOutbound ? "bg-white/10" : "bg-white/5"
-              } text-[#8696a0]`}>
+              <span
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                  isOutbound ? "bg-white/10" : "bg-white/5"
+                } text-[#8696a0]`}
+              >
                 <Mic className="h-3 w-3" />
                 <span>Áudio</span>
                 {isTranscribed && <span className="opacity-70">• Transcrito</span>}
@@ -200,7 +204,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
           {/* Text content */}
           {(msg.content || (!hasMedia && !isAudio)) && (
             <p className="whitespace-pre-wrap break-words leading-[19px]">
-              {isAudio ? (transcriptionText || msg.content || "[Áudio]") : (msg.content || "[Mídia]")}
+              {isAudio ? transcriptionText || msg.content || "[Áudio]" : msg.content || "[Mídia]"}
             </p>
           )}
 
@@ -209,7 +213,10 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
               {format(new Date(msg.created_at), "HH:mm")}
             </span>
             {isOutbound && msg.status === "sending" && (
-              <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }}>
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
                 <Clock className="h-3 w-3 text-[#ffffff80]" />
               </motion.span>
             )}
@@ -228,9 +235,14 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
             {isOutbound && msg.status === "read" && (
               <CheckCheck className="h-[14px] w-[14px] text-[#53bdeb]" />
             )}
-            {isOutbound && !["sending", "queued", "failed", "sent", "delivered", "read"].includes(msg.status || "") && msg.status !== "sending" && msg.status !== "failed" && (
-              <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
-            )}
+            {isOutbound &&
+              !["sending", "queued", "failed", "sent", "delivered", "read"].includes(
+                msg.status || ""
+              ) &&
+              msg.status !== "sending" &&
+              msg.status !== "failed" && (
+                <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
+              )}
           </div>
         </div>
       </motion.div>

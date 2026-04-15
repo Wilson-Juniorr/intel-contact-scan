@@ -33,7 +33,9 @@ export default function ConversationList({
   formatPhone,
 }: Props) {
   return (
-    <div className={`flex flex-col bg-[#111b21] border-r border-[#2a3942] overflow-hidden ${selectedPhone ? "hidden lg:flex" : "flex"}`}>
+    <div
+      className={`flex flex-col bg-[#111b21] border-r border-[#2a3942] overflow-hidden ${selectedPhone ? "hidden lg:flex" : "flex"}`}
+    >
       {/* WhatsApp-style header */}
       <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between">
         <span className="text-[#e9edef] font-medium text-base">Conversas</span>
@@ -68,9 +70,7 @@ export default function ConversationList({
                 transition={{ duration: 0.15, delay: Math.min(i * 0.02, 0.5) }}
                 onClick={() => onSelectPhone(conv.phone)}
                 className={`w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors ${
-                  selectedPhone === conv.phone
-                    ? "bg-[#2a3942]"
-                    : "hover:bg-[#202c33]"
+                  selectedPhone === conv.phone ? "bg-[#2a3942]" : "hover:bg-[#202c33]"
                 }`}
               >
                 {/* Avatar */}
@@ -100,7 +100,8 @@ export default function ConversationList({
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
                     <p className="text-[13px] text-[#8696a0] truncate max-w-[200px]">
-                      {conv.lastMessage || (conv.messageCount > 0 ? "Mídia" : formatPhone(conv.phone))}
+                      {conv.lastMessage ||
+                        (conv.messageCount > 0 ? "Mídia" : formatPhone(conv.phone))}
                     </p>
                     {conv.unreadCount > 0 && (
                       <motion.span

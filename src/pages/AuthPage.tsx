@@ -51,18 +51,58 @@ export default function AuthPage() {
         <CardContent>
           <Tabs defaultValue="login">
             <TabsList className="w-full">
-              <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1">Cadastrar</TabsTrigger>
+              <TabsTrigger value="login" className="flex-1">
+                Entrar
+              </TabsTrigger>
+              <TabsTrigger value="register" className="flex-1">
+                Cadastrar
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="login" className="space-y-4 mt-4">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" /></div>
-              <div><Label>Senha</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" /></div>
-              <Button onClick={handleSignIn} disabled={loading} className="w-full">{loading ? "Entrando..." : "Entrar"}</Button>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div>
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                />
+              </div>
+              <Button onClick={handleSignIn} disabled={loading} className="w-full">
+                {loading ? "Entrando..." : "Entrar"}
+              </Button>
             </TabsContent>
             <TabsContent value="register" className="space-y-4 mt-4">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" /></div>
-              <div><Label>Senha</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
-              <Button onClick={handleSignUp} disabled={loading} className="w-full">{loading ? "Cadastrando..." : "Criar Conta"}</Button>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div>
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+              <Button onClick={handleSignUp} disabled={loading} className="w-full">
+                {loading ? "Cadastrando..." : "Criar Conta"}
+              </Button>
             </TabsContent>
           </Tabs>
         </CardContent>

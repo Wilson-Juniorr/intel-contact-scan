@@ -9,12 +9,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  StickyNote, FileUp, Sparkles, Plus, Trash2, Upload,
-  Loader2, X, Tag, Download, File, Image as ImageIcon, Eye, FolderDown,
-  MessageCircle, Copy, Check, FileText, ChevronDown, ChevronRight,
+  StickyNote,
+  FileUp,
+  Sparkles,
+  Plus,
+  Trash2,
+  Upload,
+  Loader2,
+  X,
+  Tag,
+  Download,
+  File,
+  Image as ImageIcon,
+  Eye,
+  FolderDown,
+  MessageCircle,
+  Copy,
+  Check,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,8 +56,15 @@ interface Props {
 
 /* ─── Documentos Gerais (sem membro vinculado) ─── */
 function GeneralDocsSection({
-  documents, docCategory, setDocCategory, fileRef, uploading, handleFileUpload,
-  handlePreview, handleDownload, onDeleteDoc,
+  documents,
+  docCategory,
+  setDocCategory,
+  fileRef,
+  uploading,
+  handleFileUpload,
+  handlePreview,
+  handleDownload,
+  onDeleteDoc,
 }: {
   documents: any[];
   docCategory: string;
@@ -55,15 +85,25 @@ function GeneralDocsSection({
           <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center">
             <FileText className="h-3.5 w-3.5 text-primary" />
           </div>
-          <span className="text-xs font-semibold tracking-wide flex-1 text-left">Documentos Gerais</span>
-          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">{documents.length}</Badge>
+          <span className="text-xs font-semibold tracking-wide flex-1 text-left">
+            Documentos Gerais
+          </span>
+          <Badge variant="secondary" className="text-[9px] font-medium tabular-nums">
+            {documents.length}
+          </Badge>
           <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </motion.div>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-2 pb-2 space-y-2">
-            <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+            />
             <div className="flex gap-2">
               <Select value={docCategory} onValueChange={setDocCategory}>
                 <SelectTrigger className="h-8 text-xs flex-1">
@@ -71,16 +111,31 @@ function GeneralDocsSection({
                 </SelectTrigger>
                 <SelectContent>
                   {DOC_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              <Button
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Upload className="h-3 w-3" />
+                )}
                 Enviar
               </Button>
             </div>
-            {documents.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">Nenhum documento geral</p>}
+            {documents.length === 0 && (
+              <p className="text-[10px] text-muted-foreground text-center py-2">
+                Nenhum documento geral
+              </p>
+            )}
             <AnimatePresence>
               {documents.map((doc: any) => {
                 const isImage = doc.file_type?.startsWith("image/");
@@ -93,22 +148,44 @@ function GeneralDocsSection({
                     className="flex items-center gap-2.5 p-2 rounded-md border border-border bg-card hover:bg-accent/20 transition-colors group"
                   >
                     <div className="h-7 w-7 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
-                      {isImage ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /> : <File className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {isImage ? (
+                        <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <File className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-medium truncate">{doc.file_name}</p>
                       <Badge variant="outline" className="text-[8px] mt-0.5">
-                        {DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label || doc.category}
+                        {DOC_CATEGORIES.find((c: any) => c.value === doc.category)?.label ||
+                          doc.category}
                       </Badge>
                     </div>
                     <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handlePreview(doc.file_path, doc.file_name, doc.file_type || "")}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() =>
+                          handlePreview(doc.file_path, doc.file_name, doc.file_type || "")
+                        }
+                      >
                         <Eye className="h-3 w-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc.file_path, doc.file_name)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleDownload(doc.file_path, doc.file_name)}
+                      >
                         <Download className="h-3 w-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onDeleteDoc(doc)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => onDeleteDoc(doc)}
+                      >
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>
@@ -138,7 +215,9 @@ export function LeadObservationsPanel({ lead }: Props) {
   // Document state
   const [docCategory, setDocCategory] = useState("outros");
   const [uploading, setUploading] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(
+    null
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   // AI summary state
@@ -212,7 +291,6 @@ export function LeadObservationsPanel({ lead }: Props) {
     setPreviewDoc({ url, name: fileName, type: fileType });
   };
 
-
   const handleGenerateSummary = async () => {
     setLoadingSummary(true);
     setSummary("");
@@ -237,7 +315,13 @@ export function LeadObservationsPanel({ lead }: Props) {
     setShowEmissionForm(true);
   };
 
-  const handleGenerateWhatsAppMsg = async (formData: { vigencia: string; nomePlano: string; nomeTitular: string; emailTitular: string; celularTitular: string }) => {
+  const handleGenerateWhatsAppMsg = async (formData: {
+    vigencia: string;
+    nomePlano: string;
+    nomeTitular: string;
+    emailTitular: string;
+    celularTitular: string;
+  }) => {
     setShowEmissionForm(false);
     setGeneratingMsg(true);
     setWhatsappMsg("");
@@ -246,7 +330,8 @@ export function LeadObservationsPanel({ lead }: Props) {
       // Build signed URLs for all docs
       const docsWithLinks = await Promise.all(
         obs.documents.map(async (doc: any) => {
-          const catLabel = DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
+          const catLabel =
+            DOC_CATEGORIES.find((c) => c.value === doc.category)?.label || doc.category;
           const { data: signedData } = await supabase.storage
             .from("lead-images")
             .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
@@ -263,7 +348,7 @@ export function LeadObservationsPanel({ lead }: Props) {
       const generalDocs = docsWithLinks.filter((d) => !d.memberId);
       const allMembers = membersHook.members;
 
-      const formatDocLine = (d: typeof docsWithLinks[0]) =>
+      const formatDocLine = (d: (typeof docsWithLinks)[0]) =>
         d.url
           ? `   📎 ${d.catLabel}: ${d.fileName}\n   🔗 ${d.url}`
           : `   📎 ${d.catLabel}: ${d.fileName}`;
@@ -342,9 +427,6 @@ Atenciosamente 🤝`;
     setGeneratingMsg(false);
   };
 
-
-
-
   const handleCopyMsg = async () => {
     await navigator.clipboard.writeText(whatsappMsg);
     setCopied(true);
@@ -367,204 +449,263 @@ Atenciosamente 🤝`;
     );
   });
 
-
   return (
     <>
-    <Tabs defaultValue="notes" className="w-full">
-      <TabsList className="w-full grid grid-cols-3 h-9">
-        <TabsTrigger value="notes" className="text-[10px] gap-1 px-1">
-          <StickyNote className="h-3 w-3" /> Notas
-        </TabsTrigger>
-        <TabsTrigger value="docs" className="text-[10px] gap-1 px-1">
-          <FileUp className="h-3 w-3" /> Docs
-        </TabsTrigger>
-        <TabsTrigger value="ai" className="text-[10px] gap-1 px-1">
-          <Sparkles className="h-3 w-3" /> IA
-        </TabsTrigger>
-      </TabsList>
+      <Tabs defaultValue="notes" className="w-full">
+        <TabsList className="w-full grid grid-cols-3 h-9">
+          <TabsTrigger value="notes" className="text-[10px] gap-1 px-1">
+            <StickyNote className="h-3 w-3" /> Notas
+          </TabsTrigger>
+          <TabsTrigger value="docs" className="text-[10px] gap-1 px-1">
+            <FileUp className="h-3 w-3" /> Docs
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="text-[10px] gap-1 px-1">
+            <Sparkles className="h-3 w-3" /> IA
+          </TabsTrigger>
+        </TabsList>
 
-      {/* NOTAS */}
-      <TabsContent value="notes" className="space-y-3 mt-3">
-        <div className="space-y-2">
-          <Textarea
-            placeholder="Adicionar observação..."
-            value={noteContent}
-            onChange={(e) => setNoteContent(e.target.value)}
-            rows={3}
-            className="text-sm"
-          />
-          <div className="flex gap-2">
-            <Select value={noteCategory} onValueChange={setNoteCategory}>
-              <SelectTrigger className="h-7 text-[11px] w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {NOTE_CATEGORIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={handleSaveNote} disabled={savingNote || !noteContent.trim()} className="flex-1 h-7 text-xs">
-              {savingNote ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-              Salvar Nota
-            </Button>
+        {/* NOTAS */}
+        <TabsContent value="notes" className="space-y-3 mt-3">
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Adicionar observação..."
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+              rows={3}
+              className="text-sm"
+            />
+            <div className="flex gap-2">
+              <Select value={noteCategory} onValueChange={setNoteCategory}>
+                <SelectTrigger className="h-7 text-[11px] w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {NOTE_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleSaveNote}
+                disabled={savingNote || !noteContent.trim()}
+                className="flex-1 h-7 text-xs"
+              >
+                {savingNote ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Plus className="h-3 w-3 mr-1" />
+                )}
+                Salvar Nota
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
-          {obs.notes.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhuma nota</p>}
-          {obs.notes.map((note: any) => (
-            <div key={note.id} className="p-2.5 rounded-lg border border-border bg-card space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="text-[9px]">
-                  {NOTE_CATEGORIES.find((c) => c.value === note.category)?.label || note.category}
-                </Badge>
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] text-muted-foreground">
-                    {format(new Date(note.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                  </span>
-                  <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => obs.deleteNote(note.id)}>
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {obs.notes.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-3">Nenhuma nota</p>
+            )}
+            {obs.notes.map((note: any) => (
+              <div
+                key={note.id}
+                className="p-2.5 rounded-lg border border-border bg-card space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-[9px]">
+                    {NOTE_CATEGORIES.find((c) => c.value === note.category)?.label || note.category}
+                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-muted-foreground">
+                      {format(new Date(note.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 w-5 p-0"
+                      onClick={() => obs.deleteNote(note.id)}
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
+                <p className="text-xs whitespace-pre-wrap">{note.content}</p>
               </div>
-              <p className="text-xs whitespace-pre-wrap">{note.content}</p>
-            </div>
-          ))}
-        </div>
-      </TabsContent>
-
-      <TabsContent value="docs" className="space-y-3 mt-3">
-        {/* Ações globais */}
-        {obs.documents.length > 1 && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full h-8 gap-1.5 text-xs"
-            disabled={downloadingAll}
-            onClick={async () => {
-              setDownloadingAll(true);
-              try {
-                const zip = new JSZip();
-                for (const doc of obs.documents) {
-                  const { data, error } = await supabase.storage.from("lead-images").download((doc as any).file_path);
-                  if (!error && data) zip.file((doc as any).file_name, data);
-                }
-                const blob = await zip.generateAsync({ type: "blob" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast.success("Download concluído!");
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-              setDownloadingAll(false);
-            }}
-          >
-            {downloadingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderDown className="h-3 w-3" />}
-            Baixar todos ({obs.documents.length} arquivos)
-          </Button>
-        )}
-
-        {obs.documents.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full h-8 gap-1.5 text-xs border-secondary/30 text-secondary hover:bg-secondary/10"
-            disabled={generatingMsg}
-            onClick={handleOpenEmissionForm}
-          >
-            {generatingMsg ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
-            Montar mensagem para emissão
-          </Button>
-        )}
-
-        {/* ─── Documentos Gerais (sem member_id) ─── */}
-        <GeneralDocsSection
-          documents={obs.documents.filter((d: any) => !d.member_id)}
-          docCategory={docCategory}
-          setDocCategory={setDocCategory}
-          fileRef={fileRef}
-          uploading={uploading}
-          handleFileUpload={handleFileUpload}
-          handlePreview={handlePreview}
-          handleDownload={handleDownload}
-          onDeleteDoc={(doc: any) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
-        />
-
-        {/* ─── Titulares ─── */}
-        <MemberSection
-          role="titular"
-          members={membersHook.titulares}
-          documents={obs.documents as any}
-          onAddMember={membersHook.addMember}
-          onDeleteMember={membersHook.deleteMember}
-          onUpdateMember={membersHook.updateMember}
-          onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
-          onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
-          onPreview={handlePreview}
-          onDownload={handleDownload}
-        />
-
-        {/* ─── Dependentes ─── */}
-        <MemberSection
-          role="dependente"
-          members={membersHook.dependentes}
-          documents={obs.documents as any}
-          onAddMember={membersHook.addMember}
-          onDeleteMember={membersHook.deleteMember}
-          onUpdateMember={membersHook.updateMember}
-          onUploadDoc={async (p) => obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })}
-          onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
-          onPreview={handlePreview}
-          onDownload={handleDownload}
-        />
-      </TabsContent>
-
-
-      {/* IA */}
-      <TabsContent value="ai" className="space-y-3 mt-3">
-        <Button onClick={handleGenerateSummary} disabled={loadingSummary} className="w-full gap-2 text-xs">
-          {loadingSummary ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          Gerar Resumo Inteligente
-        </Button>
-        {summary && (
-          <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 prose prose-sm max-w-none">
-            <div className="text-xs leading-relaxed [&>h1]:text-sm [&>h2]:text-xs [&>h3]:text-xs [&>p]:text-xs [&>ul]:text-xs [&>ol]:text-xs [&>li]:text-xs">
-              <ReactMarkdown>{summary}</ReactMarkdown>
-            </div>
+            ))}
           </div>
-        )}
-        {!summary && !loadingSummary && (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            A IA vai analisar o histórico do lead (interações, notas e dados) para gerar um resumo executivo com próximos passos recomendados.
-          </p>
-        )}
-      </TabsContent>
-    </Tabs>
+        </TabsContent>
+
+        <TabsContent value="docs" className="space-y-3 mt-3">
+          {/* Ações globais */}
+          {obs.documents.length > 1 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 gap-1.5 text-xs"
+              disabled={downloadingAll}
+              onClick={async () => {
+                setDownloadingAll(true);
+                try {
+                  const zip = new JSZip();
+                  for (const doc of obs.documents) {
+                    const { data, error } = await supabase.storage
+                      .from("lead-images")
+                      .download((doc as any).file_path);
+                    if (!error && data) zip.file((doc as any).file_name, data);
+                  }
+                  const blob = await zip.generateAsync({ type: "blob" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Download concluído!");
+                } catch (e: any) {
+                  toast.error(e.message);
+                }
+                setDownloadingAll(false);
+              }}
+            >
+              {downloadingAll ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <FolderDown className="h-3 w-3" />
+              )}
+              Baixar todos ({obs.documents.length} arquivos)
+            </Button>
+          )}
+
+          {obs.documents.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 gap-1.5 text-xs border-secondary/30 text-secondary hover:bg-secondary/10"
+              disabled={generatingMsg}
+              onClick={handleOpenEmissionForm}
+            >
+              {generatingMsg ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <MessageCircle className="h-3 w-3" />
+              )}
+              Montar mensagem para emissão
+            </Button>
+          )}
+
+          {/* ─── Documentos Gerais (sem member_id) ─── */}
+          <GeneralDocsSection
+            documents={obs.documents.filter((d: any) => !d.member_id)}
+            docCategory={docCategory}
+            setDocCategory={setDocCategory}
+            fileRef={fileRef}
+            uploading={uploading}
+            handleFileUpload={handleFileUpload}
+            handlePreview={handlePreview}
+            handleDownload={handleDownload}
+            onDeleteDoc={(doc: any) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+          />
+
+          {/* ─── Titulares ─── */}
+          <MemberSection
+            role="titular"
+            members={membersHook.titulares}
+            documents={obs.documents as any}
+            onAddMember={membersHook.addMember}
+            onDeleteMember={membersHook.deleteMember}
+            onUpdateMember={membersHook.updateMember}
+            onUploadDoc={async (p) =>
+              obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })
+            }
+            onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+          />
+
+          {/* ─── Dependentes ─── */}
+          <MemberSection
+            role="dependente"
+            members={membersHook.dependentes}
+            documents={obs.documents as any}
+            onAddMember={membersHook.addMember}
+            onDeleteMember={membersHook.deleteMember}
+            onUpdateMember={membersHook.updateMember}
+            onUploadDoc={async (p) =>
+              obs.uploadDocument({ file: p.file, category: p.category, memberId: p.memberId })
+            }
+            onDeleteDoc={(doc) => obs.deleteDocument({ id: doc.id, file_path: doc.file_path })}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+          />
+        </TabsContent>
+
+        {/* IA */}
+        <TabsContent value="ai" className="space-y-3 mt-3">
+          <Button
+            onClick={handleGenerateSummary}
+            disabled={loadingSummary}
+            className="w-full gap-2 text-xs"
+          >
+            {loadingSummary ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            Gerar Resumo Inteligente
+          </Button>
+          {summary && (
+            <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 prose prose-sm max-w-none">
+              <div className="text-xs leading-relaxed [&>h1]:text-sm [&>h2]:text-xs [&>h3]:text-xs [&>p]:text-xs [&>ul]:text-xs [&>ol]:text-xs [&>li]:text-xs">
+                <ReactMarkdown>{summary}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+          {!summary && !loadingSummary && (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              A IA vai analisar o histórico do lead (interações, notas e dados) para gerar um resumo
+              executivo com próximos passos recomendados.
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Preview Dialog */}
-      <Dialog open={!!previewDoc} onOpenChange={() => {
-        if (previewDoc) URL.revokeObjectURL(previewDoc.url);
-        setPreviewDoc(null);
-      }}>
+      <Dialog
+        open={!!previewDoc}
+        onOpenChange={() => {
+          if (previewDoc) URL.revokeObjectURL(previewDoc.url);
+          setPreviewDoc(null);
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm truncate">{previewDoc?.name}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto min-h-0">
             {previewDoc?.type?.startsWith("image/") ? (
-              <img src={previewDoc.url} alt={previewDoc.name} className="w-full h-auto rounded-lg object-contain max-h-[70vh]" />
+              <img
+                src={previewDoc.url}
+                alt={previewDoc.name}
+                className="w-full h-auto rounded-lg object-contain max-h-[70vh]"
+              />
             ) : previewDoc?.type === "application/pdf" ? (
-              <iframe src={previewDoc.url} className="w-full h-[70vh] rounded-lg border-0" title={previewDoc.name} />
+              <iframe
+                src={previewDoc.url}
+                className="w-full h-[70vh] rounded-lg border-0"
+                title={previewDoc.name}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center py-12 space-y-3">
                 <File className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Pré-visualização não disponível para este tipo de arquivo</p>
-                <Button size="sm" onClick={() => previewDoc && handleDownload(previewDoc.url, previewDoc.name)} className="gap-1">
+                <p className="text-sm text-muted-foreground">
+                  Pré-visualização não disponível para este tipo de arquivo
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => previewDoc && handleDownload(previewDoc.url, previewDoc.name)}
+                  className="gap-1"
+                >
                   <Download className="h-3 w-3" /> Baixar arquivo
                 </Button>
               </div>
@@ -582,14 +723,25 @@ Atenciosamente 🤝`;
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto min-h-0 p-3 rounded-lg border border-border bg-muted/50">
-            <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed">{whatsappMsg}</pre>
+            <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed">
+              {whatsappMsg}
+            </pre>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={handleCopyMsg}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5 text-xs"
+              onClick={handleCopyMsg}
+            >
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               {copied ? "Copiado!" : "Copiar"}
             </Button>
-            <Button size="sm" className="flex-1 gap-1.5 text-xs bg-secondary hover:bg-secondary/90 text-secondary-foreground" onClick={handleSendWhatsApp}>
+            <Button
+              size="sm"
+              className="flex-1 gap-1.5 text-xs bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+              onClick={handleSendWhatsApp}
+            >
               <MessageCircle className="h-3 w-3" /> Abrir WhatsApp
             </Button>
           </div>

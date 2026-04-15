@@ -105,9 +105,16 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
   }, [open, activeTab, processImageFile]);
 
   const reset = () => {
-    setName(""); setPhone(""); setEmail(""); setType("PF");
-    setPlanType(""); setOperator(""); setLives(""); setNotes("");
-    setOcrResults([]); setPastedPreview(null);
+    setName("");
+    setPhone("");
+    setEmail("");
+    setType("PF");
+    setPlanType("");
+    setOperator("");
+    setLives("");
+    setNotes("");
+    setOcrResults([]);
+    setPastedPreview(null);
   };
 
   const handleSubmit = async () => {
@@ -158,7 +165,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
 
         <Tabs defaultValue="manual" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full">
-            <TabsTrigger value="manual" className="flex-1">Cadastro Manual</TabsTrigger>
+            <TabsTrigger value="manual" className="flex-1">
+              Cadastro Manual
+            </TabsTrigger>
             <TabsTrigger value="image" className="flex-1 gap-2">
               <Camera className="h-4 w-4" /> Por Imagem (IA)
             </TabsTrigger>
@@ -168,20 +177,35 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <Label>Nome *</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do lead" />
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nome do lead"
+                />
               </div>
               <div>
                 <Label>Telefone *</Label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="11999887766" />
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="11999887766"
+                />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" type="email" />
+                <Input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@exemplo.com"
+                  type="email"
+                />
               </div>
               <div>
                 <Label>Tipo</Label>
                 <Select value={type} onValueChange={setType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PF">Pessoa Física</SelectItem>
                     <SelectItem value="PJ">Pessoa Jurídica</SelectItem>
@@ -192,7 +216,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
               <div>
                 <Label>Tipo de Plano</Label>
                 <Select value={planType} onValueChange={setPlanType}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Individual">Individual</SelectItem>
                     <SelectItem value="Familiar">Familiar</SelectItem>
@@ -203,24 +229,51 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
               </div>
               <div>
                 <Label>Operadora</Label>
-                <Input value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="Ex: Unimed, Amil..." />
+                <Input
+                  value={operator}
+                  onChange={(e) => setOperator(e.target.value)}
+                  placeholder="Ex: Unimed, Amil..."
+                />
               </div>
               <div>
                 <Label>Qtd. Vidas</Label>
-                <Input value={lives} onChange={(e) => setLives(e.target.value)} placeholder="1" type="number" min="1" />
+                <Input
+                  value={lives}
+                  onChange={(e) => setLives(e.target.value)}
+                  placeholder="1"
+                  type="number"
+                  min="1"
+                />
               </div>
             </div>
             <div>
               <Label>Observações</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas sobre o lead..." rows={3} />
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notas sobre o lead..."
+                rows={3}
+              />
             </div>
             <Button onClick={handleSubmit} disabled={saving} className="w-full">
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</> : "Cadastrar Lead"}
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...
+                </>
+              ) : (
+                "Cadastrar Lead"
+              )}
             </Button>
           </TabsContent>
 
           <TabsContent value="image" className="mt-4 space-y-4">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
             <div
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
@@ -231,12 +284,18 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                   <p className="text-sm font-medium">Analisando imagem com IA...</p>
                 </div>
               ) : pastedPreview ? (
-                <img src={pastedPreview} alt="Preview" className="max-h-32 mx-auto rounded-lg object-contain" />
+                <img
+                  src={pastedPreview}
+                  alt="Preview"
+                  className="max-h-32 mx-auto rounded-lg object-contain"
+                />
               ) : (
                 <>
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm font-medium">Envie uma imagem com nome e número</p>
-                  <p className="text-xs text-muted-foreground mt-1">Print de WhatsApp, lista de contatos, cartão...</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Print de WhatsApp, lista de contatos, cartão...
+                  </p>
                   <div className="flex items-center justify-center gap-1.5 mt-3 text-xs text-primary font-medium">
                     <ClipboardPaste className="h-3.5 w-3.5" />
                     Ou pressione Ctrl+V para colar da área de transferência
@@ -263,7 +322,9 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                         <p className="text-sm font-medium">{c.name}</p>
                         <p className="text-xs text-muted-foreground">{c.phone}</p>
                       </div>
-                      {name === c.name && phone === c.phone && <Check className="h-4 w-4 text-primary" />}
+                      {name === c.name && phone === c.phone && (
+                        <Check className="h-4 w-4 text-primary" />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -283,7 +344,13 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
                   </div>
                 </div>
                 <Button onClick={handleSubmit} disabled={saving} className="w-full">
-                  {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</> : "Cadastrar Lead"}
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...
+                    </>
+                  ) : (
+                    "Cadastrar Lead"
+                  )}
                 </Button>
               </div>
             )}

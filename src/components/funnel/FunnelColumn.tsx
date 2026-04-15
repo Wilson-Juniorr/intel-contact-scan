@@ -44,7 +44,7 @@ export function FunnelColumn({
     if (l.quote_min_value) return sum + Number(l.quote_min_value);
     return sum + (l.lives ? l.lives * 120 : 0);
   }, 0);
-  const weightedValue = Math.round(totalValue * stage.weight / 100);
+  const weightedValue = Math.round((totalValue * stage.weight) / 100);
 
   const formatCurrency = (v: number) => formatBRLShort(v);
 

@@ -4,7 +4,21 @@ import { useTasks } from "@/hooks/useTasks";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, Pause, RotateCcw, Send, Edit3, Check, X, Sparkles, Target, Ban, CalendarClock, Bell } from "lucide-react";
+import {
+  Loader2,
+  Play,
+  Pause,
+  RotateCcw,
+  Send,
+  Edit3,
+  Check,
+  X,
+  Sparkles,
+  Target,
+  Ban,
+  CalendarClock,
+  Bell,
+} from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -29,7 +43,20 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ClosingTimeline({ leadId, leadStage }: Props) {
-  const { sequence, steps, isLoading, startSequence, pauseSequence, resumeSequence, cancelSequence, markSent, regenerateStep, updateMessage, nextDueStep, pausedIdleDays } = useClosingSequence(leadId);
+  const {
+    sequence,
+    steps,
+    isLoading,
+    startSequence,
+    pauseSequence,
+    resumeSequence,
+    cancelSequence,
+    markSent,
+    regenerateStep,
+    updateMessage,
+    nextDueStep,
+    pausedIdleDays,
+  } = useClosingSequence(leadId);
   const { addTask, completeTask } = useTasks(leadId);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -54,8 +81,8 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
             {sequence?.status === "completed"
               ? "Sequência de fechamento concluída!"
               : sequence?.status === "cancelled"
-              ? "Sequência cancelada."
-              : "Nenhuma sequência de fechamento ativa."}
+                ? "Sequência cancelada."
+                : "Nenhuma sequência de fechamento ativa."}
           </p>
           {isClosingStage && (
             <Button
@@ -69,7 +96,11 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
               }}
               disabled={startSequence.isPending}
             >
-              {startSequence.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              {startSequence.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
               {sequence ? "Nova Sequência" : "Iniciar Fechamento"}
             </Button>
           )}
@@ -83,30 +114,58 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge variant={sequence.status === "active" ? "default" : "secondary"} className="text-[10px]">
+          <Badge
+            variant={sequence.status === "active" ? "default" : "secondary"}
+            className="text-[10px]"
+          >
             {sequence.status === "active" ? "🔥 Ativa" : "⏸️ Pausada"}
           </Badge>
-          <span className="text-[10px] text-muted-foreground">
-            Etapa {sequence.current_step}/4
-          </span>
+          <span className="text-[10px] text-muted-foreground">Etapa {sequence.current_step}/4</span>
         </div>
         <div className="flex gap-1">
           {sequence.status === "active" ? (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1"
-              onClick={() => pauseSequence.mutate(undefined, { onSuccess: () => toast.success("Pausada"), onError: (e) => toast.error(e.message) })}
-              disabled={pauseSequence.isPending}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px] gap-1"
+              onClick={() =>
+                pauseSequence.mutate(undefined, {
+                  onSuccess: () => toast.success("Pausada"),
+                  onError: (e) => toast.error(e.message),
+                })
+              }
+              disabled={pauseSequence.isPending}
+            >
               <Pause className="h-3 w-3" /> Pausar
             </Button>
           ) : (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1"
-              onClick={() => resumeSequence.mutate(undefined, { onSuccess: () => toast.success("Retomada"), onError: (e) => toast.error(e.message) })}
-              disabled={resumeSequence.isPending}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px] gap-1"
+              onClick={() =>
+                resumeSequence.mutate(undefined, {
+                  onSuccess: () => toast.success("Retomada"),
+                  onError: (e) => toast.error(e.message),
+                })
+              }
+              disabled={resumeSequence.isPending}
+            >
               <Play className="h-3 w-3" /> Retomar
             </Button>
           )}
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1 text-destructive"
-            onClick={() => cancelSequence.mutate(undefined, { onSuccess: () => toast.success("Cancelada"), onError: (e) => toast.error(e.message) })}
-            disabled={cancelSequence.isPending}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10px] gap-1 text-destructive"
+            onClick={() =>
+              cancelSequence.mutate(undefined, {
+                onSuccess: () => toast.success("Cancelada"),
+                onError: (e) => toast.error(e.message),
+              })
+            }
+            disabled={cancelSequence.isPending}
+          >
             <Ban className="h-3 w-3" /> Cancelar
           </Button>
         </div>
@@ -118,10 +177,15 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
           <CalendarClock className="h-4 w-4 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium text-primary">
-              Próximo envio recomendado: {format(new Date(nextDueStep.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })}
+              Próximo envio recomendado:{" "}
+              {format(new Date(nextDueStep.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })}
             </p>
             <p className="text-[10px] text-muted-foreground">
-              {formatDistanceToNow(new Date(nextDueStep.recommended_due_at), { addSuffix: true, locale: ptBR })} — {getStepLabel(nextDueStep.step_type)}
+              {formatDistanceToNow(new Date(nextDueStep.recommended_due_at), {
+                addSuffix: true,
+                locale: ptBR,
+              })}{" "}
+              — {getStepLabel(nextDueStep.step_type)}
             </p>
           </div>
         </div>
@@ -136,9 +200,18 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
           <p className="text-[10px] text-muted-foreground mb-1.5">
             Considere retomar a sequência com uma abordagem diferente.
           </p>
-          <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1 border-orange-500/30 text-orange-600 hover:bg-orange-500/10"
-            onClick={() => resumeSequence.mutate(undefined, { onSuccess: () => toast.success("Retomada!"), onError: (e) => toast.error(e.message) })}
-            disabled={resumeSequence.isPending}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] gap-1 border-orange-500/30 text-orange-600 hover:bg-orange-500/10"
+            onClick={() =>
+              resumeSequence.mutate(undefined, {
+                onSuccess: () => toast.success("Retomada!"),
+                onError: (e) => toast.error(e.message),
+              })
+            }
+            disabled={resumeSequence.isPending}
+          >
             <Play className="h-3 w-3" /> Retomar agora
           </Button>
         </div>
@@ -151,18 +224,27 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
           const isCurrent = step.step_number === sequence.current_step;
           const isPast = step.status === "sent";
           const isFuture = step.status === "pending";
-          const isOverdue = step.recommended_due_at && new Date(step.recommended_due_at) < new Date() && step.status !== "sent";
+          const isOverdue =
+            step.recommended_due_at &&
+            new Date(step.recommended_due_at) < new Date() &&
+            step.status !== "sent";
 
           return (
             <div
               key={step.id}
               className={`relative rounded-lg border p-3 transition-all ${
-                isCurrent ? "border-primary/40 bg-primary/5 shadow-sm" : isPast ? "border-green-500/20 bg-green-500/5" : "border-border bg-card"
+                isCurrent
+                  ? "border-primary/40 bg-primary/5 shadow-sm"
+                  : isPast
+                    ? "border-green-500/20 bg-green-500/5"
+                    : "border-border bg-card"
               }`}
             >
               {/* Connector line */}
               {idx < steps.length - 1 && (
-                <div className={`absolute left-6 top-full w-0.5 h-2 ${isPast ? "bg-green-500/30" : "bg-border"}`} />
+                <div
+                  className={`absolute left-6 top-full w-0.5 h-2 ${isPast ? "bg-green-500/30" : "bg-border"}`}
+                />
               )}
 
               {/* Step header */}
@@ -170,12 +252,24 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                 <span className="text-base">{STEP_ICONS[step.step_type] || "📌"}</span>
                 <span className="text-xs font-semibold flex-1">{getStepLabel(step.step_type)}</span>
                 {isOverdue && (
-                  <Badge variant="outline" className="text-[9px] bg-destructive/10 text-destructive border-destructive/30">
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] bg-destructive/10 text-destructive border-destructive/30"
+                  >
                     Atrasado
                   </Badge>
                 )}
-                <Badge variant="outline" className={`text-[9px] ${STATUS_COLORS[step.status] || ""}`}>
-                  {step.status === "sent" ? "Enviado" : step.status === "ready" ? "Pronto" : step.status === "pending" ? "Agendado" : step.status}
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] ${STATUS_COLORS[step.status] || ""}`}
+                >
+                  {step.status === "sent"
+                    ? "Enviado"
+                    : step.status === "ready"
+                      ? "Pronto"
+                      : step.status === "pending"
+                        ? "Agendado"
+                        : step.status}
                 </Badge>
               </div>
 
@@ -184,8 +278,8 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                 {step.sent_at
                   ? `Enviado ${format(new Date(step.sent_at), "dd/MM HH:mm", { locale: ptBR })}`
                   : step.recommended_due_at
-                  ? `Recomendado: ${format(new Date(step.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })} (${formatDistanceToNow(new Date(step.recommended_due_at), { addSuffix: true, locale: ptBR })})`
-                  : `Agendado: ${format(new Date(step.scheduled_at), "dd/MM HH:mm", { locale: ptBR })}`}
+                    ? `Recomendado: ${format(new Date(step.recommended_due_at), "dd/MM HH:mm", { locale: ptBR })} (${formatDistanceToNow(new Date(step.recommended_due_at), { addSuffix: true, locale: ptBR })})`
+                    : `Agendado: ${format(new Date(step.scheduled_at), "dd/MM HH:mm", { locale: ptBR })}`}
               </div>
 
               {/* AI Analysis */}
@@ -213,15 +307,31 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                     className="text-xs"
                   />
                   <div className="flex gap-1">
-                    <Button size="sm" className="h-6 text-[10px] gap-1" onClick={() => {
-                      updateMessage.mutate({ stepId: step.id, message: editText }, {
-                        onSuccess: () => { setEditingStepId(null); toast.success("Mensagem atualizada"); },
-                        onError: (e) => toast.error(e.message),
-                      });
-                    }} disabled={updateMessage.isPending}>
+                    <Button
+                      size="sm"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => {
+                        updateMessage.mutate(
+                          { stepId: step.id, message: editText },
+                          {
+                            onSuccess: () => {
+                              setEditingStepId(null);
+                              toast.success("Mensagem atualizada");
+                            },
+                            onError: (e) => toast.error(e.message),
+                          }
+                        );
+                      }}
+                      disabled={updateMessage.isPending}
+                    >
                       <Check className="h-3 w-3" /> Salvar
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={() => setEditingStepId(null)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => setEditingStepId(null)}
+                    >
                       <X className="h-3 w-3" /> Cancelar
                     </Button>
                   </div>
@@ -233,24 +343,55 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                 <div className="flex gap-1 flex-wrap">
                   {!isFuture && step.status !== "sent" && (
                     <>
-                      <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1" onClick={() => { setEditingStepId(step.id); setEditText(step.generated_message || ""); }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] gap-1"
+                        onClick={() => {
+                          setEditingStepId(step.id);
+                          setEditText(step.generated_message || "");
+                        }}
+                      >
                         <Edit3 className="h-3 w-3" /> Editar
                       </Button>
-                      <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1"
-                        onClick={() => regenerateStep.mutate(step.id, { onSuccess: () => toast.success("Regenerada!"), onError: (e) => toast.error(e.message) })}
-                        disabled={regenerateStep.isPending}>
-                        {regenerateStep.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] gap-1"
+                        onClick={() =>
+                          regenerateStep.mutate(step.id, {
+                            onSuccess: () => toast.success("Regenerada!"),
+                            onError: (e) => toast.error(e.message),
+                          })
+                        }
+                        disabled={regenerateStep.isPending}
+                      >
+                        {regenerateStep.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3 w-3" />
+                        )}
                         Regenerar
                       </Button>
-                      <Button size="sm" className="h-6 text-[10px] gap-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                      <Button
+                        size="sm"
+                        className="h-6 text-[10px] gap-1 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
                         onClick={() => {
                           if (step.generated_message) {
                             navigator.clipboard.writeText(step.generated_message);
-                            markSent.mutate(step.id, { onSuccess: () => toast.success("Marcado como enviado!"), onError: (e) => toast.error(e.message) });
+                            markSent.mutate(step.id, {
+                              onSuccess: () => toast.success("Marcado como enviado!"),
+                              onError: (e) => toast.error(e.message),
+                            });
                           }
                         }}
-                        disabled={markSent.isPending}>
-                        {markSent.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                        disabled={markSent.isPending}
+                      >
+                        {markSent.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
                         Copiar & Enviar
                       </Button>
                     </>
@@ -261,7 +402,10 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
               {/* Reminder button for pending/ready steps */}
               {step.status !== "sent" && !isEditing && (
                 <div className="flex gap-1 mt-1.5">
-                  <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-1 text-muted-foreground hover:text-primary"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 text-[9px] gap-1 text-muted-foreground hover:text-primary"
                     onClick={async () => {
                       try {
                         await addTask({
@@ -277,7 +421,8 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
                           toast.error(e.message);
                         }
                       }
-                    }}>
+                    }}
+                  >
                     <Bell className="h-2.5 w-2.5" /> Criar lembrete
                   </Button>
                 </div>
@@ -285,7 +430,9 @@ export function ClosingTimeline({ leadId, leadStage }: Props) {
 
               {/* Loading state for pending steps without content */}
               {isFuture && !step.generated_message && (
-                <p className="text-[10px] text-muted-foreground italic">Conteúdo será gerado quando esta etapa ficar pronta.</p>
+                <p className="text-[10px] text-muted-foreground italic">
+                  Conteúdo será gerado quando esta etapa ficar pronta.
+                </p>
               )}
             </div>
           );
