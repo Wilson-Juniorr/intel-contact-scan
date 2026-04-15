@@ -64,7 +64,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
   const bubbleColor = isOutbound
     ? msg.status === "failed"
       ? "bg-red-900/60"
-      : "bg-[#005c4b]"
+      : "bg-gradient-to-br from-[#005c4b] to-[#004a3d]"
     : "bg-[#202c33]";
 
   const renderMedia = () => {
@@ -74,7 +74,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
           <img
             src={mediaData}
             alt="Mídia"
-            className="rounded-md max-w-full max-h-[300px] object-contain cursor-pointer mb-1"
+            className="rounded-md max-w-full max-h-[300px] object-contain cursor-pointer mb-1 animate-fade-in"
             onClick={() => window.open(mediaData, "_blank")}
           />
         );
@@ -82,7 +82,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
       return (
         <button
           onClick={loadMedia}
-          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1 btn-press"
         >
           {loadingMedia ? (
             <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
@@ -101,7 +101,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
     if (isVideo) {
       if (mediaData) {
         return (
-          <video controls className="rounded-md max-w-full max-h-[300px] mb-1">
+          <video controls className="rounded-md max-w-full max-h-[300px] mb-1 animate-fade-in">
             <source src={mediaData} type={mediaMime || "video/mp4"} />
           </video>
         );
@@ -109,7 +109,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
       return (
         <button
           onClick={loadMedia}
-          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1 btn-press"
         >
           {loadingMedia ? (
             <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
@@ -129,7 +129,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
           <a
             href={mediaData}
             download="documento"
-            className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+            className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1 btn-press"
           >
             <Download className="h-4 w-4 text-[#8696a0]" />
             <span className="text-[12px] text-[#8696a0]">Baixar documento</span>
@@ -139,7 +139,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
       return (
         <button
           onClick={loadMedia}
-          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1"
+          className="flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 transition-colors mb-1 btn-press"
         >
           {loadingMedia ? (
             <Loader2 className="h-4 w-4 animate-spin text-[#8696a0]" />
@@ -160,19 +160,23 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
     <div>
       {showDate && (
         <div className="flex justify-center my-3">
-          <span className="bg-[#182229] text-[#8696a0] text-[12px] px-3 py-1 rounded-lg shadow-sm">
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#182229] text-[#8696a0] text-[12px] px-3 py-1 rounded-lg shadow-sm"
+          >
             {format(new Date(msg.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </span>
+          </motion.span>
         </div>
       )}
       <motion.div
         className={`flex ${isOutbound ? "justify-end" : "justify-start"} mb-0.5`}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15 }}
+        initial={{ opacity: 0, y: 6, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
       >
         <div
-          className={`max-w-[65%] rounded-lg px-2.5 py-1.5 text-[14px] ${bubbleColor} text-[#e9edef] shadow-sm relative`}
+          className={`max-w-[65%] rounded-lg px-2.5 py-1.5 text-[14px] ${bubbleColor} text-[#e9edef] shadow-md relative`}
         >
           {/* Media content */}
           {hasMedia && renderMedia()}
@@ -233,7 +237,7 @@ export default function ChatBubble({ msg, showDate, index }: Props) {
               <CheckCheck className="h-[14px] w-[14px] text-[#ffffff99]" />
             )}
             {isOutbound && msg.status === "read" && (
-              <CheckCheck className="h-[14px] w-[14px] text-[#53bdeb]" />
+              <CheckCheck className="h-[14px] w-[14px] text-[#53bdeb] drop-shadow-[0_0_3px_rgba(96,165,250,0.5)]" />
             )}
             {isOutbound &&
               !["sending", "queued", "failed", "sent", "delivered", "read"].includes(

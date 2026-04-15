@@ -57,7 +57,8 @@ export function FunnelCard({
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="mx-1 my-1 rounded-lg border border-border bg-card shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 group hover:border-border/80"
+      className="mx-1 my-1 rounded-lg border border-border/50 bg-card shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 group hover-card-lift"
+      style={{ borderLeftWidth: 3, borderLeftColor: stageColor }}
     >
       <div className="px-3 pt-2.5 pb-2 space-y-1.5">
         {/* Title row */}
@@ -117,10 +118,13 @@ export function FunnelCard({
               </span>
             )}
           </div>
-          <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <motion.div
               className="h-full rounded-full"
-              style={{ backgroundColor: barColor }}
+              style={{
+                backgroundColor: barColor,
+                backgroundImage: isComplete ? `linear-gradient(90deg, ${barColor}, hsl(160, 84%, 50%))` : undefined,
+              }}
               initial={{ width: 0 }}
               animate={{ width: `${pct}%` }}
               transition={{ duration: 0.5, ease: "easeOut" }}
@@ -143,7 +147,7 @@ export function FunnelCard({
       </div>
 
       {/* Action icons – visible on hover */}
-      <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <ActionBtn
           icon={<Phone className="h-3.5 w-3.5" />}
           href={`tel:+${cleanPhone(lead.phone)}`}
@@ -160,7 +164,7 @@ export function FunnelCard({
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="p-1.5 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-accent btn-press"
               title="Mover etapa"
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -216,7 +220,7 @@ function ActionBtn({
   disabled?: boolean;
   className?: string;
 }) {
-  const cls = `p-1.5 rounded-md transition-colors ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : className || "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
+  const cls = `p-1.5 rounded-md transition-colors btn-press ${disabled ? "text-muted-foreground/20 cursor-not-allowed" : className || "text-muted-foreground hover:text-foreground hover:bg-accent"}`;
 
   if (href && !disabled) {
     return (
