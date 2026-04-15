@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { cleanPhone } from "@/lib/phone";
 
 // Each calendar day with at least 1 outbound message = 1 contact attempt
 
@@ -14,20 +15,20 @@ export interface ContactAttemptStats {
 
 export function useContactAttempts(leadPhone: string | undefined) {
   const { user } = useAuth();
-  const cleanPhone = leadPhone?.replace(/\D/g, "") || "";
+  const clean = cleanPhone(leadPhone || "");
 
   const messagesQuery = useQuery({
-    queryKey: ["contact_attempts", cleanPhone],
+    queryKey: ["contact_attempts", clean],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_messages")
         .select("direction, created_at")
-        .eq("phone", cleanPhone)
+        .eq("phone", clean)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && !!cleanPhone,
+    enabled: !!user && !!clean,
   });
 
   const stats: ContactAttemptStats = useMemo(() => {
