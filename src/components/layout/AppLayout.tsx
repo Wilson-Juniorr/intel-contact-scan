@@ -51,7 +51,11 @@ function AppSidebarContent() {
   const { pendingCount } = useCadence();
   const location = useLocation();
   const collapsed = state === "collapsed";
-  const collapsed = state === "collapsed";
+
+  const isNavActive = (url: string) => {
+    if (url === "/") return location.pathname === "/";
+    return location.pathname.startsWith(url);
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background">
