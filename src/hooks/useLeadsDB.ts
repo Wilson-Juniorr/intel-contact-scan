@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { FunnelStage } from "@/types/lead";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cleanPhone, normalizePhone } from "@/lib/phone";
 
 export function useLeadsDB() {
   const { user } = useAuth();
@@ -65,9 +66,8 @@ export function useLeadsDB() {
       notes?: string;
       stage: string;
     }) => {
-      // Normalize phone with 55 prefix
-      const rawDigits = lead.phone.replace(/\D/g, "");
-      const normalizedPhone = rawDigits.startsWith("55") ? rawDigits : `55${rawDigits}`;
+      const rawDigits = cleanPhone(lead.phone);
+      const normalizedPhone = normalizePhone(lead.phone);
       const { data, error } = await supabase
         .from("leads")
         .insert({ ...lead, phone: normalizedPhone, user_id: user!.id })
@@ -75,9 +75,7 @@ export function useLeadsDB() {
         .single();
       if (error) throw error;
 
-      // Auto-link existing WhatsApp messages & contacts to this new lead
-      const digits = data.phone.replace(/\D/g, "");
-      const normalized = digits.startsWith("55") ? digits : `55${digits}`;
+      const normalized = normalizePhone(data.phone);
 
       // Link messages
       await supabase
