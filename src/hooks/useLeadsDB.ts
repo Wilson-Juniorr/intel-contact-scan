@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { FunnelStage } from "@/types/lead";
+import type { Lead, Interaction, FunnelStage } from "@/types/lead";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cleanPhone, normalizePhone } from "@/lib/phone";
 
@@ -32,7 +32,7 @@ export function useLeadsDB() {
         .select("*")
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as unknown as Lead[];
     },
     enabled: !!user,
   });
@@ -45,7 +45,7 @@ export function useLeadsDB() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as unknown as Interaction[];
     },
     enabled: !!user,
   });
