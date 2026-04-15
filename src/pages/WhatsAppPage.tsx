@@ -56,10 +56,7 @@ export default function WhatsAppPage() {
     try {
       const { data, error } = await supabase.functions.invoke("sync-whatsapp");
       if (error) throw new Error(error.message);
-      toast({
-        title: "Sincronização concluída",
-        description: `${data.totalImported || 0} novas mensagens, ${data.contactsSaved || 0} contatos salvos, ${data.contactsWithNames || 0} com nome`,
-      });
+      toast.success(`Sincronização concluída: ${data.totalImported || 0} novas mensagens, ${data.contactsSaved || 0} contatos salvos`);
       await Promise.all([fetchMessages(), fetchContacts()]);
     } catch (e: any) {
       toast.error(e.message);
@@ -269,12 +266,7 @@ export default function WhatsAppPage() {
       setContacts((prev) =>
         prev.map((c) => (c.phone === phone ? { ...c, is_personal: isPersonal } : c))
       );
-      toast({
-        title: isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal",
-        description: isPersonal
-          ? "Este contato não será criado como lead automaticamente"
-          : "Este contato poderá ser criado como lead",
-      });
+      toast.success(isPersonal ? "Contato marcado como pessoal" : "Contato desmarcado como pessoal");
     } catch (e: any) {
       toast.error(e.message);
     }
