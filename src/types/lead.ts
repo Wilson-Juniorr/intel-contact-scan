@@ -48,26 +48,35 @@ export const FUNNEL_STAGES: { key: FunnelStage; label: string; color: string; we
 
 export interface Lead {
   id: string;
+  user_id: string;
   name: string;
   phone: string;
-  email?: string;
+  email?: string | null;
   type: LeadType;
-  plan_type?: PlanType;
-  operator?: string;
-  lives?: number;
-  notes?: string;
+  plan_type?: PlanType | null;
+  operator?: string | null;
+  lives?: number | null;
+  notes?: string | null;
   stage: FunnelStage;
-  lost_reason?: string;
+  lost_reason?: string | null;
+  approved_value?: number | null;
+  quote_min_value?: number | null;
+  quote_operadora?: string | null;
+  quote_plan_name?: string | null;
+  last_quote_sent_at?: string | null;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
-  last_contact_at?: string;
+  last_contact_at?: string | null;
 }
 
 export interface Interaction {
   id: string;
+  user_id: string;
   lead_id: string;
-  type: "call" | "whatsapp" | "meeting" | "email" | "note";
+  type: string;
   description: string;
+  deleted_at?: string | null;
   created_at: string;
 }
 
