@@ -1,8 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { useTasks } from "@/hooks/useTasks";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Badge } from "@/components/ui/badge";
 import {
   Users,
