@@ -56,9 +56,20 @@ export function FunnelColumn({
       onDrop={onDrop}
     >
       {/* Header – sticky */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+      <div
+        className="sticky top-0 z-10 backdrop-blur-sm border-b border-border"
+        style={{
+          background: `linear-gradient(135deg, ${stage.color}08 0%, transparent 100%)`,
+        }}
+      >
         <div className="px-3 py-2.5 flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+          <div
+            className="h-2.5 w-2.5 rounded-full shrink-0"
+            style={{
+              backgroundColor: stage.color,
+              boxShadow: `0 0 0 3px ${stage.color}20`,
+            }}
+          />
           <span className="text-xs font-semibold uppercase tracking-wider text-foreground truncate">
             {stage.label}
           </span>
@@ -73,8 +84,8 @@ export function FunnelColumn({
 
       {/* Cards area */}
       <motion.div
-        className={`flex-1 overflow-y-auto px-1.5 py-1.5 transition-colors duration-200 ${
-          isDragOver ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""
+        className={`flex-1 overflow-y-auto px-1.5 py-1.5 transition-all duration-200 ${
+          isDragOver ? "bg-primary/5 ring-2 ring-inset ring-primary/40 scale-[1.01]" : ""
         }`}
         animate={isDragOver ? { scale: 1.005 } : { scale: 1 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}

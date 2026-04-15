@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { motion } from "framer-motion";
 import {
   Sidebar,
   SidebarContent,
@@ -54,18 +55,18 @@ function AppSidebarContent() {
       <div className="flex items-center gap-3 px-4 py-5">
         {!collapsed && (
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-              <span className="text-primary-foreground font-bold text-sm">CS</span>
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center shadow-md shadow-primary/20">
+              <span className="text-primary-foreground font-extrabold text-sm">J</span>
             </div>
             <div>
-              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">CRM Saúde</h1>
+              <h1 className="text-sm font-bold gradient-text tracking-tight">È o JOTA.</h1>
               <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">{user?.email}</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto shadow-sm">
-            <span className="text-primary-foreground font-bold text-sm">CS</span>
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center mx-auto shadow-md shadow-primary/20">
+            <span className="text-primary-foreground font-extrabold text-sm">J</span>
           </div>
         )}
       </div>
@@ -80,15 +81,26 @@ function AppSidebarContent() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150"
+                      className="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:translate-x-0.5 transition-all duration-200"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
                     >
-                      <item.icon className="h-4.5 w-4.5 shrink-0" />
-                      <span className="text-sm">{item.title}</span>
-                      {item.url === "/today" && pendingCount > 0 && (
-                        <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                          {pendingCount}
-                        </span>
+                      {({ isActive }: { isActive: boolean }) => (
+                        <>
+                          {isActive && (
+                            <motion.div
+                              layoutId="activeNav"
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full"
+                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                            />
+                          )}
+                          <item.icon className="h-4.5 w-4.5 shrink-0" />
+                          <span className="text-sm">{item.title}</span>
+                          {item.url === "/today" && pendingCount > 0 && (
+                            <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse-glow">
+                              {pendingCount}
+                            </span>
+                          )}
+                        </>
                       )}
                     </NavLink>
                   </SidebarMenuButton>
@@ -104,7 +116,7 @@ function AppSidebarContent() {
           variant="ghost"
           size={collapsed ? "icon" : "default"}
           onClick={signOut}
-          className="w-full justify-start gap-2 text-sidebar-foreground/40 hover:text-destructive hover:bg-destructive/10"
+          className="w-full justify-start gap-2 text-sidebar-foreground/40 hover:text-destructive hover:bg-destructive/10 btn-press"
         >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span className="text-sm">Sair</span>}
@@ -120,9 +132,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   if (isMobile) {
     return (
       <div className="min-h-screen flex flex-col w-full bg-background">
-        <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-background/80 backdrop-blur-md sticky top-0 z-20">
-          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xs">CS</span>
+        <header className="h-12 glass border-b border-border/50 flex items-center justify-between px-4 sticky top-0 z-20 shadow-sm">
+          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center">
+            <span className="text-primary-foreground font-extrabold text-[10px]">J</span>
           </div>
           <NotificationBell />
         </header>
@@ -137,7 +149,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebarContent />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-background/80 backdrop-blur-md sticky top-0 z-20">
+          <header className="h-12 glass border-b border-border/50 flex items-center justify-between px-4 sticky top-0 z-20 shadow-sm">
             <SidebarTrigger>
               <Menu className="h-4.5 w-4.5 text-muted-foreground" />
             </SidebarTrigger>

@@ -4,6 +4,15 @@ import { Search, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+const AVATAR_GRADIENTS = [
+  "from-blue-500 to-cyan-400",
+  "from-purple-500 to-pink-400",
+  "from-amber-500 to-orange-400",
+  "from-emerald-500 to-teal-400",
+  "from-rose-500 to-red-400",
+  "from-indigo-500 to-violet-400",
+];
+
 interface ConversationSummary {
   phone: string;
   leadId: string | null;
@@ -49,7 +58,7 @@ export default function ConversationList({
             placeholder="Pesquisar ou começar uma nova conversa"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 h-9 text-sm bg-[#202c33] border-0 text-[#e9edef] placeholder:text-[#8696a0] rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="pl-9 h-9 text-sm bg-[#202c33] border-0 text-[#e9edef] placeholder:text-[#8696a0] rounded-lg focus-visible:ring-1 focus-visible:ring-[#00a884]/50 focus-visible:ring-offset-0"
           />
         </div>
       </div>
@@ -62,61 +71,76 @@ export default function ConversationList({
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {conversations.map((conv, i) => (
-              <motion.button
-                key={conv.phone}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.15, delay: Math.min(i * 0.02, 0.5) }}
-                onClick={() => onSelectPhone(conv.phone)}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors ${
-                  selectedPhone === conv.phone ? "bg-[#2a3942]" : "hover:bg-[#202c33]"
-                }`}
-              >
-                {/* Avatar */}
-                <div className="h-[49px] w-[49px] rounded-full bg-[#6b7b8d] flex items-center justify-center shrink-0">
-                  <User className="h-6 w-6 text-[#cfd9df]" />
-                </div>
+            {conversations.map((conv, i) => {
+              const gradientIdx = (conv.leadName || conv.phone).charCodeAt(0) % AVATAR_GRADIENTS.length;
+              const initials = conv.leadName
+                ? conv.leadName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+                : null;
 
-                {/* Content */}
-                <div className="min-w-0 flex-1 border-b border-[#2a3942] pb-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[#e9edef] text-[15px] truncate">
-                      {conv.leadName || formatPhone(conv.phone)}
-                    </span>
-                    {conv.isPersonal && (
-                      <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-medium shrink-0">
-                        Pessoal
+              return (
+                <motion.button
+                  key={conv.phone}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.15, delay: Math.min(i * 0.02, 0.5) }}
+                  onClick={() => onSelectPhone(conv.phone)}
+                  className={`w-full text-left flex items-center gap-3 px-3 py-2.5 transition-all duration-200 ${
+                    selectedPhone === conv.phone
+                      ? "bg-[#2a3942] border-l-[3px] border-l-[#00a884]"
+                      : "hover:bg-[#202c33] hover:translate-x-0.5 border-l-[3px] border-l-transparent"
+                  }`}
+                >
+                  {/* Avatar */}
+                  {initials ? (
+                    <div className={`h-[49px] w-[49px] rounded-full bg-gradient-to-br ${AVATAR_GRADIENTS[gradientIdx]} flex items-center justify-center shrink-0 shadow-sm`}>
+                      <span className="text-white font-semibold text-sm">{initials}</span>
+                    </div>
+                  ) : (
+                    <div className="h-[49px] w-[49px] rounded-full bg-[#6b7b8d] flex items-center justify-center shrink-0">
+                      <User className="h-6 w-6 text-[#cfd9df]" />
+                    </div>
+                  )}
+
+                  {/* Content */}
+                  <div className="min-w-0 flex-1 border-b border-[#2a3942] pb-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#e9edef] text-[15px] truncate">
+                        {conv.leadName || formatPhone(conv.phone)}
                       </span>
-                    )}
-                    <span className="text-[11px] text-[#8696a0] shrink-0">
-                      {conv.messageCount > 0
-                        ? formatDistanceToNow(new Date(conv.lastMessageAt), {
-                            addSuffix: false,
-                            locale: ptBR,
-                          })
-                        : ""}
-                    </span>
+                      {conv.isPersonal && (
+                        <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded font-medium shrink-0">
+                          Pessoal
+                        </span>
+                      )}
+                      <span className="text-[11px] text-[#8696a0] shrink-0">
+                        {conv.messageCount > 0
+                          ? formatDistanceToNow(new Date(conv.lastMessageAt), {
+                              addSuffix: false,
+                              locale: ptBR,
+                            })
+                          : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-[13px] text-[#8696a0] truncate max-w-[200px]">
+                        {conv.lastMessage ||
+                          (conv.messageCount > 0 ? "Mídia" : formatPhone(conv.phone))}
+                      </p>
+                      {conv.unreadCount > 0 && (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                          className="bg-[#00a884] text-[#111b21] text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1 animate-pulse-glow"
+                        >
+                          {conv.unreadCount}
+                        </motion.span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-[13px] text-[#8696a0] truncate max-w-[200px]">
-                      {conv.lastMessage ||
-                        (conv.messageCount > 0 ? "Mídia" : formatPhone(conv.phone))}
-                    </p>
-                    {conv.unreadCount > 0 && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 15 }}
-                        className="bg-[#00a884] text-[#111b21] text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1"
-                      >
-                        {conv.unreadCount}
-                      </motion.span>
-                    )}
-                  </div>
-                </div>
-              </motion.button>
-            ))}
+                </motion.button>
+              );
+            })}
           </AnimatePresence>
         )}
       </div>
