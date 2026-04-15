@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Clock,
   Zap,
+  Brain,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +35,7 @@ const navItems = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Follow-Up", url: "/follow-up", icon: Clock },
   { title: "Assistente IA", url: "/assistant", icon: Bot },
+  { title: "Uso de IA", url: "/ai-usage", icon: Brain },
 ];
 
 function AppSidebarContent() {

@@ -17,6 +17,7 @@ const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
 const TodayPage = lazy(() => import("./pages/TodayPage"));
 const FollowUpPage = lazy(() => import("./pages/FollowUpPage"));
 const AssistantPage = lazy(() => import("./pages/AssistantPage"));
+const AIUsagePage = lazy(() => import("./pages/AIUsagePage"));
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ function ProtectedRoutes() {
             <Route path="/assistant" element={<AssistantPage />} />
             <Route path="/whatsapp" element={<WhatsAppPage />} />
             <Route path="/follow-up" element={<FollowUpPage />} />
+            <Route path="/ai-usage" element={<AIUsagePage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
