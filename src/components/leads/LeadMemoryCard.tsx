@@ -95,13 +95,15 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
           </Button>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        {(isLoading || updating) && !memory && (
+          <div className="space-y-2 py-2">
+            <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+            <div className="h-20 w-full rounded bg-muted animate-pulse" />
           </div>
         )}
 
-        {!isLoading && !memory && (
+        {!isLoading && !updating && !memory && (
           <p className="text-xs text-muted-foreground text-center py-2">
             Clique em "Gerar memória" para criar um resumo inteligente deste lead
           </p>

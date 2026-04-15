@@ -243,6 +243,14 @@ export default function AIRewriteModal({
               {loading ? "Gerando variações..." : variants.length > 0 ? "Regenerar" : "Gerar variações"}
             </Button>
 
+            {/* Loading state */}
+            {loading && variants.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-[#00a884]" />
+                <span className="text-[12px] text-[#8696a0]">Gerando variantes...</span>
+              </div>
+            )}
+
             {/* Variants */}
             <AnimatePresence>
               {variants.length > 0 && (
