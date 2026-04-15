@@ -11,7 +11,7 @@ import {
   ChevronDown, ChevronRight, User, Users, Plus, Trash2, Upload, Loader2,
   Eye, Download, File, Image as ImageIcon, X, Pencil, Check, UserPlus,
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface MemberDoc {

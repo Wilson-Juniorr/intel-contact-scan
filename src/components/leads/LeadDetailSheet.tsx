@@ -30,7 +30,7 @@ import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { ClosingTimeline } from "@/components/closing/ClosingTimeline";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import JSZip from "jszip";
 

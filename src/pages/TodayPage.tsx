@@ -5,7 +5,7 @@ import { useCadence } from "@/hooks/useCadence";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { CadenceSection } from "@/components/today/CadenceSection";
 import {
   Accordion,

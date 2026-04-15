@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Send, User, Bell, Mic, MicOff, Paperclip, X, FileText, ArrowRightLeft, Phone, CalendarClock, StickyNote, FileUp, CheckCircle2, Image } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { FUNNEL_STAGES } from "@/types/lead";
