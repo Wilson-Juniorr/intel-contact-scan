@@ -1,872 +1,976 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1";
-  };
+    PostgrestVersion: "14.1"
+  }
   public: {
     Tables: {
       action_log: {
         Row: {
-          action_type: string;
-          created_at: string;
-          id: string;
-          lead_id: string;
-          metadata: Json | null;
-          user_id: string;
-        };
+          action_type: string
+          created_at: string
+          id: string
+          lead_id: string
+          metadata: Json | null
+          user_id: string
+        }
         Insert: {
-          action_type: string;
-          created_at?: string;
-          id?: string;
-          lead_id: string;
-          metadata?: Json | null;
-          user_id: string;
-        };
+          action_type: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          user_id: string
+        }
         Update: {
-          action_type?: string;
-          created_at?: string;
-          id?: string;
-          lead_id?: string;
-          metadata?: Json | null;
-          user_id?: string;
-        };
+          action_type?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "action_log_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "action_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
+      api_usage: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number | null
+          function_name: string
+          id: string
+          input_tokens: number | null
+          model: string | null
+          output_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number | null
+          function_name: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number | null
+          function_name?: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       closing_sequences: {
         Row: {
-          completed_at: string | null;
-          created_at: string;
-          current_step: number;
-          id: string;
-          lead_id: string;
-          paused_at: string | null;
-          status: string;
-          updated_at: string;
-          user_id: string;
-        };
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          id: string
+          lead_id: string
+          paused_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          completed_at?: string | null;
-          created_at?: string;
-          current_step?: number;
-          id?: string;
-          lead_id: string;
-          paused_at?: string | null;
-          status?: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          id?: string
+          lead_id: string
+          paused_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          completed_at?: string | null;
-          created_at?: string;
-          current_step?: number;
-          id?: string;
-          lead_id?: string;
-          paused_at?: string | null;
-          status?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          id?: string
+          lead_id?: string
+          paused_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "closing_sequences_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: true;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "closing_sequences_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       closing_steps: {
         Row: {
-          ai_analysis: string | null;
-          created_at: string;
-          generated_message: string | null;
-          id: string;
-          recommended_due_at: string | null;
-          scheduled_at: string;
-          sent_at: string | null;
-          sequence_id: string;
-          status: string;
-          step_number: number;
-          step_type: string;
-          updated_at: string;
-          user_id: string;
-        };
+          ai_analysis: string | null
+          created_at: string
+          generated_message: string | null
+          id: string
+          recommended_due_at: string | null
+          scheduled_at: string
+          sent_at: string | null
+          sequence_id: string
+          status: string
+          step_number: number
+          step_type: string
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          ai_analysis?: string | null;
-          created_at?: string;
-          generated_message?: string | null;
-          id?: string;
-          recommended_due_at?: string | null;
-          scheduled_at: string;
-          sent_at?: string | null;
-          sequence_id: string;
-          status?: string;
-          step_number: number;
-          step_type: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          ai_analysis?: string | null
+          created_at?: string
+          generated_message?: string | null
+          id?: string
+          recommended_due_at?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          sequence_id: string
+          status?: string
+          step_number: number
+          step_type: string
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          ai_analysis?: string | null;
-          created_at?: string;
-          generated_message?: string | null;
-          id?: string;
-          recommended_due_at?: string | null;
-          scheduled_at?: string;
-          sent_at?: string | null;
-          sequence_id?: string;
-          status?: string;
-          step_number?: number;
-          step_type?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
+          ai_analysis?: string | null
+          created_at?: string
+          generated_message?: string | null
+          id?: string
+          recommended_due_at?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          sequence_id?: string
+          status?: string
+          step_number?: number
+          step_type?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "closing_steps_sequence_id_fkey";
-            columns: ["sequence_id"];
-            isOneToOne: false;
-            referencedRelation: "closing_sequences";
-            referencedColumns: ["id"];
+            foreignKeyName: "closing_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "closing_sequences"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       follow_up_queue: {
         Row: {
-          attempt_number: number;
-          created_at: string;
-          id: string;
-          lead_id: string;
-          max_attempts: number;
-          message_content: string | null;
-          scheduled_at: string;
-          sent_at: string | null;
-          status: string;
-          user_id: string;
-        };
+          attempt_number: number
+          created_at: string
+          id: string
+          lead_id: string
+          max_attempts: number
+          message_content: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
         Insert: {
-          attempt_number?: number;
-          created_at?: string;
-          id?: string;
-          lead_id: string;
-          max_attempts?: number;
-          message_content?: string | null;
-          scheduled_at: string;
-          sent_at?: string | null;
-          status?: string;
-          user_id: string;
-        };
+          attempt_number?: number
+          created_at?: string
+          id?: string
+          lead_id: string
+          max_attempts?: number
+          message_content?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
         Update: {
-          attempt_number?: number;
-          created_at?: string;
-          id?: string;
-          lead_id?: string;
-          max_attempts?: number;
-          message_content?: string | null;
-          scheduled_at?: string;
-          sent_at?: string | null;
-          status?: string;
-          user_id?: string;
-        };
+          attempt_number?: number
+          created_at?: string
+          id?: string
+          lead_id?: string
+          max_attempts?: number
+          message_content?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "follow_up_queue_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "follow_up_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       interactions: {
         Row: {
-          created_at: string;
-          description: string;
-          id: string;
-          lead_id: string;
-          type: string;
-          user_id: string;
-        };
+          created_at: string
+          deleted_at: string | null
+          description: string
+          id: string
+          lead_id: string
+          type: string
+          user_id: string
+        }
         Insert: {
-          created_at?: string;
-          description: string;
-          id?: string;
-          lead_id: string;
-          type: string;
-          user_id: string;
-        };
+          created_at?: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          lead_id: string
+          type: string
+          user_id: string
+        }
         Update: {
-          created_at?: string;
-          description?: string;
-          id?: string;
-          lead_id?: string;
-          type?: string;
-          user_id?: string;
-        };
+          created_at?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          lead_id?: string
+          type?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "interactions_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "interactions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       lead_checklist: {
         Row: {
-          completed: boolean;
-          created_at: string;
-          document_id: string | null;
-          id: string;
-          item_name: string;
-          lead_id: string;
-          user_id: string;
-        };
+          completed: boolean
+          created_at: string
+          document_id: string | null
+          id: string
+          item_name: string
+          lead_id: string
+          user_id: string
+        }
         Insert: {
-          completed?: boolean;
-          created_at?: string;
-          document_id?: string | null;
-          id?: string;
-          item_name: string;
-          lead_id: string;
-          user_id: string;
-        };
+          completed?: boolean
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          item_name: string
+          lead_id: string
+          user_id: string
+        }
         Update: {
-          completed?: boolean;
-          created_at?: string;
-          document_id?: string | null;
-          id?: string;
-          item_name?: string;
-          lead_id?: string;
-          user_id?: string;
-        };
+          completed?: boolean
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          item_name?: string
+          lead_id?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lead_checklist_document_id_fkey";
-            columns: ["document_id"];
-            isOneToOne: false;
-            referencedRelation: "lead_documents";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_checklist_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "lead_documents"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lead_checklist_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_checklist_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       lead_documents: {
         Row: {
-          category: string;
-          created_at: string;
-          file_name: string;
-          file_path: string;
-          file_size: number | null;
-          file_type: string | null;
-          id: string;
-          lead_id: string;
-          member_id: string | null;
-          ocr_text: string | null;
-          user_id: string;
-        };
+          category: string
+          created_at: string
+          deleted_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          lead_id: string
+          member_id: string | null
+          ocr_text: string | null
+          user_id: string
+        }
         Insert: {
-          category?: string;
-          created_at?: string;
-          file_name: string;
-          file_path: string;
-          file_size?: number | null;
-          file_type?: string | null;
-          id?: string;
-          lead_id: string;
-          member_id?: string | null;
-          ocr_text?: string | null;
-          user_id: string;
-        };
+          category?: string
+          created_at?: string
+          deleted_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          lead_id: string
+          member_id?: string | null
+          ocr_text?: string | null
+          user_id: string
+        }
         Update: {
-          category?: string;
-          created_at?: string;
-          file_name?: string;
-          file_path?: string;
-          file_size?: number | null;
-          file_type?: string | null;
-          id?: string;
-          lead_id?: string;
-          member_id?: string | null;
-          ocr_text?: string | null;
-          user_id?: string;
-        };
+          category?: string
+          created_at?: string
+          deleted_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          lead_id?: string
+          member_id?: string | null
+          ocr_text?: string | null
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lead_documents_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_documents_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "lead_documents_member_id_fkey";
-            columns: ["member_id"];
-            isOneToOne: false;
-            referencedRelation: "lead_members";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_documents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "lead_members"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       lead_members: {
         Row: {
-          birth_date: string | null;
-          cpf: string | null;
-          created_at: string;
-          email: string | null;
-          id: string;
-          lead_id: string;
-          name: string;
-          phone: string | null;
-          role: string;
-          updated_at: string;
-          user_id: string;
-          vinculo: string | null;
-        };
+          birth_date: string | null
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          lead_id: string
+          name: string
+          phone: string | null
+          role: string
+          updated_at: string
+          user_id: string
+          vinculo: string | null
+        }
         Insert: {
-          birth_date?: string | null;
-          cpf?: string | null;
-          created_at?: string;
-          email?: string | null;
-          id?: string;
-          lead_id: string;
-          name: string;
-          phone?: string | null;
-          role?: string;
-          updated_at?: string;
-          user_id: string;
-          vinculo?: string | null;
-        };
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_id: string
+          name: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id: string
+          vinculo?: string | null
+        }
         Update: {
-          birth_date?: string | null;
-          cpf?: string | null;
-          created_at?: string;
-          email?: string | null;
-          id?: string;
-          lead_id?: string;
-          name?: string;
-          phone?: string | null;
-          role?: string;
-          updated_at?: string;
-          user_id?: string;
-          vinculo?: string | null;
-        };
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_id?: string
+          name?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
+          vinculo?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "lead_members_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_members_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       lead_memory: {
         Row: {
-          created_at: string;
-          id: string;
-          lead_id: string;
-          structured_json: Json | null;
-          summary: string | null;
-          updated_at: string;
-          user_id: string;
-        };
+          created_at: string
+          id: string
+          lead_id: string
+          structured_json: Json | null
+          summary: string | null
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          created_at?: string;
-          id?: string;
-          lead_id: string;
-          structured_json?: Json | null;
-          summary?: string | null;
-          updated_at?: string;
-          user_id: string;
-        };
+          created_at?: string
+          id?: string
+          lead_id: string
+          structured_json?: Json | null
+          summary?: string | null
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          created_at?: string;
-          id?: string;
-          lead_id?: string;
-          structured_json?: Json | null;
-          summary?: string | null;
-          updated_at?: string;
-          user_id?: string;
-        };
+          created_at?: string
+          id?: string
+          lead_id?: string
+          structured_json?: Json | null
+          summary?: string | null
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lead_memory_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_memory_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       lead_notes: {
         Row: {
-          category: string;
-          content: string;
-          created_at: string;
-          id: string;
-          lead_id: string;
-          tags: string[] | null;
-          updated_at: string;
-          user_id: string;
-        };
+          category: string
+          content: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          lead_id: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          category?: string;
-          content: string;
-          created_at?: string;
-          id?: string;
-          lead_id: string;
-          tags?: string[] | null;
-          updated_at?: string;
-          user_id: string;
-        };
+          category?: string
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          lead_id: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          category?: string;
-          content?: string;
-          created_at?: string;
-          id?: string;
-          lead_id?: string;
-          tags?: string[] | null;
-          updated_at?: string;
-          user_id?: string;
-        };
+          category?: string
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          lead_id?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "lead_notes_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       leads: {
         Row: {
-          approved_value: number | null;
-          created_at: string;
-          email: string | null;
-          id: string;
-          last_contact_at: string | null;
-          last_quote_sent_at: string | null;
-          lives: number | null;
-          lost_reason: string | null;
-          name: string;
-          notes: string | null;
-          operator: string | null;
-          phone: string;
-          plan_type: string | null;
-          quote_min_value: number | null;
-          quote_operadora: string | null;
-          quote_plan_name: string | null;
-          stage: string;
-          type: string;
-          updated_at: string;
-          user_id: string;
-        };
+          approved_value: number | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          id: string
+          last_contact_at: string | null
+          last_quote_sent_at: string | null
+          lives: number | null
+          lost_reason: string | null
+          name: string
+          notes: string | null
+          operator: string | null
+          phone: string
+          plan_type: string | null
+          quote_min_value: number | null
+          quote_operadora: string | null
+          quote_plan_name: string | null
+          stage: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          approved_value?: number | null;
-          created_at?: string;
-          email?: string | null;
-          id?: string;
-          last_contact_at?: string | null;
-          last_quote_sent_at?: string | null;
-          lives?: number | null;
-          lost_reason?: string | null;
-          name: string;
-          notes?: string | null;
-          operator?: string | null;
-          phone: string;
-          plan_type?: string | null;
-          quote_min_value?: number | null;
-          quote_operadora?: string | null;
-          quote_plan_name?: string | null;
-          stage?: string;
-          type?: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          approved_value?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          last_contact_at?: string | null
+          last_quote_sent_at?: string | null
+          lives?: number | null
+          lost_reason?: string | null
+          name: string
+          notes?: string | null
+          operator?: string | null
+          phone: string
+          plan_type?: string | null
+          quote_min_value?: number | null
+          quote_operadora?: string | null
+          quote_plan_name?: string | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          approved_value?: number | null;
-          created_at?: string;
-          email?: string | null;
-          id?: string;
-          last_contact_at?: string | null;
-          last_quote_sent_at?: string | null;
-          lives?: number | null;
-          lost_reason?: string | null;
-          name?: string;
-          notes?: string | null;
-          operator?: string | null;
-          phone?: string;
-          plan_type?: string | null;
-          quote_min_value?: number | null;
-          quote_operadora?: string | null;
-          quote_plan_name?: string | null;
-          stage?: string;
-          type?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          approved_value?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          last_contact_at?: string | null
+          last_quote_sent_at?: string | null
+          lives?: number | null
+          lost_reason?: string | null
+          name?: string
+          notes?: string | null
+          operator?: string | null
+          phone?: string
+          plan_type?: string | null
+          quote_min_value?: number | null
+          quote_operadora?: string | null
+          quote_plan_name?: string | null
+          stage?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
-          completed: boolean;
-          created_at: string;
-          date: string;
-          description: string;
-          id: string;
-          lead_id: string;
-          user_id: string;
-        };
+          completed: boolean
+          created_at: string
+          date: string
+          deleted_at: string | null
+          description: string
+          id: string
+          lead_id: string
+          user_id: string
+        }
         Insert: {
-          completed?: boolean;
-          created_at?: string;
-          date: string;
-          description: string;
-          id?: string;
-          lead_id: string;
-          user_id: string;
-        };
+          completed?: boolean
+          created_at?: string
+          date: string
+          deleted_at?: string | null
+          description: string
+          id?: string
+          lead_id: string
+          user_id: string
+        }
         Update: {
-          completed?: boolean;
-          created_at?: string;
-          date?: string;
-          description?: string;
-          id?: string;
-          lead_id?: string;
-          user_id?: string;
-        };
+          completed?: boolean
+          created_at?: string
+          date?: string
+          deleted_at?: string | null
+          description?: string
+          id?: string
+          lead_id?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "reminders_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       tasks: {
         Row: {
-          created_at: string;
-          due_at: string | null;
-          id: string;
-          lead_id: string;
-          notes: string | null;
-          status: string;
-          title: string;
-          updated_at: string;
-          user_id: string;
-        };
+          created_at: string
+          deleted_at: string | null
+          due_at: string | null
+          id: string
+          lead_id: string
+          notes: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          created_at?: string;
-          due_at?: string | null;
-          id?: string;
-          lead_id: string;
-          notes?: string | null;
-          status?: string;
-          title: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          created_at?: string
+          deleted_at?: string | null
+          due_at?: string | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          created_at?: string;
-          due_at?: string | null;
-          id?: string;
-          lead_id?: string;
-          notes?: string | null;
-          status?: string;
-          title?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
+          created_at?: string
+          deleted_at?: string | null
+          due_at?: string | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "tasks_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
+      user_settings: {
+        Row: {
+          ai_enabled: boolean | null
+          created_at: string
+          daily_token_limit: number | null
+          display_name: string | null
+          id: string
+          monthly_token_limit: number | null
+          notification_browser: boolean | null
+          notification_sound: boolean | null
+          onboarding_completed: boolean | null
+          onboarding_step: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          created_at?: string
+          daily_token_limit?: number | null
+          display_name?: string | null
+          id?: string
+          monthly_token_limit?: number | null
+          notification_browser?: boolean | null
+          notification_sound?: boolean | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          created_at?: string
+          daily_token_limit?: number | null
+          display_name?: string | null
+          id?: string
+          monthly_token_limit?: number | null
+          notification_browser?: boolean | null
+          notification_sound?: boolean | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_contacts: {
         Row: {
-          contact_name: string | null;
-          created_at: string;
-          id: string;
-          is_personal: boolean;
-          lead_id: string | null;
-          phone: string;
-          updated_at: string;
-          user_id: string;
-        };
+          contact_name: string | null
+          created_at: string
+          id: string
+          is_personal: boolean
+          lead_id: string | null
+          phone: string
+          updated_at: string
+          user_id: string
+        }
         Insert: {
-          contact_name?: string | null;
-          created_at?: string;
-          id?: string;
-          is_personal?: boolean;
-          lead_id?: string | null;
-          phone: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          is_personal?: boolean
+          lead_id?: string | null
+          phone: string
+          updated_at?: string
+          user_id: string
+        }
         Update: {
-          contact_name?: string | null;
-          created_at?: string;
-          id?: string;
-          is_personal?: boolean;
-          lead_id?: string | null;
-          phone?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          is_personal?: boolean
+          lead_id?: string | null
+          phone?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "whatsapp_contacts_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "whatsapp_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       whatsapp_messages: {
         Row: {
-          business_relevance_score: number | null;
-          classification_confidence: string | null;
-          contact_name: string | null;
-          content: string | null;
-          created_at: string;
-          direction: string;
-          extracted_entities: Json | null;
-          extracted_semantic_summary: string | null;
-          extracted_text: string | null;
-          id: string;
-          intent: string | null;
-          lead_id: string | null;
-          media_storage_path: string | null;
-          media_url: string | null;
-          message_category: string | null;
-          message_type: string;
-          phone: string;
-          processing_error: string | null;
-          processing_status: string | null;
-          status: string | null;
-          uazapi_message_id: string | null;
-          user_id: string;
-        };
+          business_relevance_score: number | null
+          classification_confidence: string | null
+          contact_name: string | null
+          content: string | null
+          created_at: string
+          direction: string
+          extracted_entities: Json | null
+          extracted_semantic_summary: string | null
+          extracted_text: string | null
+          id: string
+          intent: string | null
+          lead_id: string | null
+          media_storage_path: string | null
+          media_url: string | null
+          message_category: string | null
+          message_type: string
+          phone: string
+          processing_error: string | null
+          processing_status: string | null
+          status: string | null
+          uazapi_message_id: string | null
+          user_id: string
+        }
         Insert: {
-          business_relevance_score?: number | null;
-          classification_confidence?: string | null;
-          contact_name?: string | null;
-          content?: string | null;
-          created_at?: string;
-          direction: string;
-          extracted_entities?: Json | null;
-          extracted_semantic_summary?: string | null;
-          extracted_text?: string | null;
-          id?: string;
-          intent?: string | null;
-          lead_id?: string | null;
-          media_storage_path?: string | null;
-          media_url?: string | null;
-          message_category?: string | null;
-          message_type?: string;
-          phone: string;
-          processing_error?: string | null;
-          processing_status?: string | null;
-          status?: string | null;
-          uazapi_message_id?: string | null;
-          user_id: string;
-        };
+          business_relevance_score?: number | null
+          classification_confidence?: string | null
+          contact_name?: string | null
+          content?: string | null
+          created_at?: string
+          direction: string
+          extracted_entities?: Json | null
+          extracted_semantic_summary?: string | null
+          extracted_text?: string | null
+          id?: string
+          intent?: string | null
+          lead_id?: string | null
+          media_storage_path?: string | null
+          media_url?: string | null
+          message_category?: string | null
+          message_type?: string
+          phone: string
+          processing_error?: string | null
+          processing_status?: string | null
+          status?: string | null
+          uazapi_message_id?: string | null
+          user_id: string
+        }
         Update: {
-          business_relevance_score?: number | null;
-          classification_confidence?: string | null;
-          contact_name?: string | null;
-          content?: string | null;
-          created_at?: string;
-          direction?: string;
-          extracted_entities?: Json | null;
-          extracted_semantic_summary?: string | null;
-          extracted_text?: string | null;
-          id?: string;
-          intent?: string | null;
-          lead_id?: string | null;
-          media_storage_path?: string | null;
-          media_url?: string | null;
-          message_category?: string | null;
-          message_type?: string;
-          phone?: string;
-          processing_error?: string | null;
-          processing_status?: string | null;
-          status?: string | null;
-          uazapi_message_id?: string | null;
-          user_id?: string;
-        };
+          business_relevance_score?: number | null
+          classification_confidence?: string | null
+          contact_name?: string | null
+          content?: string | null
+          created_at?: string
+          direction?: string
+          extracted_entities?: Json | null
+          extracted_semantic_summary?: string | null
+          extracted_text?: string | null
+          id?: string
+          intent?: string | null
+          lead_id?: string | null
+          media_storage_path?: string | null
+          media_url?: string | null
+          message_category?: string | null
+          message_type?: string
+          phone?: string
+          processing_error?: string | null
+          processing_status?: string | null
+          status?: string | null
+          uazapi_message_id?: string | null
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "whatsapp_messages_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
+            foreignKeyName: "whatsapp_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-    };
+        ]
+      }
+    }
     Views: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Functions: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Enums: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-};
+      [_ in never]: never
+    }
+  }
+}
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R;
+      Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R;
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
       }
       ? R
       : never
-    : never;
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
+      Insert: infer I
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I;
+        Insert: infer I
       }
       ? I
       : never
-    : never;
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
+      Update: infer U
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
+        Update: infer U
       }
       ? U
       : never
-    : never;
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
+    schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
+  schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
+    : never
 
 export const Constants = {
   public: {
     Enums: {},
   },
-} as const;
+} as const
