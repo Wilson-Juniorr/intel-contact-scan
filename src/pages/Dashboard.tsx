@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import { DashboardMetrics } from "@/components/dashboard/DashboardMetrics";
 import { Badge } from "@/components/ui/badge";
 import {
   Users,
@@ -258,6 +259,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      <DashboardMetrics leads={leads} />
     </div>
     </>
   );
