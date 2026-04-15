@@ -18,22 +18,22 @@ export default function AuthPage() {
     if (!email || !password) return;
     setLoading(true);
     const { error } = await signIn(email, password);
-    if (error) toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+    if (error) toast.error(error.message);
     setLoading(false);
   };
 
   const handleSignUp = async () => {
     if (!email || !password) return;
     if (password.length < 6) {
-      toast({ title: "Senha muito curta", description: "Mínimo de 6 caracteres", variant: "destructive" });
+      toast.error("Mínimo de 6 caracteres");
       return;
     }
     setLoading(true);
     const { error } = await signUp(email, password);
     if (error) {
-      toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
+      toast.error(error.message);
     } else {
-      toast({ title: "Cadastro realizado!", description: "Verifique seu email para confirmar a conta." });
+      toast.success("Cadastro realizado!: Verifique seu email para confirmar a conta.");
     }
     setLoading(false);
   };

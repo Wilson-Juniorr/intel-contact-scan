@@ -55,9 +55,9 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["lead_memory", leadId] });
-      toast({ title: "Memória atualizada", description: `Resumo de ${leadName} foi atualizado com sucesso` });
+      toast.success(`Memória atualizada: ${(`Resumo de ${leadName} foi atualizado com sucesso`)}`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setUpdating(false);
     }

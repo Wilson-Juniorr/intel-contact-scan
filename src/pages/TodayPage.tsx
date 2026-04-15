@@ -40,9 +40,9 @@ export default function TodayPage() {
   const handleMarkDone = useCallback(async (leadId: string) => {
     try {
       await markDone(leadId, "contact_done");
-      toast({ title: "Contato registrado!" });
+      toast.success("Contato registrado!");
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   }, [markDone]);
 
@@ -72,11 +72,11 @@ export default function TodayPage() {
           body: JSON.stringify({ leadIds: batches[i] }),
         });
         if (resp.status === 429) {
-          toast({ title: "Limite atingido", description: "Aguarde e tente novamente.", variant: "destructive" });
+          toast.error("Aguarde e tente novamente.");
           break;
         }
         if (resp.status === 402) {
-          toast({ title: "Créditos insuficientes", variant: "destructive" });
+          toast.error("Créditos insuficientes");
           break;
         }
         if (!resp.ok) {
@@ -87,9 +87,9 @@ export default function TodayPage() {
         (data.results || []).forEach((r: NBAResult) => allResults.set(r.id, r));
       }
       setNbaResults(allResults);
-      toast({ title: "Sugestões geradas", description: `${allResults.size} leads analisados` });
+      toast.success(`Sugestões geradas: ${(`${allResults.size} leads analisados`)}`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setLoadingNBA(false);
     }

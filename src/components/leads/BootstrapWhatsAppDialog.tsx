@@ -40,7 +40,7 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
       const data = await resp.json();
       setStats(data);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setLoading(false);
   };
@@ -60,10 +60,10 @@ export function BootstrapWhatsAppDialog({ open, onOpenChange, onComplete }: Prop
       if (!resp.ok) throw new Error("Erro ao executar bootstrap");
       const data = await resp.json();
       setResult(data);
-      toast({ title: `${data.created} negócios criados com sucesso!` });
+      toast.success(`${data.created} negócios criados com sucesso!`);
       onComplete();
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setExecuting(false);
   };

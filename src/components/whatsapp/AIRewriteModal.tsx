@@ -66,7 +66,7 @@ export default function AIRewriteModal({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
+        toast.error("Você precisa estar logado");
         return;
       }
 
@@ -104,7 +104,7 @@ export default function AIRewriteModal({
         throw new Error("Nenhuma variação retornada");
       }
     } catch (e: any) {
-      toast({ title: "Erro na IA", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setLoading(false);
     }

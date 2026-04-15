@@ -62,7 +62,7 @@ export default function WhatsAppPage() {
       });
       await Promise.all([fetchMessages(), fetchContacts()]);
     } catch (e: any) {
-      toast({ title: "Erro na sincronização", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSyncing(false);
     }
@@ -276,7 +276,7 @@ export default function WhatsAppPage() {
           : "Este contato poderá ser criado como lead",
       });
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   };
 
@@ -327,7 +327,7 @@ export default function WhatsAppPage() {
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
       );
-      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSending(false);
     }

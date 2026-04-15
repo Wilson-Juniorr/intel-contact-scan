@@ -77,7 +77,7 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.phone.trim()) {
-      toast({ title: "Nome e telefone são obrigatórios", variant: "destructive" });
+      toast.error("Nome e telefone são obrigatórios");
       return;
     }
     setSaving(true);
@@ -94,10 +94,10 @@ function LeadEditForm({ lead, onSaved, onCancel }: { lead: Lead; onSaved: () => 
         stage: form.stage,
         lost_reason: form.lost_reason.trim() || null,
       });
-      toast({ title: "Lead atualizado com sucesso!" });
+      toast.success("Lead atualizado com sucesso!");
       onSaved();
     } catch (e: any) {
-      toast({ title: "Erro ao atualizar", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSaving(false);
   };
@@ -306,9 +306,9 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
       for (const file of Array.from(files)) {
         await obs.uploadDocument({ file, category: docCategory });
       }
-      toast({ title: `${files.length} arquivo(s) enviado(s)!` });
+      toast.success(`${files.length} arquivo(s) enviado(s)!`);
     } catch (e: any) {
-      toast({ title: "Erro no upload", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -316,7 +316,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   const handleDownload = async (filePath: string, fileName: string) => {
     const { data, error } = await supabase.storage.from("lead-images").download(filePath);
-    if (error) { toast({ title: "Erro ao baixar", variant: "destructive" }); return; }
+    if (error) { toast.error("Erro ao baixar"); return; }
     const url = URL.createObjectURL(data);
     const a = document.createElement("a");
     a.href = url; a.download = fileName; a.click();
@@ -325,7 +325,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
 
   const handlePreview = async (filePath: string, fileName: string, fileType: string) => {
     const { data, error } = await supabase.storage.from("lead-images").download(filePath);
-    if (error) { toast({ title: "Erro ao visualizar", variant: "destructive" }); return; }
+    if (error) { toast.error("Erro ao visualizar"); return; }
     const url = URL.createObjectURL(data);
     setPreviewDoc({ url, name: fileName, type: fileType });
   };
@@ -342,9 +342,9 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
     try {
       await obs.addNote({ content: noteContent.trim(), category: noteCategory, tags: noteTags });
       setNoteContent(""); setNoteTags([]);
-      toast({ title: "Nota salva!" });
+      toast.success("Nota salva!");
     } catch (e: any) {
-      toast({ title: "Erro ao salvar nota", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSavingNote(false);
   };
@@ -358,14 +358,14 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
       if (error) throw error;
       setSummary(data.summary);
     } catch (e: any) {
-      toast({ title: "Erro ao gerar resumo", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setLoadingSummary(false);
   };
 
   const handleGenerateWhatsAppMsg = async () => {
     if (!obs.documents.length) {
-      toast({ title: "Nenhum documento", description: "Adicione documentos antes.", variant: "destructive" });
+      toast.error("Adicione documentos antes.");
       return;
     }
     setGeneratingMsg(true); setWhatsappMsg(""); setCopied(false);
@@ -408,7 +408,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
       }
       setShowMsgDialog(true);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setGeneratingMsg(false);
   };
@@ -546,8 +546,8 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
                   const blob = await zip.generateAsync({ type: "blob" });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a"); a.href = url; a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`; a.click(); URL.revokeObjectURL(url);
-                  toast({ title: "Download concluído!" });
-                } catch (e: any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
+                  toast.success("Download concluído!");
+                } catch (e: any) { toast.error(e.message); }
                 setDownloadingAll(false);
               }}>
               {downloadingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderDown className="h-3 w-3" />}
@@ -725,7 +725,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
             <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed">{whatsappMsg}</pre>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={async () => { await navigator.clipboard.writeText(whatsappMsg); setCopied(true); toast({ title: "Copiado!" }); setTimeout(() => setCopied(false), 2000); }}>
+            <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={async () => { await navigator.clipboard.writeText(whatsappMsg); setCopied(true); toast.success("Copiado!"); setTimeout(() => setCopied(false), 2000); }}>
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               {copied ? "Copiado!" : "Copiar"}
             </Button>

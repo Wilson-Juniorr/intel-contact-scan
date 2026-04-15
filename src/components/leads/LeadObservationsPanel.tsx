@@ -165,9 +165,9 @@ export function LeadObservationsPanel({ lead }: Props) {
       await obs.addNote({ content: noteContent.trim(), category: noteCategory, tags: noteTags });
       setNoteContent("");
       setNoteTags([]);
-      toast({ title: "Nota salva!" });
+      toast.success("Nota salva!");
     } catch (e: any) {
-      toast({ title: "Erro ao salvar nota", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSavingNote(false);
   };
@@ -180,9 +180,9 @@ export function LeadObservationsPanel({ lead }: Props) {
       for (const file of Array.from(files)) {
         await obs.uploadDocument({ file, category: docCategory });
       }
-      toast({ title: `${files.length} arquivo(s) enviado(s)!` });
+      toast.success(`${files.length} arquivo(s) enviado(s)!`);
     } catch (e: any) {
-      toast({ title: "Erro no upload", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -191,7 +191,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   const handleDownload = async (filePath: string, fileName: string) => {
     const { data, error } = await supabase.storage.from("lead-images").download(filePath);
     if (error) {
-      toast({ title: "Erro ao baixar", variant: "destructive" });
+      toast.error("Erro ao baixar");
       return;
     }
     const url = URL.createObjectURL(data);
@@ -205,7 +205,7 @@ export function LeadObservationsPanel({ lead }: Props) {
   const handlePreview = async (filePath: string, fileName: string, fileType: string) => {
     const { data, error } = await supabase.storage.from("lead-images").download(filePath);
     if (error) {
-      toast({ title: "Erro ao visualizar", variant: "destructive" });
+      toast.error("Erro ao visualizar");
       return;
     }
     const url = URL.createObjectURL(data);
@@ -224,14 +224,14 @@ export function LeadObservationsPanel({ lead }: Props) {
       if (error) throw error;
       setSummary(data.summary);
     } catch (e: any) {
-      toast({ title: "Erro ao gerar resumo", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setLoadingSummary(false);
   };
 
   const handleOpenEmissionForm = () => {
     if (!obs.documents.length) {
-      toast({ title: "Nenhum documento", description: "Adicione documentos antes de gerar a mensagem.", variant: "destructive" });
+      toast.error("Adicione documentos antes de gerar a mensagem.");
       return;
     }
     setShowEmissionForm(true);
@@ -337,7 +337,7 @@ Atenciosamente 🤝`;
       setWhatsappMsg(message);
       setShowMsgDialog(true);
     } catch (e: any) {
-      toast({ title: "Erro ao gerar mensagem", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setGeneratingMsg(false);
   };
@@ -348,7 +348,7 @@ Atenciosamente 🤝`;
   const handleCopyMsg = async () => {
     await navigator.clipboard.writeText(whatsappMsg);
     setCopied(true);
-    toast({ title: "Mensagem copiada!" });
+    toast.success("Mensagem copiada!");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -457,9 +457,9 @@ Atenciosamente 🤝`;
                 a.download = `documentos_${lead.name.replace(/\s+/g, "_")}.zip`;
                 a.click();
                 URL.revokeObjectURL(url);
-                toast({ title: "Download concluído!" });
+                toast.success("Download concluído!");
               } catch (e: any) {
-                toast({ title: "Erro ao baixar", description: e.message, variant: "destructive" });
+                toast.error(e.message);
               }
               setDownloadingAll(false);
             }}

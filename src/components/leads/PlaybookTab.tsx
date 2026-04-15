@@ -71,9 +71,9 @@ export function PlaybookTab({ lead }: Props) {
       await addTask({ lead_id: lead.id, title: t, due_at: newTaskDue || undefined });
       setNewTaskTitle("");
       setNewTaskDue("");
-      toast({ title: "Tarefa criada!" });
+      toast.success("Tarefa criada!");
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -82,9 +82,9 @@ export function PlaybookTab({ lead }: Props) {
   const handleComplete = async (taskId: string) => {
     try {
       await completeTask(taskId, lead.id);
-      toast({ title: "Tarefa concluída!" });
+      toast.success("Tarefa concluída!");
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   };
 
@@ -109,7 +109,7 @@ export function PlaybookTab({ lead }: Props) {
       const data = await resp.json();
       setAiTasks(Array.isArray(data.tasks) ? data.tasks : []);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setGeneratingAiTasks(false);
     }
@@ -161,7 +161,7 @@ export function PlaybookTab({ lead }: Props) {
       setRiskFlags(Array.isArray(data.risk_flags) ? data.risk_flags : []);
       setTimeline(data.timeline || null);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setGeneratingMsg(false);
     }
@@ -192,10 +192,10 @@ export function PlaybookTab({ lead }: Props) {
         const copy = [...suggestedMsgs];
         copy[idx] = data.message;
         setSuggestedMsgs(copy);
-        toast({ title: `Mensagem ${idx + 1} regenerada! ✨` });
+        toast.success(`Mensagem ${idx + 1} regenerada! ✨`);
       }
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setRegeneratingIdx(null);
     }
@@ -296,7 +296,7 @@ export function PlaybookTab({ lead }: Props) {
             )}
             <Button size="sm" variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100" onClick={async () => {
               await deleteTask(task.id);
-              toast({ title: "Tarefa removida" });
+              toast.success("Tarefa removida");
             }}>
               <Trash2 className="h-3 w-3 text-destructive" />
             </Button>
@@ -436,7 +436,7 @@ export function PlaybookTab({ lead }: Props) {
                   <Button size="sm" variant="ghost" className="h-5 text-[9px] gap-0.5 px-1" onClick={async () => {
                     await navigator.clipboard.writeText(msg);
                     setCopiedIdx(idx);
-                    toast({ title: "Copiado!" });
+                    toast.success("Copiado!");
                     setTimeout(() => setCopiedIdx(null), 2000);
                   }}>
                     {copiedIdx === idx ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
@@ -454,7 +454,7 @@ export function PlaybookTab({ lead }: Props) {
               <Button size="sm" variant="outline" className="flex-1 text-xs gap-1 h-7" onClick={async () => {
                 await navigator.clipboard.writeText(suggestedMsgs.join("\n\n"));
                 setCopiedIdx(-1);
-                toast({ title: "Toda sequência copiada!" });
+                toast.success("Toda sequência copiada!");
                 setTimeout(() => setCopiedIdx(null), 2000);
               }}>
                 {copiedIdx === -1 ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -486,7 +486,7 @@ export function PlaybookTab({ lead }: Props) {
                 <p className="text-muted-foreground whitespace-pre-wrap">{filled}</p>
                 <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={async () => {
                   await navigator.clipboard.writeText(filled);
-                  toast({ title: "Template copiado!" });
+                  toast.success("Template copiado!");
                 }}>
                   <Copy className="h-2.5 w-2.5" /> Copiar
                 </Button>

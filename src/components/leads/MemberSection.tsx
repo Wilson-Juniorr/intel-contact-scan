@@ -65,9 +65,9 @@ export function MemberSection({
       });
       setAddingName("");
       setShowAddForm(false);
-      toast({ title: `${isTitular ? "Titular" : "Dependente"} adicionado!` });
+      toast.success(`${isTitular ? "Titular" : "Dependente"} adicionado!`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSaving(false);
   };
@@ -200,9 +200,9 @@ function MemberCard({
       for (const file of Array.from(files)) {
         await onUploadDoc({ file, category: docCategory, memberId: member.id });
       }
-      toast({ title: `${files.length} arquivo(s) enviado(s)!` });
+      toast.success(`${files.length} arquivo(s) enviado(s)!`);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
@@ -212,9 +212,9 @@ function MemberCard({
     try {
       await onUpdate(member.id, { name: editName.trim(), cpf: editCpf.trim() || null });
       setEditing(false);
-      toast({ title: "Atualizado!" });
+      toast.success("Atualizado!");
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
   };
 

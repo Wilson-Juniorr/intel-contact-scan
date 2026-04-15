@@ -188,7 +188,7 @@ export default function AssistantPage() {
     }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      toast({ title: "Navegador não suporta entrada por voz", variant: "destructive" });
+      toast.error("Navegador não suporta entrada por voz");
       return;
     }
     const recognition = new SR();
@@ -218,9 +218,9 @@ export default function AssistantPage() {
         if (error) throw error;
         const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
         setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
-        toast({ title: `📎 "${file.name}" pronto para enviar` });
+        toast.success(`📎 "${file.name}" pronto para enviar`);
       } catch (err: any) {
-        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+        toast.error(err.message);
       }
     }
     if (chatFileRef.current) chatFileRef.current.value = "";
@@ -243,7 +243,7 @@ export default function AssistantPage() {
           const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
           setPendingFiles((prev) => [...prev, { file_name: fileName, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
         } catch (err: any) {
-          toast({ title: "Erro ao colar arquivo", description: err.message, variant: "destructive" });
+          toast.error(err.message);
         }
         break;
       }
@@ -276,9 +276,9 @@ export default function AssistantPage() {
         if (error) throw error;
         const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
         setPendingFiles((prev) => [...prev, { file_name: file.name, file_path: filePath, file_type: file.type, file_size: file.size, previewUrl }]);
-        toast({ title: `📎 "${file.name}" pronto para enviar` });
+        toast.success(`📎 "${file.name}" pronto para enviar`);
       } catch (err: any) {
-        toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+        toast.error(err.message);
       }
     }
   }, [user]);
@@ -384,10 +384,10 @@ export default function AssistantPage() {
           return updated;
         });
         invalidateAll();
-        toast({ title: "✅ Ação executada no CRM" });
+        toast.success("✅ Ação executada no CRM");
       }
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setPendingFiles([]);
     setLoading(false);

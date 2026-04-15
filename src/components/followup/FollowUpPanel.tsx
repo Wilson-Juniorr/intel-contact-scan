@@ -163,7 +163,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
+        toast.error("Você precisa estar logado");
         setGeneratingFor(null);
         return;
       }
@@ -201,7 +201,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
       }));
       setEditingMsg(null);
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setGeneratingFor(null);
   };
@@ -220,7 +220,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         description: `[Follow-up ${idx + 1}] ${message.slice(0, 100)}${message.length > 100 ? "..." : ""}`,
       });
 
-      toast({ title: "✅ Enviado!", description: `Mensagem ${idx + 1} enviada para ${lead.name}` });
+      toast.success(`✅ Enviado!: ${(`Mensagem ${idx + 1} enviada para ${lead.name}`)}`);
       
       setResults((prev) => {
         const r = prev[lead.id];
@@ -235,7 +235,7 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         return { ...prev, [lead.id]: { ...r, messages: msgs } };
       });
     } catch (e: any) {
-      toast({ title: "Erro ao enviar", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSendingFor(null);
     }
@@ -258,14 +258,14 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
         description: `[Follow-up sequência ${msgs.length}x] ${msgs[0].slice(0, 80)}...`,
       });
 
-      toast({ title: "✅ Sequência enviada!", description: `${msgs.length} mensagens enviadas para ${lead.name}` });
+      toast.success(`✅ Sequência enviada!: ${(`${msgs.length} mensagens enviadas para ${lead.name}`)}`);
       setResults((prev) => {
         const copy = { ...prev };
         delete copy[lead.id];
         return copy;
       });
     } catch (e: any) {
-      toast({ title: "Erro ao enviar sequência", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setSendingAll(null);
     }
@@ -275,14 +275,14 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
     navigator.clipboard.writeText(message);
     setCopiedIdx({ leadId, idx });
     setTimeout(() => setCopiedIdx(null), 2000);
-    toast({ title: "Copiado!" });
+    toast.success("Copiado!");
   };
 
   const copyAll = (leadId: string, msgs: string[]) => {
     navigator.clipboard.writeText(msgs.join("\n\n"));
     setCopiedIdx({ leadId, idx: -1 });
     setTimeout(() => setCopiedIdx(null), 2000);
-    toast({ title: "Toda sequência copiada!" });
+    toast.success("Toda sequência copiada!");
   };
 
   const updateMessageAt = (leadId: string, idx: number, value: string) => {
@@ -321,10 +321,10 @@ export function FollowUpPanel({ singleLeadId }: FollowUpPanelProps) {
       const data = await resp.json();
       if (data.message) {
         updateMessageAt(leadId, idx, data.message);
-        toast({ title: `Mensagem ${idx + 1} regenerada! ✨` });
+        toast.success(`Mensagem ${idx + 1} regenerada! ✨`);
       }
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setRegeneratingMsg(null);
     }

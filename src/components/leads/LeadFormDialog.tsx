@@ -65,20 +65,20 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
         if (error) throw error;
         const contacts = data?.contacts || [];
         if (contacts.length === 0) {
-          toast({ title: "Nenhum contato encontrado", description: "Tente com outra imagem", variant: "destructive" });
+          toast.error("Tente com outra imagem");
         } else {
           setOcrResults(contacts);
           if (contacts[0]) {
             setName(contacts[0].name || "");
             setPhone(contacts[0].phone || "");
           }
-          toast({ title: `${contacts.length} contato(s) encontrado(s)!` });
+          toast.success(`${contacts.length} contato(s) encontrado(s)!`);
         }
         setOcrLoading(false);
       };
       reader.readAsDataURL(file);
     } catch (e: any) {
-      toast({ title: "Erro no OCR", description: e.message, variant: "destructive" });
+      toast.error(e.message);
       setOcrLoading(false);
     }
   }, []);
@@ -112,7 +112,7 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
 
   const handleSubmit = async () => {
     if (!name.trim() || !phone.trim()) {
-      toast({ title: "Preencha nome e telefone", variant: "destructive" });
+      toast.error("Preencha nome e telefone");
       return;
     }
     setSaving(true);
@@ -128,11 +128,11 @@ export function LeadFormDialog({ open, onOpenChange }: Props) {
         notes: notes.trim() || undefined,
         stage: "novo",
       });
-      toast({ title: "Lead cadastrado com sucesso!" });
+      toast.success("Lead cadastrado com sucesso!");
       reset();
       onOpenChange(false);
     } catch (e: any) {
-      toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     }
     setSaving(false);
   };
