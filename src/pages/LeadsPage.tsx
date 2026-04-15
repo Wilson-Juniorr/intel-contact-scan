@@ -152,9 +152,21 @@ export default function LeadsPage() {
             </Card>
           );
         })}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && leads.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+            <Users className="h-12 w-12 text-muted-foreground/30" />
+            <div>
+              <p className="font-medium">Nenhum lead cadastrado</p>
+              <p className="text-sm text-muted-foreground">Crie seu primeiro lead para começar a gerenciar.</p>
+            </div>
+            <Button onClick={() => setFormOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Criar Lead
+            </Button>
+          </div>
+        )}
+        {filtered.length === 0 && leads.length > 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            Nenhum lead encontrado
+            Nenhum lead encontrado para "{search}"
           </div>
         )}
       </div>
