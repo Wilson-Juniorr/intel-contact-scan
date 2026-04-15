@@ -199,6 +199,7 @@ export type Database = {
       interactions: {
         Row: {
           created_at: string
+          deleted_at: string | null
           description: string
           id: string
           lead_id: string
@@ -207,6 +208,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           description: string
           id?: string
           lead_id: string
@@ -215,6 +217,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           description?: string
           id?: string
           lead_id?: string
@@ -280,6 +283,7 @@ export type Database = {
         Row: {
           category: string
           created_at: string
+          deleted_at: string | null
           file_name: string
           file_path: string
           file_size: number | null
@@ -293,6 +297,7 @@ export type Database = {
         Insert: {
           category?: string
           created_at?: string
+          deleted_at?: string | null
           file_name: string
           file_path: string
           file_size?: number | null
@@ -306,6 +311,7 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string
+          deleted_at?: string | null
           file_name?: string
           file_path?: string
           file_size?: number | null
@@ -429,6 +435,7 @@ export type Database = {
           category: string
           content: string
           created_at: string
+          deleted_at: string | null
           id: string
           lead_id: string
           tags: string[] | null
@@ -439,6 +446,7 @@ export type Database = {
           category?: string
           content: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           lead_id: string
           tags?: string[] | null
@@ -449,6 +457,7 @@ export type Database = {
           category?: string
           content?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           lead_id?: string
           tags?: string[] | null
@@ -469,6 +478,7 @@ export type Database = {
         Row: {
           approved_value: number | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           last_contact_at: string | null
@@ -491,6 +501,7 @@ export type Database = {
         Insert: {
           approved_value?: number | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           last_contact_at?: string | null
@@ -513,6 +524,7 @@ export type Database = {
         Update: {
           approved_value?: number | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           last_contact_at?: string | null
@@ -539,6 +551,7 @@ export type Database = {
           completed: boolean
           created_at: string
           date: string
+          deleted_at: string | null
           description: string
           id: string
           lead_id: string
@@ -548,6 +561,7 @@ export type Database = {
           completed?: boolean
           created_at?: string
           date: string
+          deleted_at?: string | null
           description: string
           id?: string
           lead_id: string
@@ -557,6 +571,7 @@ export type Database = {
           completed?: boolean
           created_at?: string
           date?: string
+          deleted_at?: string | null
           description?: string
           id?: string
           lead_id?: string
@@ -575,6 +590,7 @@ export type Database = {
       tasks: {
         Row: {
           created_at: string
+          deleted_at: string | null
           due_at: string | null
           id: string
           lead_id: string
@@ -586,6 +602,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           due_at?: string | null
           id?: string
           lead_id: string
@@ -597,6 +614,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           due_at?: string | null
           id?: string
           lead_id?: string
