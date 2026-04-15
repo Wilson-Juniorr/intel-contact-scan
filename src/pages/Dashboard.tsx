@@ -110,6 +110,9 @@ export default function Dashboard() {
   }
 
   return (
+    <>
+    <WelcomeModal open={welcomeOpen} onClose={() => { setWelcomeOpen(false); setStep(1); }} />
+    <OnboardingChecklist />
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -256,5 +259,6 @@ export default function Dashboard() {
         </Card>
       )}
     </div>
+    </>
   );
 }
