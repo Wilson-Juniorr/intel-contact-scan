@@ -88,9 +88,10 @@ export function classifyLeads(leads: any[]): {
 }
 
 export function buildWhatsAppUrl(phone: string, stage: string, name: string): string {
-  const cleanPhone = phone.replace(/\D/g, "");
+  const { cleanPhone, normalizePhone } = require("@/lib/phone");
+  const clean = phone.replace(/\D/g, "");
   const template = WHATSAPP_MESSAGES[stage] || WHATSAPP_MESSAGES.novo;
   const firstName = name.split(" ")[0];
   const message = template.replace("{nome}", firstName);
-  return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/55${clean}?text=${encodeURIComponent(message)}`;
 }
