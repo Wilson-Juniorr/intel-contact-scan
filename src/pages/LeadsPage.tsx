@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, MessageCircle, ChevronRight, Trash2 } from "lucide-react";
+import { Search, Plus, MessageCircle, ChevronRight, Trash2, Users } from "lucide-react";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { toast } from "sonner";
