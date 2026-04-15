@@ -91,23 +91,19 @@ function AppSidebarContent() {
                       className="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:translate-x-0.5 transition-all duration-200"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
                     >
-                      {({ isActive }: { isActive: boolean }) => (
-                        <>
-                          {isActive && (
-                            <motion.div
-                              layoutId="activeNav"
-                              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full"
-                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                            />
-                          )}
-                          <item.icon className="h-4.5 w-4.5 shrink-0" />
-                          <span className="text-sm">{item.title}</span>
-                          {item.url === "/today" && pendingCount > 0 && (
-                            <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse-glow">
-                              {pendingCount}
-                            </span>
-                          )}
-                        </>
+                      {isNavActive(item.url) && (
+                        <motion.div
+                          layoutId="activeNav"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full"
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        />
+                      )}
+                      <item.icon className="h-4.5 w-4.5 shrink-0" />
+                      <span className="text-sm">{item.title}</span>
+                      {item.url === "/today" && pendingCount > 0 && (
+                        <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-pulse-glow">
+                          {pendingCount}
+                        </span>
                       )}
                     </NavLink>
                   </SidebarMenuButton>
