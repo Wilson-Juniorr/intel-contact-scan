@@ -15,6 +15,7 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCadence } from "@/hooks/useCadence";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
@@ -119,6 +120,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   if (isMobile) {
     return (
       <div className="min-h-screen flex flex-col w-full bg-background">
+        <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-background/80 backdrop-blur-md sticky top-0 z-20">
+          <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-xs">CS</span>
+          </div>
+          <NotificationBell />
+        </header>
         <main className="flex-1 p-4 pb-20 overflow-auto">{children}</main>
         <MobileBottomNav />
       </div>
@@ -130,10 +137,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebarContent />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 border-b border-border flex items-center px-4 gap-3 bg-background/80 backdrop-blur-md sticky top-0 z-20">
+          <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-background/80 backdrop-blur-md sticky top-0 z-20">
             <SidebarTrigger>
               <Menu className="h-4.5 w-4.5 text-muted-foreground" />
             </SidebarTrigger>
+            <NotificationBell />
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
         </div>

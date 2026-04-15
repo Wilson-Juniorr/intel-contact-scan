@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Save, Download, Eye, EyeOff } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useLeadsContext } from "@/contexts/LeadsContext";
+import { TeamTab } from "@/components/settings/TeamTab";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -23,16 +24,18 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm">Gerencie seu perfil, integrações e dados</p>
       </div>
       <Tabs defaultValue="profile">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="ai">IA</TabsTrigger>
           <TabsTrigger value="data">Dados</TabsTrigger>
+          <TabsTrigger value="team">Equipe</TabsTrigger>
         </TabsList>
         <TabsContent value="profile"><ProfileTab /></TabsContent>
         <TabsContent value="whatsapp"><WhatsAppTab /></TabsContent>
         <TabsContent value="ai"><AITab /></TabsContent>
         <TabsContent value="data"><DataTab /></TabsContent>
+        <TabsContent value="team"><TeamTab /></TabsContent>
       </Tabs>
     </div>
   );

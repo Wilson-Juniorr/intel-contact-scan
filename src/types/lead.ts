@@ -58,6 +58,12 @@ export interface Lead {
   notes?: string;
   stage: FunnelStage;
   lost_reason?: string;
+  approved_value?: number;
+  quote_min_value?: number;
+  quote_operadora?: string;
+  quote_plan_name?: string;
+  last_quote_sent_at?: string;
+  org_id?: string;
   created_at: string;
   updated_at: string;
   last_contact_at?: string;

@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, MessageCircle, ChevronRight, Trash2, Users } from "lucide-react";
+import { Search, Plus, MessageCircle, ChevronRight, Trash2, Users, Upload } from "lucide-react";
+import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ export default function LeadsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const filtered = leads.filter(
@@ -75,11 +77,16 @@ export default function LeadsPage() {
               <Trash2 className="h-4 w-4" /> Excluir ({selectedIds.size})
             </Button>
           )}
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" /> Importar
+          </Button>
           <Button onClick={() => setFormOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Novo Lead
           </Button>
         </div>
       </div>
+
+      <LeadImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => {}} />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
