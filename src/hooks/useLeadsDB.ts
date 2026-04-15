@@ -165,7 +165,22 @@ export function useLeadsDB() {
 
   const deleteLeadsMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from("leads").delete().in("id", ids);
+      const { error } = await supabase
+        .from("leads")
+        .update({ deleted_at: new Date().toISOString() })
+        .in("id", ids);
+      if (error) throw error;
+      return ids;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
+  });
+
+  const restoreLeadsMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ deleted_at: null })
+        .in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
@@ -204,6 +219,7 @@ export function useLeadsDB() {
     moveStage: (id: string, stage: FunnelStage, lost_reason?: string) =>
       moveStageMutation.mutateAsync({ id, stage, lost_reason }),
     deleteLeads: (ids: string[]) => deleteLeadsMutation.mutateAsync(ids),
+    restoreLeads: (ids: string[]) => restoreLeadsMutation.mutateAsync(ids),
     addInteraction: addInteractionMutation.mutateAsync,
     getLeadInteractions,
   };

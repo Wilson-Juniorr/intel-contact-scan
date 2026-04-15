@@ -5,15 +5,18 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LeadsProvider } from "@/contexts/LeadsContext";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Dashboard from "@/pages/Dashboard";
-import LeadsPage from "@/pages/LeadsPage";
-import FunnelPage from "@/pages/FunnelPage";
-import AssistantPage from "@/pages/AssistantPage";
+import { lazy, Suspense } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
 import AuthPage from "@/pages/AuthPage";
-import WhatsAppPage from "@/pages/WhatsAppPage";
-import FollowUpPage from "@/pages/FollowUpPage";
-import TodayPage from "@/pages/TodayPage";
 import NotFound from "./pages/NotFound";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const LeadsPage = lazy(() => import("./pages/LeadsPage"));
+const FunnelPage = lazy(() => import("./pages/FunnelPage"));
+const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
+const TodayPage = lazy(() => import("./pages/TodayPage"));
+const FollowUpPage = lazy(() => import("./pages/FollowUpPage"));
+const AssistantPage = lazy(() => import("./pages/AssistantPage"));
 
 const queryClient = new QueryClient();
 
@@ -36,16 +39,18 @@ function ProtectedRoutes() {
   return (
     <LeadsProvider>
       <AppLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/today" element={<TodayPage />} />
-          <Route path="/leads" element={<LeadsPage />} />
-          <Route path="/funnel" element={<FunnelPage />} />
-          <Route path="/assistant" element={<AssistantPage />} />
-          <Route path="/whatsapp" element={<WhatsAppPage />} />
-          <Route path="/follow-up" element={<FollowUpPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageSkeleton />}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/today" element={<TodayPage />} />
+            <Route path="/leads" element={<LeadsPage />} />
+            <Route path="/funnel" element={<FunnelPage />} />
+            <Route path="/assistant" element={<AssistantPage />} />
+            <Route path="/whatsapp" element={<WhatsAppPage />} />
+            <Route path="/follow-up" element={<FollowUpPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </AppLayout>
     </LeadsProvider>
   );
