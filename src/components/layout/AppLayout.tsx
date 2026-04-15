@@ -8,11 +8,15 @@ import {
   MessageCircle,
   Clock,
   Zap,
+  Settings,
+  ClipboardList,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCadence } from "@/hooks/useCadence";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +38,8 @@ const navItems = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Follow-Up", url: "/follow-up", icon: Clock },
   { title: "Assistente IA", url: "/assistant", icon: Bot },
+  { title: "Configurações", url: "/settings", icon: Settings },
+  { title: "Atividades", url: "/activity", icon: ClipboardList },
 ];
 
 function AppSidebarContent() {
@@ -44,7 +50,6 @@ function AppSidebarContent() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar-background">
-      {/* Brand */}
       <div className="flex items-center gap-3 px-4 py-5">
         {!collapsed && (
           <div className="flex items-center gap-3">
@@ -52,12 +57,8 @@ function AppSidebarContent() {
               <span className="text-primary-foreground font-bold text-sm">CS</span>
             </div>
             <div>
-              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">
-                CRM Saúde
-              </h1>
-              <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">
-                {user?.email}
-              </p>
+              <h1 className="text-sm font-bold text-sidebar-foreground tracking-tight">CRM Saúde</h1>
+              <p className="text-[10px] text-sidebar-foreground/50 truncate max-w-[140px]">{user?.email}</p>
             </div>
           </div>
         )}
@@ -113,6 +114,17 @@ function AppSidebarContent() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen flex flex-col w-full bg-background">
+        <main className="flex-1 p-4 pb-20 overflow-auto">{children}</main>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
