@@ -28,6 +28,12 @@ export default function Dashboard() {
   const { leads } = useLeadsContext();
   const { todayTasks } = useTasks();
   const navigate = useNavigate();
+  const { step, completed: onboardingCompleted, setStep } = useOnboarding();
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  useEffect(() => {
+    if (step === 0 && !onboardingCompleted) setWelcomeOpen(true);
+  }, [step, onboardingCompleted]);
 
   const stats = useMemo(() => {
     const today = new Date();
