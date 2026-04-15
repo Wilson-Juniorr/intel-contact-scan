@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { buildWhatsAppUrl } from "@/lib/phone";
 import {
   CheckCircle2, Circle, Target, MessageCircle, CalendarPlus,
   Loader2, Sparkles, Copy, Check, Trash2, Pencil, Brain, Lightbulb, RefreshCw,
@@ -461,7 +462,7 @@ export function PlaybookTab({ lead }: Props) {
                 Copiar tudo
               </Button>
               <Button size="sm" className="flex-1 text-xs gap-1 h-7 bg-secondary hover:bg-secondary/90 text-secondary-foreground" asChild>
-                <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}?text=${encodeURIComponent(suggestedMsgs[0])}`} target="_blank" rel="noopener noreferrer">
+                <a href={buildWhatsAppUrl(lead.phone, suggestedMsgs[0])} target="_blank" rel="noopener noreferrer">
                   <MessageCircle className="h-3 w-3" /> WhatsApp
                 </a>
               </Button>
