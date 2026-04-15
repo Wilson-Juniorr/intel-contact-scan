@@ -9,7 +9,6 @@ import { Loader2, MessageCircle, PhoneCall, Clock, TrendingUp, ChevronUp, FileTe
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cleanPhone, normalizePhone } from "@/lib/phone";
-import { Button } from "@/components/ui/button";
 
 interface Props {
   leadPhone: string;
