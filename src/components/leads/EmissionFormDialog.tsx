@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, FileText, Send, User, Phone, Mail, Users, Building2 } from "lucide-react";
+import { cleanPhone } from "@/lib/phone";
 
 export interface EmissionFormData {
   vigencia: string;
@@ -33,7 +34,7 @@ interface Props {
 const EMAIL_DOMAINS = ["@gmail.com", "@outlook.com", "@hotmail.com", "@yahoo.com.br", "@icloud.com"];
 
 function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const digits = cleanPhone(value).slice(0, 11);
   if (digits.length <= 2) return digits;
   if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
