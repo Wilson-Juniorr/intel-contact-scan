@@ -373,6 +373,21 @@ export default function WhatsAppPage() {
         </Button>
       </div>
 
+      {contacts.length === 0 && messages.length === 0 && !loading ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+          <MessageCircle className="h-16 w-16 text-muted-foreground/30" />
+          <div>
+            <h2 className="text-xl font-semibold">Nenhuma conversa ainda</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sincronize seu WhatsApp para começar a ver as conversas.
+            </p>
+          </div>
+          <Button onClick={handleSync} disabled={syncing} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar agora"}
+          </Button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] h-[calc(100vh-180px)] rounded-lg overflow-hidden border border-[#2a3942] shadow-xl">
         <ConversationList
           conversations={filteredConversations}
@@ -402,6 +417,7 @@ export default function WhatsAppPage() {
           onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
         />
       </div>
+      )}
     </motion.div>
   );
 }
