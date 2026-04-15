@@ -1,4 +1,3 @@
-import React from "react";
 import { Phone, MessageCircle, Mail, User, PhoneCall, Trash2, ArrowRightLeft } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,7 +22,7 @@ interface Props {
   onMoveStage?: (id: string, stage: FunnelStage) => void;
 }
 
-export const FunnelCard = React.memo(function FunnelCard({
+export function FunnelCard({
   lead,
   stageColor,
   onDragStart,
@@ -202,7 +201,7 @@ export const FunnelCard = React.memo(function FunnelCard({
       </div>
     </motion.div>
   );
-});
+}
 
 function ActionBtn({
   icon,

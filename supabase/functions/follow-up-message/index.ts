@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { checkAndTrackUsage, recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
@@ -131,13 +130,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const userId = claimsData.claims.sub;
-
-    const usageCheck = await checkAndTrackUsage(userId, "follow-up-message");
-    if (!usageCheck.allowed) {
-      return new Response(JSON.stringify({ error: usageCheck.error, code: "AI_LIMIT_REACHED" }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const { leadId, userContext, regenerateIndex, existingMessages, existingAnalysis } = await req.json();
     if (!leadId) throw new Error("leadId é obrigatório");
@@ -465,7 +457,6 @@ NÃO retorne nada além do JSON.`;
     }
 
     const data = await response.json();
-    await recordUsage(usageCheck.supabaseAdmin, userId, "follow-up-message", data);
     const rawContent = data.choices?.[0]?.message?.content || "";
 
     // Parse response

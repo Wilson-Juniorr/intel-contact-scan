@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { Lead, Interaction, FunnelStage } from "@/types/lead";
+import type { FunnelStage } from "@/types/lead";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cleanPhone, normalizePhone } from "@/lib/phone";
 
@@ -32,7 +32,7 @@ export function useLeadsDB() {
         .select("*")
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as Lead[];
+      return data;
     },
     enabled: !!user,
   });
@@ -45,7 +45,7 @@ export function useLeadsDB() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as Interaction[];
+      return data;
     },
     enabled: !!user,
   });
@@ -114,7 +114,7 @@ export function useLeadsDB() {
           .eq("id", data.id);
       }
 
-      return data as unknown as Lead;
+      return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
   });
@@ -165,22 +165,7 @@ export function useLeadsDB() {
 
   const deleteLeadsMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from("leads")
-        .update({ deleted_at: new Date().toISOString() })
-        .in("id", ids);
-      if (error) throw error;
-      return ids;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
-  });
-
-  const restoreLeadsMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from("leads")
-        .update({ deleted_at: null })
-        .in("id", ids);
+      const { error } = await supabase.from("leads").delete().in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leads"] }),
@@ -219,7 +204,6 @@ export function useLeadsDB() {
     moveStage: (id: string, stage: FunnelStage, lost_reason?: string) =>
       moveStageMutation.mutateAsync({ id, stage, lost_reason }),
     deleteLeads: (ids: string[]) => deleteLeadsMutation.mutateAsync(ids),
-    restoreLeads: (ids: string[]) => restoreLeadsMutation.mutateAsync(ids),
     addInteraction: addInteractionMutation.mutateAsync,
     getLeadInteractions,
   };

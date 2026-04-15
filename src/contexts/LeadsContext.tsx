@@ -1,32 +1,21 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useLeadsDB } from "@/hooks/useLeadsDB";
-import type { Lead, Interaction, FunnelStage } from "@/types/lead";
+import type { FunnelStage } from "@/types/lead";
 
 interface LeadsContextType {
-  leads: Lead[];
+  leads: any[];
   isLoading: boolean;
-  addLead: (lead: {
-    name: string;
-    phone: string;
-    email?: string;
-    type: string;
-    plan_type?: string;
-    operator?: string;
-    lives?: number;
-    notes?: string;
-    stage: string;
-  }) => Promise<Lead>;
+  addLead: (lead: any) => Promise<any>;
   updateLead: (id: string, updates: Record<string, unknown>) => Promise<void>;
   moveStage: (id: string, stage: FunnelStage, lost_reason?: string) => Promise<void>;
-  deleteLeads: (ids: string[]) => Promise<string[]>;
-  restoreLeads: (ids: string[]) => Promise<void>;
-  interactions: Interaction[];
+  deleteLeads: (ids: string[]) => Promise<void>;
+  interactions: any[];
   addInteraction: (interaction: {
     lead_id: string;
     type: string;
     description: string;
   }) => Promise<void>;
-  getLeadInteractions: (leadId: string) => Interaction[];
+  getLeadInteractions: (leadId: string) => any[];
 }
 
 const LeadsContext = createContext<LeadsContextType | null>(null);

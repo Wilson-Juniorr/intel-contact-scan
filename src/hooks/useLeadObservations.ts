@@ -108,10 +108,7 @@ export function useLeadObservations(leadId: string | undefined) {
 
   const deleteNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      const { error } = await supabase
-        .from("lead_notes")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", noteId);
+      const { error } = await supabase.from("lead_notes").delete().eq("id", noteId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lead_notes", leadId] }),
@@ -142,11 +139,8 @@ export function useLeadObservations(leadId: string | undefined) {
 
   const deleteDocumentMutation = useMutation({
     mutationFn: async (doc: { id: string; file_path: string }) => {
-      // Soft delete - keep file in storage for potential undo
-      const { error } = await supabase
-        .from("lead_documents")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", doc.id);
+      await supabase.storage.from("lead-images").remove([doc.file_path]);
+      const { error } = await supabase.from("lead_documents").delete().eq("id", doc.id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["lead_documents", leadId] }),

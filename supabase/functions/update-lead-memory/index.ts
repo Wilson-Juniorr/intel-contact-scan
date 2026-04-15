@@ -1,8 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -200,9 +199,6 @@ ${notesSummary ? `NOTAS:\n${notesSummary}` : "Sem notas."}`,
     }
 
     const aiData = await response.json();
-    // Track usage using service role client (already created as `supabase` above)
-    const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    await recordUsage(supabaseAdmin, userId, "update-lead-memory", aiData);
     const aiContent = aiData.choices?.[0]?.message?.content || "";
 
     // Parse response

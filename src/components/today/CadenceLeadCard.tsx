@@ -1,4 +1,3 @@
-import React from "react";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ interface Props {
   onMarkDone: (leadId: string) => Promise<void>;
 }
 
-export const CadenceLeadCard = React.memo(function CadenceLeadCard({ lead, diasSemContato, status, onMarkDone }: Props) {
+export function CadenceLeadCard({ lead, diasSemContato, status, onMarkDone }: Props) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
@@ -98,4 +97,4 @@ export const CadenceLeadCard = React.memo(function CadenceLeadCard({ lead, diasS
       </CardContent>
     </Card>
   );
-});
+}

@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkAndTrackUsage, recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-user-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Expose-Headers": "x-actions-taken, x-action-names",
 };
@@ -377,41 +376,20 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
-    // Auth validation - check standard Authorization header first, then x-user-token
-    const authHeader = req.headers.get("Authorization");
     const userToken = req.headers.get("x-user-token");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.replace("Bearer ", "") : userToken;
-
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     let userId: string | null = null;
     let supabase: any = null;
 
-    supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    );
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Token inválido" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (userToken) {
+      supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: `Bearer ${userToken}` } } }
+      );
+      const { data: { user } } = await supabase.auth.getUser(userToken);
+      userId = user?.id || null;
     }
-    userId = claimsData.claims.sub;
-
-    // Check usage limits
-    const usageCheck = await checkAndTrackUsage(userId, "chat");
-    if (!usageCheck.allowed) {
-      return new Response(JSON.stringify({ error: usageCheck.error, code: "AI_LIMIT_REACHED" }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const usageAdmin = usageCheck.supabaseAdmin;
 
     const fileContext = fileInfo
       ? `\n\n## ARQUIVO ENVIADO PELO USUÁRIO:\nNome: ${fileInfo.file_name}\nTipo: ${fileInfo.file_type}\nTamanho: ${fileInfo.file_size ? Math.round(fileInfo.file_size / 1024) + "KB" : "?"}\n\nPergunte ao usuário a qual lead este documento pertence e qual a categoria (RG/CPF, Comprovante de Residência, Cartão SUS, Contrato Social, Proposta, Declaração de Saúde, Outros).`
@@ -537,7 +515,6 @@ ${crmContext || "Nenhum dado do CRM disponível."}`;
     }
 
     const firstResult = await firstResponse.json();
-    await recordUsage(usageAdmin, userId!, "chat", firstResult);
     const choice = firstResult.choices?.[0];
 
     // Tool calls detected - execute in a loop (supports multi-step: search → confirm → execute)

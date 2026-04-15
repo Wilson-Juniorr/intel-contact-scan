@@ -1,8 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { recordUsage } from "../_shared/usage-tracker.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -225,9 +224,6 @@ ${contextText.slice(0, 20000)}`;
     }
 
     const aiData = await response.json();
-    // Track usage
-    const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    await recordUsage(supabaseAdmin, userData.user.id, "extract-quote-data", aiData);
     const raw = aiData.choices?.[0]?.message?.content?.trim() || "";
     console.log("AI raw response:", raw.slice(0, 500));
 

@@ -6,20 +6,25 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LeadsProvider } from "@/contexts/LeadsContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { lazy, Suspense } from "react";
-import PageSkeleton from "@/components/PageSkeleton";
-import AuthPage from "@/pages/AuthPage";
+import { PageSkeleton } from "@/components/PageSkeleton";
 import NotFound from "./pages/NotFound";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const LeadsPage = lazy(() => import("./pages/LeadsPage"));
 const FunnelPage = lazy(() => import("./pages/FunnelPage"));
-const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
-const TodayPage = lazy(() => import("./pages/TodayPage"));
-const FollowUpPage = lazy(() => import("./pages/FollowUpPage"));
 const AssistantPage = lazy(() => import("./pages/AssistantPage"));
-const AIUsagePage = lazy(() => import("./pages/AIUsagePage"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
+const FollowUpPage = lazy(() => import("./pages/FollowUpPage"));
+const TodayPage = lazy(() => import("./pages/TodayPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const ActivityPage = lazy(() => import("./pages/ActivityPage"));
 
 const queryClient = new QueryClient();
+
+function SuspenseWrap({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>;
+}
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
@@ -40,19 +45,18 @@ function ProtectedRoutes() {
   return (
     <LeadsProvider>
       <AppLayout>
-        <Suspense fallback={<PageSkeleton />}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/today" element={<TodayPage />} />
-            <Route path="/leads" element={<LeadsPage />} />
-            <Route path="/funnel" element={<FunnelPage />} />
-            <Route path="/assistant" element={<AssistantPage />} />
-            <Route path="/whatsapp" element={<WhatsAppPage />} />
-            <Route path="/follow-up" element={<FollowUpPage />} />
-            <Route path="/ai-usage" element={<AIUsagePage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<SuspenseWrap><Dashboard /></SuspenseWrap>} />
+          <Route path="/today" element={<SuspenseWrap><TodayPage /></SuspenseWrap>} />
+          <Route path="/leads" element={<SuspenseWrap><LeadsPage /></SuspenseWrap>} />
+          <Route path="/funnel" element={<SuspenseWrap><FunnelPage /></SuspenseWrap>} />
+          <Route path="/assistant" element={<SuspenseWrap><AssistantPage /></SuspenseWrap>} />
+          <Route path="/whatsapp" element={<SuspenseWrap><WhatsAppPage /></SuspenseWrap>} />
+          <Route path="/follow-up" element={<SuspenseWrap><FollowUpPage /></SuspenseWrap>} />
+          <Route path="/settings" element={<SuspenseWrap><SettingsPage /></SuspenseWrap>} />
+          <Route path="/activity" element={<SuspenseWrap><ActivityPage /></SuspenseWrap>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </AppLayout>
     </LeadsProvider>
   );
@@ -71,7 +75,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
+      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <SuspenseWrap><AuthPage /></SuspenseWrap>} />
       <Route path="/*" element={<ProtectedRoutes />} />
     </Routes>
   );

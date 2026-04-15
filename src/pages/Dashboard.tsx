@@ -1,8 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { useTasks } from "@/hooks/useTasks";
 import { FUNNEL_STAGES } from "@/types/lead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Badge } from "@/components/ui/badge";
 import {
   Users,
@@ -25,6 +28,12 @@ export default function Dashboard() {
   const { leads } = useLeadsContext();
   const { todayTasks } = useTasks();
   const navigate = useNavigate();
+  const { step, completed: onboardingCompleted, setStep } = useOnboarding();
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  useEffect(() => {
+    if (step === 0 && !onboardingCompleted) setWelcomeOpen(true);
+  }, [step, onboardingCompleted]);
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -101,6 +110,9 @@ export default function Dashboard() {
   }
 
   return (
+    <>
+    <WelcomeModal open={welcomeOpen} onClose={() => { setWelcomeOpen(false); setStep(1); }} />
+    <OnboardingChecklist />
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -247,5 +259,6 @@ export default function Dashboard() {
         </Card>
       )}
     </div>
+    </>
   );
 }

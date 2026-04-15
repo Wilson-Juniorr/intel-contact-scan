@@ -45,7 +45,7 @@ const STAGES_REQUIRE_APPROVED: FunnelStage[] = [
 ];
 
 export default function FunnelPage() {
-  const { leads, moveStage, updateLead, deleteLeads, restoreLeads } = useLeadsContext();
+  const { leads, moveStage, updateLead, deleteLeads } = useLeadsContext();
   const queryClient = useQueryClient();
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -391,8 +391,9 @@ export default function FunnelPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir negócio</AlertDialogTitle>
-        <AlertDialogDescription>
+            <AlertDialogDescription>
               Tem certeza que deseja excluir "{leads.find((l) => l.id === deleteLeadId)?.name}"?
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -401,20 +402,9 @@ export default function FunnelPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (deleteLeadId) {
-                  const leadName = leads.find((l) => l.id === deleteLeadId)?.name;
                   try {
                     await deleteLeads([deleteLeadId]);
-                    const deletedId = deleteLeadId;
-                    toast(`"${leadName}" removido`, {
-                      action: {
-                        label: "Desfazer",
-                        onClick: async () => {
-                          await restoreLeads([deletedId]);
-                          toast.success("Lead restaurado");
-                        },
-                      },
-                      duration: 8000,
-                    });
+                    toast.success("Negócio excluído!");
                   } catch {
                     toast.error("Erro ao excluir negócio");
                   }

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function LeadsPage() {
-  const { leads, deleteLeads, restoreLeads } = useLeadsContext();
+  const { leads, deleteLeads } = useLeadsContext();
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -52,20 +52,9 @@ export default function LeadsPage() {
   };
 
   const handleDelete = async () => {
-    const count = selectedIds.size;
-    const idsToDelete = Array.from(selectedIds);
     try {
-      await deleteLeads(idsToDelete);
-      toast(`${count} lead(s) removido(s)`, {
-        action: {
-          label: "Desfazer",
-          onClick: async () => {
-            await restoreLeads(idsToDelete);
-            toast.success("Leads restaurados");
-          },
-        },
-        duration: 8000,
-      });
+      await deleteLeads(Array.from(selectedIds));
+      toast.success(`${selectedIds.size} lead(s) excluído(s)`);
       setSelectedIds(new Set());
     } catch {
       toast.error("Erro ao excluir leads");
