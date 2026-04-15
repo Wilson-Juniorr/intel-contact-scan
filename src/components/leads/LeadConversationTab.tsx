@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { Loader2, MessageCircle, PhoneCall, Clock, TrendingUp, ChevronUp, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cleanPhone, normalizePhone } from "@/lib/phone";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   leadPhone: string;
@@ -21,8 +23,8 @@ const PAGE_SIZE = 1000;
 export function LeadConversationTab({ leadPhone, leadName, compact = false, leadId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const cleanPhone = leadPhone.replace(/\D/g, "");
-  const normalizedPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+  const clean = cleanPhone(leadPhone);
+  const normalizedPhone = normalizePhone(leadPhone);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [allMessages, setAllMessages] = useState<any[]>([]);

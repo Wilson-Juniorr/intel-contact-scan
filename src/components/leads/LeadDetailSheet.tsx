@@ -31,6 +31,7 @@ import { ClosingTimeline } from "@/components/closing/ClosingTimeline";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { buildWhatsAppUrl } from "@/lib/phone";
 import ReactMarkdown from "react-markdown";
 import JSZip from "jszip";
 
@@ -265,7 +266,7 @@ function FullscreenLeadView({ lead, isEditing, onStartEdit, onStopEdit }: {
   const interactions = getLeadInteractions(lead.id);
   const { totalAttempts, responseRate, lastAttemptAt } = useContactAttempts(lead.phone);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
-  const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
+  const whatsappUrl = buildWhatsAppUrl(lead.phone);
 
   // Document state
   const [docCategory, setDocCategory] = useState("outros");
@@ -749,7 +750,7 @@ function SidebarLeadContent({ lead, isEditing, onStartEdit, onStopEdit }: {
   const interactions = getLeadInteractions(lead.id);
   const { totalAttempts, responseRate } = useContactAttempts(lead.phone);
   const stageInfo = FUNNEL_STAGES.find((s) => s.key === lead.stage);
-  const whatsappUrl = `https://wa.me/55${lead.phone.replace(/\D/g, "")}`;
+  const whatsappUrl = buildWhatsAppUrl(lead.phone);
 
   const iconMap: Record<string, React.ReactNode> = {
     call: <Phone className="h-3.5 w-3.5" />,
