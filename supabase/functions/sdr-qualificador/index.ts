@@ -179,6 +179,10 @@ function runDeterministicCritic(
     "ele vai te atender", "ele assume", "ele entra em contato",
     // Revela que é bot
     "como assistente", "sou uma ia", "sou um bot", "sou robô",
+    // Não revelar que recebeu áudio (responder fluido como humano)
+    "recebi seu áudio", "recebi seu audio", "ouvi seu áudio", "ouvi seu audio",
+    "entendi seu áudio", "entendi seu audio", "escutei seu áudio", "escutei seu audio",
+    "seu áudio chegou", "seu audio chegou", "transcrição", "transcricao",
   ];
   for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
 
