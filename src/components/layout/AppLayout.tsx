@@ -10,6 +10,7 @@ import {
   Zap,
   Settings,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +42,7 @@ const navItems = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Follow-Up", url: "/follow-up", icon: Clock },
   { title: "Assistente IA", url: "/assistant", icon: Bot },
+  { title: "Agents", url: "/agents", icon: Sparkles },
   { title: "Configurações", url: "/settings", icon: Settings },
   { title: "Atividades", url: "/activity", icon: ClipboardList },
 ];
