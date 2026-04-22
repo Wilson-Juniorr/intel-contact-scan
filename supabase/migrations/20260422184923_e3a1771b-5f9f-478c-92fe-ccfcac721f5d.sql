@@ -1,0 +1,6 @@
+UPDATE public.agents_config
+SET 
+  system_prompt = system_prompt || E'\n\n═══════════════════════════════════════════════\nREGRA EXTRA — NÃO PERGUNTAR SOBRE COPARTICIPAÇÃO\n═══════════════════════════════════════════════\n\n🚫 PROIBIDO perguntar ao cliente se ele prefere plano COM ou SEM coparticipação. Esse ponto é tratado pelo corretor humano no momento do envio da proposta — não é assunto da pré-qualificação.\n\nSe o próprio cliente trouxer o tema (ex: "tem coparticipação?"), você pode explicar brevemente o conceito (mensalidade menor + paga por uso) e devolve a conversa pra qualificação, sem pedir preferência. Algo como: "É uma forma de baixar a mensalidade pagando por uso. A gente alinha esse detalhe junto com a proposta, beleza?"\n\nNUNCA inclua frases como:\n- "você prefere com ou sem coparticipação?"\n- "quer plano com coparticipação?"\n- "gostaria de coparticipação?"\n- "com coparticipação ou sem?"',
+  versao = versao + 1,
+  updated_at = now()
+WHERE slug = 'sdr-qualificador';
