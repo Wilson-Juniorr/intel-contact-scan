@@ -1424,6 +1424,163 @@ export type Database = {
           },
         ]
       }
+      rewarming_campaigns: {
+        Row: {
+          agente_slug: string
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          dias_inativo_min: number
+          dias_semana: number[] | null
+          estagios_alvo: string[] | null
+          excluir_perdidos: boolean
+          filtro_tipo: string[] | null
+          horario_envio: string
+          id: string
+          intervalo_dias: number
+          max_tentativas: number
+          mensagens_template: Json
+          nome: string
+          objetivo: string | null
+          tom: string | null
+          updated_at: string
+        }
+        Insert: {
+          agente_slug: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dias_inativo_min?: number
+          dias_semana?: number[] | null
+          estagios_alvo?: string[] | null
+          excluir_perdidos?: boolean
+          filtro_tipo?: string[] | null
+          horario_envio?: string
+          id?: string
+          intervalo_dias?: number
+          max_tentativas?: number
+          mensagens_template?: Json
+          nome: string
+          objetivo?: string | null
+          tom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agente_slug?: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dias_inativo_min?: number
+          dias_semana?: number[] | null
+          estagios_alvo?: string[] | null
+          excluir_perdidos?: boolean
+          filtro_tipo?: string[] | null
+          horario_envio?: string
+          id?: string
+          intervalo_dias?: number
+          max_tentativas?: number
+          mensagens_template?: Json
+          nome?: string
+          objetivo?: string | null
+          tom?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rewarming_log: {
+        Row: {
+          created_at: string
+          erro: string | null
+          id: string
+          lead_id: string | null
+          mensagem: string | null
+          pool_id: string | null
+          status: string
+          tentativa: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          erro?: string | null
+          id?: string
+          lead_id?: string | null
+          mensagem?: string | null
+          pool_id?: string | null
+          status?: string
+          tentativa: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          erro?: string | null
+          id?: string
+          lead_id?: string | null
+          mensagem?: string | null
+          pool_id?: string | null
+          status?: string
+          tentativa?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewarming_log_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "rewarming_pool"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewarming_pool: {
+        Row: {
+          campaign_id: string
+          enrolled_at: string
+          id: string
+          lead_id: string
+          motivo_saida: string | null
+          proxima_execucao: string
+          status: string
+          tentativas_feitas: number
+          ultima_resposta_em: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          enrolled_at?: string
+          id?: string
+          lead_id: string
+          motivo_saida?: string | null
+          proxima_execucao?: string
+          status?: string
+          tentativas_feitas?: number
+          ultima_resposta_em?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          enrolled_at?: string
+          id?: string
+          lead_id?: string
+          motivo_saida?: string | null
+          proxima_execucao?: string
+          status?: string
+          tentativas_feitas?: number
+          ultima_resposta_em?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rewarming_pool_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "rewarming_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       router_decisions: {
         Row: {
           agent_escolhido: string
