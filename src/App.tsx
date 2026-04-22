@@ -19,7 +19,7 @@ const FollowUpPage = lazy(() => import("./pages/FollowUpPage"));
 const TodayPage = lazy(() => import("./pages/TodayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
-const AgentsPage = lazy(() => import("./pages/AgentsPage"));
+const AgentsPage = lazy(() => import("@/pages/AgentsPage"));
 
 const queryClient = new QueryClient();
 
