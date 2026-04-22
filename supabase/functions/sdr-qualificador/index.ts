@@ -301,6 +301,15 @@ Deno.serve(async (req) => {
 
     const messages = [...historico, { role: "user", content: user_message }];
 
+    // Histórico de quantidade de balões dos últimos turnos do agente (anti-monotonia)
+    const ultimosBaloes: number[] = (historico as any[])
+      .filter((m) => m.role === "assistant" && typeof m.content === "string")
+      .slice(-3)
+      .map((m) => {
+        const n = m.content.split(SPLIT_CHAR).map((b: string) => b.trim()).filter(Boolean).length;
+        return Math.max(1, n);
+      });
+
     // Generate + critic loop (max 2 attempts)
     let propostaFinal: string | null = null;
     let metadata: any = null;
@@ -319,7 +328,7 @@ Deno.serve(async (req) => {
       totalOut += resp.tokens_out;
 
       const { texto, meta } = parseResponse(resp.text);
-      const fails = runDeterministicCritic(texto, meta, state);
+      const fails = runDeterministicCritic(texto, meta, state, ultimosBaloes);
 
       if (fails.length === 0) {
         propostaFinal = texto;
