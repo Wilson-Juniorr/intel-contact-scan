@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Pencil, Save, History, Play, Loader2 } from "lucide-react";
+import { Bot, Pencil, Save, History, Play, Loader2, Wand2, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import { AgentBuilderWizard } from "./AgentBuilderWizard";
 
 type Agent = {
   id: string;
@@ -49,6 +50,7 @@ export function AgentsConfigTab() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Agent | null>(null);
   const [testing, setTesting] = useState<Agent | null>(null);
+  const [wizardSlug, setWizardSlug] = useState<string | null | undefined>(undefined);
 
   const load = async () => {
     setLoading(true);
@@ -76,6 +78,11 @@ export function AgentsConfigTab() {
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button onClick={() => setWizardSlug(null)} className="bg-gradient-to-r from-primary to-blue-500 btn-press">
+          <Plus className="h-4 w-4 mr-1" /> Novo Agent (Builder)
+        </Button>
+      </div>
       {agents.map((a, i) => (
         <motion.div
           key={a.id}
@@ -102,6 +109,9 @@ export function AgentsConfigTab() {
                 <Button variant="outline" size="sm" onClick={() => setTesting(a)} className="btn-press">
                   <Play className="h-3.5 w-3.5 mr-1" /> Testar
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => setWizardSlug(a.slug)} className="btn-press">
+                  <Wand2 className="h-3.5 w-3.5 mr-1" /> Builder
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditing(a)} className="btn-press">
                   <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
@@ -113,6 +123,11 @@ export function AgentsConfigTab() {
 
       {editing && <AgentEditDialog agent={editing} onClose={() => { setEditing(null); load(); }} />}
       {testing && <AgentTestDialog agent={testing} onClose={() => setTesting(null)} />}
+      <AgentBuilderWizard
+        open={wizardSlug !== undefined}
+        agentSlug={wizardSlug}
+        onClose={(saved) => { setWizardSlug(undefined); if (saved) load(); }}
+      />
     </div>
   );
 }
