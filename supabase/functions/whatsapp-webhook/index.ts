@@ -698,7 +698,8 @@ Deno.serve(async (req) => {
       leadId &&
       messageType === "text" &&
       content &&
-      content.trim().length > 0
+      content.trim().length > 0 &&
+      Number(msgClassification.business_relevance_score ?? 0) >= 0.31
     ) {
       try {
         const { data: leadFlag } = await supabase
