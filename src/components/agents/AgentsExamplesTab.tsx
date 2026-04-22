@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,16 +8,28 @@ import { Plus, Search, Pencil, Trash2, CheckCircle2, Circle, Star, Sparkles, Mes
 import { useAgentExamples, type AgentExample } from "@/hooks/useAgentExamples";
 import { AgentExampleDialog } from "./AgentExampleDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const AGENT_OPTIONS = [
-  { slug: "camila-sdr", label: "Camila SDR" },
-  { slug: "closer-pro", label: "Closer Pro" },
-  { slug: "follow-up-bot", label: "Follow-up Bot" },
-];
+import { supabase } from "@/integrations/supabase/client";
 
 export function AgentsExamplesTab() {
-  const [agentSlug, setAgentSlug] = useState<string>("camila-sdr");
+  const [agents, setAgents] = useState<{ slug: string; nome: string; ativo: boolean }[]>([]);
+  const [agentSlug, setAgentSlug] = useState<string>("sdr-qualificador");
   const { examples, loading, upsert, remove, toggleApproval } = useAgentExamples(agentSlug);
+
+  useEffect(() => {
+    supabase
+      .from("agents_config")
+      .select("slug, nome, ativo")
+      .order("ativo", { ascending: false })
+      .order("nome")
+      .then(({ data }) => {
+        if (data && data.length) {
+          setAgents(data);
+          if (!data.find((a) => a.slug === agentSlug)) setAgentSlug(data[0].slug);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "aprovados" | "pendentes">("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -84,10 +96,12 @@ export function AgentsExamplesTab() {
             <div className="flex items-center gap-3">
               <CardTitle className="text-lg">Biblioteca Few-shot</CardTitle>
               <Select value={agentSlug} onValueChange={setAgentSlug}>
-                <SelectTrigger className="w-48 h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-56 h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {AGENT_OPTIONS.map((a) => (
-                    <SelectItem key={a.slug} value={a.slug}>{a.label}</SelectItem>
+                  {agents.map((a) => (
+                    <SelectItem key={a.slug} value={a.slug}>
+                      {a.nome} {!a.ativo && "(inativo)"}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
