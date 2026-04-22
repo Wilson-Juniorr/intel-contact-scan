@@ -691,6 +691,41 @@ Deno.serve(async (req) => {
 
     console.log(`${direction} message saved for phone:`, normalizedPhone, "lead:", leadId);
 
+    // ═══ ROUTE TO AI AGENT (Camila SDR & friends) ═══
+    // Only inbound text messages of qualified leads not in manual mode go to the router.
+    if (
+      !isFromMe &&
+      leadId &&
+      messageType === "text" &&
+      content &&
+      content.trim().length > 0
+    ) {
+      try {
+        const { data: leadFlag } = await supabase
+          .from("leads")
+          .select("in_manual_conversation")
+          .eq("id", leadId)
+          .maybeSingle();
+        if (!leadFlag?.in_manual_conversation) {
+          // Fire-and-forget: don't block webhook response
+          // @ts-ignore EdgeRuntime is provided by Supabase runtime
+          (globalThis as any).EdgeRuntime?.waitUntil?.(
+            supabase.functions.invoke("route-message", {
+              body: {
+                lead_id: leadId,
+                whatsapp_number: normalizedPhone,
+                message_text: content,
+              },
+            }).catch((err: any) =>
+              console.error("route-message dispatch failed:", err?.message ?? err)
+            ),
+          );
+        }
+      } catch (routeErr) {
+        console.error("route-message check failed:", routeErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ status: "ok", saved: true, direction, lead_id: leadId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
