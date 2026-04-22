@@ -850,6 +850,104 @@ export type Database = {
           },
         ]
       }
+      lead_distribution_rules: {
+        Row: {
+          agente_alvo: string | null
+          agentes_pool: string[] | null
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          dias_semana: number[] | null
+          filtro_estagio: string[] | null
+          filtro_origem: string[] | null
+          filtro_palavras_chave: string[] | null
+          filtro_tipo: string[] | null
+          fora_horario_acao: string
+          horario_fim: string | null
+          horario_inicio: string | null
+          id: string
+          max_leads_dia: number | null
+          modo_distribuicao: string
+          nome: string
+          prioridade: number
+          updated_at: string
+        }
+        Insert: {
+          agente_alvo?: string | null
+          agentes_pool?: string[] | null
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dias_semana?: number[] | null
+          filtro_estagio?: string[] | null
+          filtro_origem?: string[] | null
+          filtro_palavras_chave?: string[] | null
+          filtro_tipo?: string[] | null
+          fora_horario_acao?: string
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          max_leads_dia?: number | null
+          modo_distribuicao?: string
+          nome: string
+          prioridade?: number
+          updated_at?: string
+        }
+        Update: {
+          agente_alvo?: string | null
+          agentes_pool?: string[] | null
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          dias_semana?: number[] | null
+          filtro_estagio?: string[] | null
+          filtro_origem?: string[] | null
+          filtro_palavras_chave?: string[] | null
+          filtro_tipo?: string[] | null
+          fora_horario_acao?: string
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          max_leads_dia?: number | null
+          modo_distribuicao?: string
+          nome?: string
+          prioridade?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lead_distribution_state: {
+        Row: {
+          contador_dia: number
+          data_contador: string
+          rule_id: string
+          ultimo_indice: number
+          updated_at: string
+        }
+        Insert: {
+          contador_dia?: number
+          data_contador?: string
+          rule_id: string
+          ultimo_indice?: number
+          updated_at?: string
+        }
+        Update: {
+          contador_dia?: number
+          data_contador?: string
+          rule_id?: string
+          ultimo_indice?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_distribution_state_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: true
+            referencedRelation: "lead_distribution_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_documents: {
         Row: {
           category: string
@@ -1044,6 +1142,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lead_routing_log: {
+        Row: {
+          agente_escolhido: string | null
+          contexto: Json | null
+          created_at: string
+          id: string
+          lead_id: string | null
+          motivo: string | null
+          rule_id: string | null
+          rule_nome: string | null
+        }
+        Insert: {
+          agente_escolhido?: string | null
+          contexto?: Json | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          motivo?: string | null
+          rule_id?: string | null
+          rule_nome?: string | null
+        }
+        Update: {
+          agente_escolhido?: string | null
+          contexto?: Json | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          motivo?: string | null
+          rule_id?: string | null
+          rule_nome?: string | null
+        }
+        Relationships: []
       }
       leads: {
         Row: {
