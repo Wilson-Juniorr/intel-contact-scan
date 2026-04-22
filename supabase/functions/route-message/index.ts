@@ -10,6 +10,20 @@ const corsHeaders = {
 };
 
 const SDR_STAGES = ["novo", "tentativa_contato", "contato_realizado"];
+const MIN_RELEVANCE_SCORE = 0.31;
+
+function hasLeadIntent(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return [
+    /cot[açc][aã]o/,
+    /plano de sa[uú]de/,
+    /or[cç]amento/,
+    /mensalidade/,
+    /operadora/,
+    /quero.*(plano|cot)/,
+    /pode me ajudar/,
+  ].some((pattern) => pattern.test(normalized));
+}
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -44,7 +58,7 @@ Deno.serve(async (req) => {
     // 1. Skip if user took manual control of this lead
     const { data: lead } = await supabase
       .from("leads")
-      .select("stage, in_manual_conversation, user_id")
+      .select("stage, in_manual_conversation, user_id, created_at, last_contact_at")
       .eq("id", lead_id)
       .maybeSingle();
 
@@ -66,6 +80,28 @@ Deno.serve(async (req) => {
     if (!SDR_STAGES.includes(stage)) {
       return new Response(
         JSON.stringify({ ok: true, skipped: "stage_out_of_sdr_scope", stage }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const { data: recentMessages } = await supabase
+      .from("whatsapp_messages")
+      .select("direction, business_relevance_score, message_category, created_at")
+      .eq("lead_id", lead_id)
+      .order("created_at", { ascending: false })
+      .limit(8);
+
+    const inboundMessages = (recentMessages ?? []).filter((msg) => msg.direction === "inbound");
+    const relevantInbound = inboundMessages.find(
+      (msg) => Number(msg.business_relevance_score ?? 0) >= MIN_RELEVANCE_SCORE,
+    );
+    const looksLikeLead = hasLeadIntent(message_text);
+    const hasAnyPriorOutbound = (recentMessages ?? []).some((msg) => msg.direction === "outbound");
+    const isFirstMeaningfulTouch = !hasAnyPriorOutbound && inboundMessages.length <= 1;
+
+    if (!relevantInbound && !looksLikeLead) {
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "non_lead_message" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -103,9 +139,9 @@ Deno.serve(async (req) => {
     await supabase.from("router_decisions").insert({
       conversation_id: sdrResp.conversation_id ?? null,
       message_in: message_text.slice(0, 500),
-      contexto_avaliado: { stage, lead_id },
+      contexto_avaliado: { stage, lead_id, is_first_meaningful_touch: isFirstMeaningfulTouch, business_relevance_score: relevantInbound?.business_relevance_score ?? null },
       agent_escolhido: "sdr-qualificador",
-      motivo: `stub: stage=${stage}`,
+      motivo: isFirstMeaningfulTouch ? `novo_lead: stage=${stage}` : `lead_existente: stage=${stage}`,
     });
 
     // 5. Send each balloon with a humanized delay via send-whatsapp
@@ -120,6 +156,7 @@ Deno.serve(async (req) => {
             phone: normalizedPhone,
             message: mensagens[i],
             lead_id,
+            user_id: lead.user_id,
           },
         });
       } catch (sendErr) {
