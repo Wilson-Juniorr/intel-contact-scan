@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import ChatBubble from "./ChatBubble";
 import TemplateSelector from "./TemplateSelector";
 import AIRewriteModal from "./AIRewriteModal";
+import { AgentStatusIndicator } from "@/components/agents/AgentStatusIndicator";
 
 interface WhatsAppMessage {
   id: string;
@@ -46,6 +47,7 @@ interface Props {
   leadType?: string;
   isPersonal?: boolean;
   onTogglePersonal?: (val: boolean) => void;
+  inManualConversation?: boolean;
 }
 
 export default function ChatArea({
@@ -65,6 +67,7 @@ export default function ChatArea({
   leadType,
   isPersonal = false,
   onTogglePersonal,
+  inManualConversation = false,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAIRewrite, setShowAIRewrite] = useState(false);
@@ -135,6 +138,12 @@ export default function ChatArea({
             </div>
 
             {/* Messages area with WhatsApp wallpaper pattern */}
+            {leadId && (
+              <AgentStatusIndicator
+                leadId={leadId}
+                inManualConversation={inManualConversation}
+              />
+            )}
             <div
               className="flex-1 min-h-0 overflow-y-auto px-[6%] py-2"
               style={{
