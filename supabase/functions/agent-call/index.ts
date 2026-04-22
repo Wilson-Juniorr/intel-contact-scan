@@ -68,8 +68,37 @@ Deno.serve(async (req) => {
     const history = conv?.mensagens ?? [];
     const messages = [...history, { role: "user", content: user_message }];
 
+    // 2.5) Buscar exemplos few-shot aprovados (top 3 por qualidade)
+    const { data: examples } = await supabase
+      .from("agent_examples")
+      .select("scenario, cliente_tipo, tom_cliente, turns, observacao")
+      .eq("agent_slug", agent_slug)
+      .eq("aprovado", true)
+      .order("qualidade_score", { ascending: false })
+      .limit(3);
+
+    let fewShotBlock = "";
+    if (examples && examples.length) {
+      fewShotBlock = "\n\n## 📚 EXEMPLOS DE CONVERSAS-MODELO\nUse estes exemplos como referência de tom, estrutura e desfecho. Não copie literalmente — adapte ao contexto real.\n\n";
+      examples.forEach((ex: any, i: number) => {
+        fewShotBlock += `### Exemplo ${i + 1}: ${ex.scenario}\n`;
+        if (ex.cliente_tipo || ex.tom_cliente) {
+          fewShotBlock += `_Cliente ${ex.cliente_tipo || ""}${ex.tom_cliente ? `, tom ${ex.tom_cliente}` : ""}_\n`;
+        }
+        const turns = Array.isArray(ex.turns) ? ex.turns : [];
+        for (const t of turns) {
+          const who = t.role === "user" ? "👤 Cliente" : "🤖 Você";
+          fewShotBlock += `**${who}:** ${t.content}\n`;
+          if (t.nota) fewShotBlock += `_(nota: ${t.nota})_\n`;
+        }
+        if (ex.observacao) fewShotBlock += `_Por que funciona: ${ex.observacao}_\n`;
+        fewShotBlock += "\n";
+      });
+    }
+
     const systemPrompt =
       agent.system_prompt +
+      fewShotBlock +
       (extra_context ? `\n\n## CONTEXTO EXTRA\n${JSON.stringify(extra_context, null, 2)}` : "");
 
     // 3) Chama Lovable AI Gateway (sem chave Anthropic — usa LOVABLE_API_KEY)
