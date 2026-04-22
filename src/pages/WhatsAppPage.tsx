@@ -414,6 +414,7 @@ export default function WhatsAppPage() {
             leadType={selectedLead?.type}
             isPersonal={selectedConversation?.isPersonal || false}
             onTogglePersonal={(val) => selectedPhone && handleTogglePersonal(selectedPhone, val)}
+            inManualConversation={(selectedLead as any)?.in_manual_conversation === true}
           />
         </div>
       )}
