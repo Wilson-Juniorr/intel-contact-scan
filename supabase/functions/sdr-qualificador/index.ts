@@ -1,4 +1,4 @@
-// Camila SDR v3 — Gemini fine-tuning
+// Junior SDR v3 — Gemini fine-tuning (corretor em primeira pessoa)
 // Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass +
 // split por `‖` + delays humanizados + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -169,13 +169,16 @@ function runDeterministicCritic(
     "garantid", "imperdível", "só hoje", "100%", "melhor plano",
     // Anti-robô / infantilização
     "mastigadinho", "mastigado pro", "mastigado pra", "bonitinho pro", "bonitinho pra",
-    // Proibido falar do Junior ou prometer transferência — Camila atende sozinha
-    "pro junior", "pra junior", "o junior vai", "o junior cota", "o junior conseg",
+    // Junior fala em PRIMEIRA pessoa — proibido falar dele em terceira pessoa
+    // ou prometer que outra pessoa vai assumir.
+    "o junior vai", "o junior cota", "o junior conseg", "o junior vai te",
     "chamo o junior", "chamar o junior", "passar pro junior", "passar pra junior",
+    "passar pro corretor", "passar pra corretora", "passar pro time",
     "te direciono", "vou direcionar", "vou encaminhar", "vou transferir",
     "ele vai te atender", "ele assume", "ele entra em contato",
+    "atendente do junior", "secretária do junior", "do time do junior",
     // Revela que é bot
-    "como assistente", "sou uma ia", "sou um bot", "sou robô",
+    "como assistente", "sou uma ia", "sou um bot", "sou robô", "sou a camila",
   ];
   for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
 

@@ -1,6 +1,6 @@
 // Routes inbound WhatsApp messages to the right agent. Currently a stub: only
-// the SDR qualifier (Camila) is wired up. PROMPT-06 will expand the routing
-// matrix (follow-up, fechador, negociador, etc).
+// the SDR qualifier (Junior, em primeira pessoa) is wired up. PROMPT-06 will
+// expand the routing matrix (follow-up, fechador, negociador, etc).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -180,9 +180,9 @@ Deno.serve(async (req) => {
       await supabase.from("notifications").insert({
         user_id: lead.user_id,
         type: "lead_qualificado",
-        title: "Camila qualificou um lead",
+        title: "Junior SDR qualificou um lead",
         body:
-          `O lead avançou para "Contato realizado". Assuma a conversa no WhatsApp para cotar.`,
+          `O bot Junior fez a pré-qualificação. Lead avançou para "Contato realizado" — assuma a conversa pra fechar.`,
         lead_id,
       });
     }
