@@ -4,6 +4,7 @@ import { AgentsConfigTab } from "@/components/agents/AgentsConfigTab";
 import { AgentsConversationsTab } from "@/components/agents/AgentsConversationsTab";
 import { AgentsComplianceTab } from "@/components/agents/AgentsComplianceTab";
 import { AgentsMetricsTab } from "@/components/agents/AgentsMetricsTab";
+import { AgentsPlaygroundTab } from "@/components/agents/AgentsPlaygroundTab";
 
 export default function AgentsPage() {
   return (
@@ -19,13 +20,15 @@ export default function AgentsPage() {
       </div>
 
       <Tabs defaultValue="config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
           <TabsTrigger value="config">Configuração</TabsTrigger>
+          <TabsTrigger value="playground">Playground</TabsTrigger>
           <TabsTrigger value="conversations">Conversas</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="metrics">Métricas</TabsTrigger>
         </TabsList>
         <TabsContent value="config" className="animate-fade-in"><AgentsConfigTab /></TabsContent>
+        <TabsContent value="playground" className="animate-fade-in"><AgentsPlaygroundTab /></TabsContent>
         <TabsContent value="conversations" className="animate-fade-in"><AgentsConversationsTab /></TabsContent>
         <TabsContent value="compliance" className="animate-fade-in"><AgentsComplianceTab /></TabsContent>
         <TabsContent value="metrics" className="animate-fade-in"><AgentsMetricsTab /></TabsContent>
