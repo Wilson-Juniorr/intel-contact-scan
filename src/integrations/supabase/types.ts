@@ -777,6 +777,7 @@ export type Database = {
           deleted_at: string | null
           email: string | null
           id: string
+          in_manual_conversation: boolean
           last_contact_at: string | null
           last_quote_sent_at: string | null
           lives: number | null
@@ -801,6 +802,7 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
+          in_manual_conversation?: boolean
           last_contact_at?: string | null
           last_quote_sent_at?: string | null
           lives?: number | null
@@ -825,6 +827,7 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
+          in_manual_conversation?: boolean
           last_contact_at?: string | null
           last_quote_sent_at?: string | null
           lives?: number | null
