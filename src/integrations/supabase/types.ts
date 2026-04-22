@@ -93,7 +93,10 @@ export type Database = {
       agent_conversations: {
         Row: {
           agent_slug: string
+          balao_count: number
           contexto_extra: Json
+          conversation_state: Json
+          critic_fails: number
           custo_estimado: number
           encerrada_em: string | null
           id: string
@@ -109,7 +112,10 @@ export type Database = {
         }
         Insert: {
           agent_slug: string
+          balao_count?: number
           contexto_extra?: Json
+          conversation_state?: Json
+          critic_fails?: number
           custo_estimado?: number
           encerrada_em?: string | null
           id?: string
@@ -125,7 +131,10 @@ export type Database = {
         }
         Update: {
           agent_slug?: string
+          balao_count?: number
           contexto_extra?: Json
+          conversation_state?: Json
+          critic_fails?: number
           custo_estimado?: number
           encerrada_em?: string | null
           id?: string
@@ -148,6 +157,95 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_critic_log: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          criterios_falhados: string[] | null
+          id: string
+          regenerou: boolean
+          resposta_final: string | null
+          resposta_proposta: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          criterios_falhados?: string[] | null
+          id?: string
+          regenerou?: boolean
+          resposta_final?: string | null
+          resposta_proposta: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          criterios_falhados?: string[] | null
+          id?: string
+          regenerou?: boolean
+          resposta_final?: string | null
+          resposta_proposta?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_critic_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_examples: {
+        Row: {
+          agent_slug: string
+          aprovado: boolean
+          cliente_tipo: string | null
+          created_at: string
+          created_by: string | null
+          fonte: string | null
+          id: string
+          observacao: string | null
+          qualidade_score: number | null
+          scenario: string
+          tags: string[] | null
+          tom_cliente: string | null
+          turns: Json
+          updated_at: string
+        }
+        Insert: {
+          agent_slug: string
+          aprovado?: boolean
+          cliente_tipo?: string | null
+          created_at?: string
+          created_by?: string | null
+          fonte?: string | null
+          id?: string
+          observacao?: string | null
+          qualidade_score?: number | null
+          scenario: string
+          tags?: string[] | null
+          tom_cliente?: string | null
+          turns: Json
+          updated_at?: string
+        }
+        Update: {
+          agent_slug?: string
+          aprovado?: boolean
+          cliente_tipo?: string | null
+          created_at?: string
+          created_by?: string | null
+          fonte?: string | null
+          id?: string
+          observacao?: string | null
+          qualidade_score?: number | null
+          scenario?: string
+          tags?: string[] | null
+          tom_cliente?: string | null
+          turns?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
       agent_handoffs: {
         Row: {
@@ -224,6 +322,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "agent_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_split_log: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          delays_ms: number[] | null
+          id: string
+          numero_baloes: number
+          resposta_original: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          delays_ms?: number[] | null
+          id?: string
+          numero_baloes: number
+          resposta_original: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          delays_ms?: number[] | null
+          id?: string
+          numero_baloes?: number
+          resposta_original?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_split_log_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "agent_conversations"
