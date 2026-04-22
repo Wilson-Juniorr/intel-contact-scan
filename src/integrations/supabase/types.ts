@@ -49,6 +49,269 @@ export type Database = {
           },
         ]
       }
+      agent_compliance_log: {
+        Row: {
+          acao_tomada: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          mensagem_corrigida: string | null
+          mensagem_original: string
+          violacao_detalhe: string | null
+          violacao_tipo: string
+        }
+        Insert: {
+          acao_tomada?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          mensagem_corrigida?: string | null
+          mensagem_original: string
+          violacao_detalhe?: string | null
+          violacao_tipo: string
+        }
+        Update: {
+          acao_tomada?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          mensagem_corrigida?: string | null
+          mensagem_original?: string
+          violacao_detalhe?: string | null
+          violacao_tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_compliance_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_conversations: {
+        Row: {
+          agent_slug: string
+          contexto_extra: Json
+          custo_estimado: number
+          encerrada_em: string | null
+          id: string
+          iniciada_em: string
+          lead_id: string | null
+          mensagens: Json
+          status: string
+          total_tokens_in: number
+          total_tokens_out: number
+          transferida_para: string | null
+          ultima_atividade: string
+          whatsapp_number: string
+        }
+        Insert: {
+          agent_slug: string
+          contexto_extra?: Json
+          custo_estimado?: number
+          encerrada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          lead_id?: string | null
+          mensagens?: Json
+          status?: string
+          total_tokens_in?: number
+          total_tokens_out?: number
+          transferida_para?: string | null
+          ultima_atividade?: string
+          whatsapp_number: string
+        }
+        Update: {
+          agent_slug?: string
+          contexto_extra?: Json
+          custo_estimado?: number
+          encerrada_em?: string | null
+          id?: string
+          iniciada_em?: string
+          lead_id?: string | null
+          mensagens?: Json
+          status?: string
+          total_tokens_in?: number
+          total_tokens_out?: number
+          transferida_para?: string | null
+          ultima_atividade?: string
+          whatsapp_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_handoffs: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_junior: boolean | null
+          contexto_transferido: Json | null
+          conversation_id: string
+          created_at: string
+          from_agent: string
+          id: string
+          motivo: string
+          to_agent: string
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_junior?: boolean | null
+          contexto_transferido?: Json | null
+          conversation_id: string
+          created_at?: string
+          from_agent: string
+          id?: string
+          motivo: string
+          to_agent: string
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_junior?: boolean | null
+          contexto_transferido?: Json | null
+          conversation_id?: string
+          created_at?: string
+          from_agent?: string
+          id?: string
+          motivo?: string
+          to_agent?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_handoffs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_messages: {
+        Row: {
+          conteudo: string
+          conversation_id: string
+          created_at: string
+          direcao: string
+          id: string
+          tokens_in: number | null
+          tokens_out: number | null
+        }
+        Insert: {
+          conteudo: string
+          conversation_id: string
+          created_at?: string
+          direcao: string
+          id?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Update: {
+          conteudo?: string
+          conversation_id?: string
+          created_at?: string
+          direcao?: string
+          id?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents_config: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          max_tokens: number
+          modelo: string
+          nome: string
+          slug: string
+          system_prompt: string
+          temperature: number
+          tipo: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          max_tokens?: number
+          modelo?: string
+          nome: string
+          slug: string
+          system_prompt: string
+          temperature?: number
+          tipo: string
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          max_tokens?: number
+          modelo?: string
+          nome?: string
+          slug?: string
+          system_prompt?: string
+          temperature?: number
+          tipo?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: []
+      }
+      agents_config_history: {
+        Row: {
+          agent_slug: string
+          created_at: string
+          criado_por: string | null
+          id: string
+          modelo: string
+          motivo_mudanca: string | null
+          system_prompt: string
+          versao: number
+        }
+        Insert: {
+          agent_slug: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          modelo: string
+          motivo_mudanca?: string | null
+          system_prompt: string
+          versao: number
+        }
+        Update: {
+          agent_slug?: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          modelo?: string
+          motivo_mudanca?: string | null
+          system_prompt?: string
+          versao?: number
+        }
+        Relationships: []
+      }
       api_usage: {
         Row: {
           created_at: string
@@ -684,6 +947,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
           completed: boolean
@@ -721,6 +1011,44 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      router_decisions: {
+        Row: {
+          agent_escolhido: string
+          contexto_avaliado: Json | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          message_in: string | null
+          motivo: string | null
+        }
+        Insert: {
+          agent_escolhido: string
+          contexto_avaliado?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          message_in?: string | null
+          motivo?: string | null
+        }
+        Update: {
+          agent_escolhido?: string
+          contexto_avaliado?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          message_in?: string | null
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "router_decisions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "agent_conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -771,6 +1099,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       user_settings: {
         Row: {
@@ -947,9 +1296,16 @@ export type Database = {
     }
     Functions: {
       get_user_org_ids: { Args: { _user_id: string }; Returns: string[] }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "corretor" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1076,6 +1432,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "corretor", "viewer"],
+    },
   },
 } as const
