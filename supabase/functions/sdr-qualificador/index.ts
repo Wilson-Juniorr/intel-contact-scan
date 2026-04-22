@@ -29,6 +29,7 @@ interface ConversationState {
   tom_cliente: Tom;
   fonte: string | null;
   turn_number: number;
+  veio_por_audio: boolean;
 }
 
 function detectarTom(msg: string): Tom {
@@ -45,6 +46,7 @@ function buildState(
   lead: any,
   conv: any,
   user_message: string,
+  is_audio: boolean,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
   const coletado: Record<string, unknown> = {};
@@ -70,6 +72,7 @@ function buildState(
     tom_cliente: detectarTom(user_message),
     fonte: null,
     turn_number: turn,
+    veio_por_audio: is_audio,
   };
 }
 
@@ -202,7 +205,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { lead_id, whatsapp_number, user_message } = body;
+    const { lead_id, whatsapp_number, user_message, is_audio } = body;
     let conversation_id: string | null = body.conversation_id ?? null;
 
     if (!lead_id || !whatsapp_number || !user_message) {
@@ -247,7 +250,7 @@ Deno.serve(async (req) => {
       supabase.from("leads").select("*, lead_memory(*)").eq("id", lead_id).maybeSingle(),
     ]);
 
-    const state = buildState(lead, conv, user_message);
+    const state = buildState(lead, conv, user_message, is_audio === true);
     const fewShot = await selectFewShot(supabase, state);
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
@@ -260,6 +263,15 @@ Deno.serve(async (req) => {
       `PALAVRAS_ULTIMA_MSG: ${state.palavras_ultima_msg}\n` +
       `TOM_CLIENTE: ${state.tom_cliente}\n` +
       `TURN: ${state.turn_number}\n` +
+      (state.veio_por_audio
+        ? "\n🎤 ESTA MENSAGEM CHEGOU COMO ÁUDIO. O texto acima é a TRANSCRIÇÃO do áudio do cliente.\n" +
+          "REGRAS PARA RESPONDER ÁUDIO:\n" +
+          "- NÃO diga 'recebi seu áudio', 'ouvi seu áudio', 'entendi seu áudio'.\n" +
+          "- NÃO repita a transcrição literal nem cite que é uma transcrição.\n" +
+          "- Responda como se estivesse numa conversa fluida — exatamente como você responderia a um texto.\n" +
+          "- Se a transcrição estiver confusa/incompleta, peça pra repetir de forma natural ('não peguei tudo, me conta de novo?').\n" +
+          "- Mantenha o split em balões e o tom humano de sempre.\n"
+        : "") +
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +

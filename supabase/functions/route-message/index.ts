@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lead_id, whatsapp_number, message_text } = await req.json();
+    const { lead_id, whatsapp_number, message_text, is_audio } = await req.json();
     if (!lead_id || !whatsapp_number || !message_text) {
       return new Response(
         JSON.stringify({
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const relevantInbound = inboundMessages.find(
       (msg) => Number(msg.business_relevance_score ?? 0) >= MIN_RELEVANCE_SCORE,
     );
-    const looksLikeLead = hasLeadIntent(message_text);
+    const looksLikeLead = hasLeadIntent(message_text) || is_audio === true;
     const hasAnyPriorOutbound = (recentMessages ?? []).some((msg) => msg.direction === "outbound");
     const isFirstMeaningfulTouch = !hasAnyPriorOutbound && inboundMessages.length <= 1;
 
@@ -129,6 +129,7 @@ Deno.serve(async (req) => {
           lead_id,
           whatsapp_number: normalizedPhone,
           user_message: message_text,
+          is_audio: is_audio === true,
         },
       },
     );
