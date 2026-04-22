@@ -151,6 +151,7 @@ function runDeterministicCritic(
   texto: string,
   meta: any,
   state: ConversationState,
+  ultimosBaloes: number[] = [],
 ): string[] {
   const fails: string[] = [];
   if (!texto || texto.length < 3) fails.push("resposta_vazia");
@@ -159,6 +160,23 @@ function runDeterministicCritic(
   const baloes = texto.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
   const palavrasTotal = texto.replace(/‖/g, " ").split(/\s+/).filter(Boolean).length;
   if (palavrasTotal > 12 && baloes.length === 1) fails.push("falta_split_baloes");
+
+  // Limites duros de quantidade
+  if (baloes.length > 4) fails.push("baloes_acima_do_maximo_4");
+  // Cliente respondeu curto → resposta deve ser curta (1-2 balões no máximo)
+  if (state.palavras_ultima_msg <= 5 && baloes.length > 2) {
+    fails.push("excesso_baloes_para_msg_curta_do_cliente");
+  }
+  // Resposta curta total não pode ser fragmentada em 3+
+  if (palavrasTotal <= 18 && baloes.length >= 3) {
+    fails.push("fragmentacao_excessiva_para_resposta_curta");
+  }
+  // Anti-monotonia: se os 2 últimos turnos do agente já tiveram 3 balões, não repetir 3
+  if (ultimosBaloes.length >= 2 &&
+      ultimosBaloes.slice(-2).every((n) => n === 3) &&
+      baloes.length === 3) {
+    fails.push("padrao_3_baloes_repetido_em_3_turnos");
+  }
 
   for (const b of baloes) {
     const linhas = b.split("\n").filter((l) => l.trim()).length;
@@ -283,6 +301,15 @@ Deno.serve(async (req) => {
 
     const messages = [...historico, { role: "user", content: user_message }];
 
+    // Histórico de quantidade de balões dos últimos turnos do agente (anti-monotonia)
+    const ultimosBaloes: number[] = (historico as any[])
+      .filter((m) => m.role === "assistant" && typeof m.content === "string")
+      .slice(-3)
+      .map((m) => {
+        const n = m.content.split(SPLIT_CHAR).map((b: string) => b.trim()).filter(Boolean).length;
+        return Math.max(1, n);
+      });
+
     // Generate + critic loop (max 2 attempts)
     let propostaFinal: string | null = null;
     let metadata: any = null;
@@ -301,7 +328,7 @@ Deno.serve(async (req) => {
       totalOut += resp.tokens_out;
 
       const { texto, meta } = parseResponse(resp.text);
-      const fails = runDeterministicCritic(texto, meta, state);
+      const fails = runDeterministicCritic(texto, meta, state, ultimosBaloes);
 
       if (fails.length === 0) {
         propostaFinal = texto;
