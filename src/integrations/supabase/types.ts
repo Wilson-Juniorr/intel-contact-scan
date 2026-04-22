@@ -49,6 +49,78 @@ export type Database = {
           },
         ]
       }
+      agent_budget_alerts: {
+        Row: {
+          acao_tomada: string | null
+          agent_slug: string
+          created_at: string
+          gasto_usd: number
+          id: string
+          limite_usd: number
+          pct_consumido: number
+          periodo: string
+          tipo: string
+        }
+        Insert: {
+          acao_tomada?: string | null
+          agent_slug: string
+          created_at?: string
+          gasto_usd: number
+          id?: string
+          limite_usd: number
+          pct_consumido: number
+          periodo: string
+          tipo: string
+        }
+        Update: {
+          acao_tomada?: string | null
+          agent_slug?: string
+          created_at?: string
+          gasto_usd?: number
+          id?: string
+          limite_usd?: number
+          pct_consumido?: number
+          periodo?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      agent_budgets: {
+        Row: {
+          agent_slug: string
+          ativo: boolean
+          created_at: string
+          daily_limit_usd: number
+          id: string
+          monthly_limit_usd: number
+          pause_on_exceed: boolean
+          updated_at: string
+          warn_at_pct: number
+        }
+        Insert: {
+          agent_slug: string
+          ativo?: boolean
+          created_at?: string
+          daily_limit_usd?: number
+          id?: string
+          monthly_limit_usd?: number
+          pause_on_exceed?: boolean
+          updated_at?: string
+          warn_at_pct?: number
+        }
+        Update: {
+          agent_slug?: string
+          ativo?: boolean
+          created_at?: string
+          daily_limit_usd?: number
+          id?: string
+          monthly_limit_usd?: number
+          pause_on_exceed?: boolean
+          updated_at?: string
+          warn_at_pct?: number
+        }
+        Relationships: []
+      }
       agent_compliance_log: {
         Row: {
           acao_tomada: string | null
