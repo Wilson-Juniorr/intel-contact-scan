@@ -1,5 +1,6 @@
-// Wrapper that invokes agent-call with the SDR slug and humanizes the output
-// (splits into 1-3 balloons, returns randomized delays, marks "digitando" state).
+// Camila SDR v3 — Gemini fine-tuning
+// Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass +
+// split por `‖` + delays humanizados + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -9,167 +10,357 @@ const corsHeaders = {
 };
 
 const AGENT_SLUG = "sdr-qualificador";
+const SPLIT_CHAR = "‖";
+const CRITIC_MODEL = "google/gemini-2.5-flash-lite";
 
-function splitEmBaloes(texto: string): string[] {
-  const semJson = texto.replace(/```json[\s\S]*?```/g, "").trim();
-  const paragrafos = semJson
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+type Tom =
+  | "cooperativo"
+  | "resistente"
+  | "ocupado"
+  | "emocional"
+  | "tecnico"
+  | "hostil";
 
-  if (paragrafos.length === 0) return [texto.trim()].filter(Boolean);
-  if (paragrafos.length === 1) {
-    const linhas = paragrafos[0].split("\n").filter((l) => l.trim());
-    if (linhas.length <= 3) return paragrafos;
-    const metade = Math.ceil(linhas.length / 2);
-    return [
-      linhas.slice(0, metade).join("\n"),
-      linhas.slice(metade).join("\n"),
-    ];
+interface ConversationState {
+  coletado: Record<string, unknown>;
+  falta: string[];
+  ultima_msg_cliente: string;
+  palavras_ultima_msg: number;
+  tom_cliente: Tom;
+  fonte: string | null;
+  turn_number: number;
+}
+
+function detectarTom(msg: string): Tom {
+  const lower = msg.toLowerCase();
+  if (/(não enche|chato|para de|já disse|encherem|me deixa em paz)/.test(lower)) return "hostil";
+  if (/(urgente|internad|avc|infarto|câncer|cancer|cirurgia|uti)/.test(lower)) return "emocional";
+  if (/(pressa|rápido|rapid|tô sem tempo|objetiv|corrid)/.test(lower)) return "ocupado";
+  if (/(coparticipa|carência|carencia|cpt|portabil|ans|reajuste)/.test(lower)) return "tecnico";
+  if (msg.trim().split(/\s+/).filter(Boolean).length <= 3) return "resistente";
+  return "cooperativo";
+}
+
+function buildState(
+  lead: any,
+  conv: any,
+  user_message: string,
+): ConversationState {
+  const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
+  const coletado: Record<string, unknown> = {};
+  if (lead?.name && !/^\+?\d+$/.test(lead.name)) coletado.nome = lead.name;
+  if (lead?.type) coletado.tipo = lead.type;
+  if (lead?.lives) coletado.vidas = lead.lives;
+  if (lead?.operator) coletado.plano_atual = { operadora: lead.operator };
+  if (mem.orcamento) coletado.orcamento = mem.orcamento;
+  if (mem.rede_hospitais) coletado.rede = mem.rede_hospitais;
+  if (mem.urgencia) coletado.urgencia = mem.urgencia;
+
+  const camposBase = ["tipo", "vidas", "plano_atual", "o_que_busca", "regiao", "horario"];
+  const falta = camposBase.filter((k) => !(k in coletado));
+
+  const palavras = user_message.trim().split(/\s+/).filter(Boolean).length;
+  const turn = ((conv?.mensagens ?? []) as any[]).filter((m) => m.role === "assistant").length + 1;
+
+  return {
+    coletado,
+    falta,
+    ultima_msg_cliente: user_message,
+    palavras_ultima_msg: palavras,
+    tom_cliente: detectarTom(user_message),
+    fonte: null,
+    turn_number: turn,
+  };
+}
+
+async function selectFewShot(
+  supabase: any,
+  state: ConversationState,
+): Promise<string> {
+  const { data: exemplos } = await supabase
+    .from("agent_examples")
+    .select("scenario, turns")
+    .eq("agent_slug", AGENT_SLUG)
+    .eq("aprovado", true)
+    .in("tom_cliente", [state.tom_cliente, "cooperativo"])
+    .order("qualidade_score", { ascending: false })
+    .limit(3);
+
+  if (!exemplos || exemplos.length === 0) return "";
+
+  let out = "<FEW_SHOT>\n";
+  for (const ex of exemplos) {
+    out += `\n[Exemplo — cenário "${ex.scenario}"]\n`;
+    for (const t of (ex.turns as any[])) {
+      out += `${t.role === "user" ? "User" : "Assistant"}: ${t.content}\n`;
+    }
   }
-  if (paragrafos.length <= 3) return paragrafos;
-  return [paragrafos[0], paragrafos[1], paragrafos.slice(2).join("\n\n")];
+  out += "</FEW_SHOT>\n\nUse esses exemplos como PADRÃO de qualidade.\n";
+  return out;
+}
+
+function parseResponse(raw: string): { texto: string; meta: any | null } {
+  const m = raw.match(/<METADATA>([\s\S]*?)<\/METADATA>/);
+  if (!m) return { texto: raw.trim(), meta: null };
+  let meta: any = null;
+  try { meta = JSON.parse(m[1].trim()); } catch { meta = { parse_error: true }; }
+  const texto = raw.replace(/<METADATA>[\s\S]*?<\/METADATA>/, "").trim();
+  return { texto, meta };
+}
+
+async function callGemini(
+  modelo: string,
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>,
+  opts: { max_tokens: number; temperature: number },
+): Promise<{ text: string; tokens_in: number; tokens_out: number }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: modelo,
+      max_tokens: opts.max_tokens,
+      temperature: opts.temperature,
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
+    }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`AI gateway ${resp.status}: ${t}`);
+  }
+  const data = await resp.json();
+  return {
+    text: data.choices?.[0]?.message?.content ?? "",
+    tokens_in: data.usage?.prompt_tokens ?? 0,
+    tokens_out: data.usage?.completion_tokens ?? 0,
+  };
+}
+
+function calcularDelay(balao: string): number {
+  const base = Math.min(Math.max(balao.length * 25, 1500), 7000);
+  const jitter = (Math.random() * 0.4 - 0.2) * base;
+  return Math.round(base + jitter);
+}
+
+function runDeterministicCritic(
+  texto: string,
+  meta: any,
+  state: ConversationState,
+): string[] {
+  const fails: string[] = [];
+  if (!texto || texto.length < 3) fails.push("resposta_vazia");
+  if (texto.length > 1200) fails.push("resposta_longa_demais");
+
+  const baloes = texto.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
+  const palavrasTotal = texto.replace(/‖/g, " ").split(/\s+/).filter(Boolean).length;
+  if (palavrasTotal > 12 && baloes.length === 1) fails.push("falta_split_baloes");
+
+  for (const b of baloes) {
+    const linhas = b.split("\n").filter((l) => l.trim()).length;
+    if (linhas > 4) fails.push("balao_com_mais_de_3_linhas");
+  }
+
+  const lower = texto.toLowerCase();
+  const blocklist = [
+    "em que posso ajudá", "estou à disposição", "prezado", "caro cliente",
+    "obrigado por entrar em contato", "nosso atendimento", "maravilhoso!",
+    "garantid", "imperdível", "só hoje", "100%", "melhor plano",
+  ];
+  for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
+
+  for (const b of baloes) {
+    const emojis = [...b.matchAll(/[\u{1F300}-\u{1FAFF}]/gu)];
+    if (emojis.length > 2) fails.push("multiplos_emojis_em_balao");
+    const proibidos = ["🎯", "💯", "🚀", "⚡", "🔥", "✅", "❌"];
+    for (const e of emojis) if (proibidos.includes(e[0])) fails.push(`emoji_proibido:${e[0]}`);
+  }
+
+  if (state.palavras_ultima_msg <= 5 && meta && meta.usou_mirror_ou_label === false) {
+    fails.push("nao_aplicou_mirror_em_resposta_curta");
+  }
+  return fails;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
 
   try {
-    const { lead_id, whatsapp_number, user_message, conversation_id: convIn } =
-      await req.json();
+    const body = await req.json();
+    const { lead_id, whatsapp_number, user_message } = body;
+    let conversation_id: string | null = body.conversation_id ?? null;
 
     if (!lead_id || !whatsapp_number || !user_message) {
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "lead_id, whatsapp_number and user_message are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ ok: false, error: "lead_id, whatsapp_number e user_message são obrigatórios" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    // Agent config
+    const { data: agent } = await supabase.from("agents_config")
+      .select("*").eq("slug", AGENT_SLUG).eq("ativo", true).maybeSingle();
+    if (!agent) throw new Error(`Agent ${AGENT_SLUG} inativo ou não encontrado`);
 
-    // 1. Find or create the active conversation for this lead+agent
-    let conversation_id: string | null = convIn ?? null;
+    // Acha/cria conversation
     if (!conversation_id) {
       const { data: existing } = await supabase
         .from("agent_conversations")
         .select("id")
-        .eq("lead_id", lead_id)
-        .eq("agent_slug", AGENT_SLUG)
+        .eq("lead_id", lead_id).eq("agent_slug", AGENT_SLUG)
         .in("status", ["ativa", "digitando", "pausada"])
         .order("ultima_atividade", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
+        .limit(1).maybeSingle();
       if (existing) {
         conversation_id = existing.id;
       } else {
         const { data: novo, error: convErr } = await supabase
           .from("agent_conversations")
-          .insert({
-            lead_id,
-            agent_slug: AGENT_SLUG,
-            whatsapp_number,
-            status: "ativa",
-            mensagens: [],
-          })
-          .select("id")
-          .single();
+          .insert({ lead_id, agent_slug: AGENT_SLUG, whatsapp_number, status: "ativa", mensagens: [] })
+          .select("id").single();
         if (convErr) throw convErr;
         conversation_id = novo!.id;
       }
     }
 
-    // 2. Mark "digitando" so the UI can show typing indicator live
-    await supabase
-      .from("agent_conversations")
-      .update({
-        status: "digitando",
-        ultima_atividade: new Date().toISOString(),
-      })
+    await supabase.from("agent_conversations")
+      .update({ status: "digitando", ultima_atividade: new Date().toISOString() })
       .eq("id", conversation_id);
 
-    // 3. Load lightweight lead context for the agent
-    const { data: lead } = await supabase
-      .from("leads")
-      .select("id, name, phone, stage, type, operator")
-      .eq("id", lead_id)
-      .maybeSingle();
+    const [{ data: conv }, { data: lead }] = await Promise.all([
+      supabase.from("agent_conversations").select("*").eq("id", conversation_id).maybeSingle(),
+      supabase.from("leads").select("*, lead_memory(*)").eq("id", lead_id).maybeSingle(),
+    ]);
 
-    const { data: memoryRow } = await supabase
-      .from("lead_memory")
-      .select("summary")
-      .eq("lead_id", lead_id)
-      .maybeSingle();
+    const state = buildState(lead, conv, user_message);
+    const fewShot = await selectFewShot(supabase, state);
 
-    const extra_context = {
-      lead_name: lead?.name ?? null,
-      lead_phone: lead?.phone ?? whatsapp_number,
-      lead_stage: lead?.stage ?? "novo",
-      lead_type: lead?.type ?? "PF",
-      lead_operator: lead?.operator ?? null,
-      lead_memoria_resumo: memoryRow?.summary ?? null,
-    };
+    const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
-    // 4. Invoke the central agent-call function (handles LLM + persistence)
-    const { data: agentResp, error: agentErr } = await supabase.functions.invoke(
-      "agent-call",
-      {
-        body: {
-          agent_slug: AGENT_SLUG,
-          conversation_id,
-          user_message,
-          extra_context,
-        },
-      },
-    );
-    if (agentErr) throw agentErr;
+    const systemWithContext = (agent.system_prompt as string) +
+      "\n\n═══ ESTADO ATUAL DA CONVERSA ═══\n" +
+      `COLETADO: ${JSON.stringify(state.coletado)}\n` +
+      `FALTA: ${JSON.stringify(state.falta)}\n` +
+      `ULTIMA_MSG_CLIENTE: "${state.ultima_msg_cliente}"\n` +
+      `PALAVRAS_ULTIMA_MSG: ${state.palavras_ultima_msg}\n` +
+      `TOM_CLIENTE: ${state.tom_cliente}\n` +
+      `TURN: ${state.turn_number}\n` +
+      (state.palavras_ultima_msg <= 5
+        ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
+        : "") +
+      `\n${fewShot}\n`;
 
-    const responseText: string =
-      agentResp?.response ?? agentResp?.text ?? agentResp?.message ?? "";
+    const messages = [...historico, { role: "user", content: user_message }];
 
-    // 5. Switch back to "ativa"
-    await supabase
-      .from("agent_conversations")
-      .update({ status: "ativa", ultima_atividade: new Date().toISOString() })
-      .eq("id", conversation_id);
+    // Generate + critic loop (max 2 attempts)
+    let propostaFinal: string | null = null;
+    let metadata: any = null;
+    let criterios_falhados: string[] = [];
+    let attempt = 0;
+    let totalIn = 0;
+    let totalOut = 0;
 
-    // 6. Humanize: split into 1-3 balloons
-    const baloes = splitEmBaloes(responseText);
-    const delays_ms = baloes.map(() => 1500 + Math.floor(Math.random() * 5500));
+    while (attempt < 2 && !propostaFinal) {
+      attempt++;
+      const resp = await callGemini(agent.modelo, systemWithContext, messages, {
+        max_tokens: agent.max_tokens,
+        temperature: Number(agent.temperature),
+      });
+      totalIn += resp.tokens_in;
+      totalOut += resp.tokens_out;
 
-    // 7. Detect qualification JSON marker
-    const qualificou = /"qualificado"\s*:\s*true/i.test(responseText);
+      const { texto, meta } = parseResponse(resp.text);
+      const fails = runDeterministicCritic(texto, meta, state);
+
+      if (fails.length === 0) {
+        propostaFinal = texto;
+        metadata = meta;
+        criterios_falhados = [];
+      } else {
+        criterios_falhados = fails;
+        if (attempt >= 2) {
+          // Aceita mesmo com falhas em vez de cair em fallback
+          propostaFinal = texto || "Pode me dar um segundinho?";
+          metadata = meta;
+        } else {
+          messages.push({
+            role: "user",
+            content: `[SISTEMA] Sua resposta anterior falhou: ${fails.join(", ")}. Regenere corrigindo.`,
+          });
+        }
+      }
+    }
+
+    if (!propostaFinal) propostaFinal = "Oi! Dá um segundinho que já te respondo certinho 😅";
+
+    // Logs
+    await supabase.from("agent_critic_log").insert({
+      conversation_id,
+      resposta_proposta: propostaFinal,
+      criterios_falhados,
+      regenerou: attempt > 1,
+      resposta_final: propostaFinal,
+    });
+
+    // Split em balões
+    const baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
+    const delays = baloes.map((b) => calcularDelay(b));
+
+    await supabase.from("agent_split_log").insert({
+      conversation_id,
+      resposta_original: propostaFinal,
+      numero_baloes: baloes.length,
+      delays_ms: delays,
+    });
+
+    // Persiste mensagens
+    const novosMensagens = [...messages.filter((m) => !m.content?.startsWith("[SISTEMA]")), { role: "assistant", content: propostaFinal }];
+    await supabase.from("agent_conversations").update({
+      mensagens: novosMensagens,
+      conversation_state: state,
+      balao_count: (conv?.balao_count ?? 0) + baloes.length,
+      critic_fails: (conv?.critic_fails ?? 0) + (criterios_falhados.length > 0 ? 1 : 0),
+      total_tokens_in: (conv?.total_tokens_in ?? 0) + totalIn,
+      total_tokens_out: (conv?.total_tokens_out ?? 0) + totalOut,
+      status: "ativa",
+      ultima_atividade: new Date().toISOString(),
+    }).eq("id", conversation_id);
+
+    await supabase.from("agent_messages").insert([
+      { conversation_id, direcao: "incoming", conteudo: user_message, tokens_in: totalIn },
+      { conversation_id, direcao: "outgoing", conteudo: propostaFinal, tokens_out: totalOut },
+    ]);
+
+    const qualificou = !!metadata?.deve_transferir_junior;
 
     return new Response(
       JSON.stringify({
         ok: true,
         conversation_id,
+        // Novos campos (v3)
+        baloes,
+        delay_per_balao: delays,
+        metadata,
+        criterios_falhados,
+        // Retrocompat com Playground atual
         mensagens: baloes,
-        delays_ms,
+        delays_ms: delays,
         qualificou,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("sdr-qualificador error:", msg);
+    console.error("sdr-qualificador v3 error:", msg);
     return new Response(
       JSON.stringify({ ok: false, error: msg }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
