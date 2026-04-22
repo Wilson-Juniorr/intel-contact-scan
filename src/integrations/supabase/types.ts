@@ -364,6 +364,76 @@ export type Database = {
           },
         ]
       }
+      agent_techniques: {
+        Row: {
+          agent_slug: string
+          created_at: string
+          id: string
+          notas: string | null
+          prioridade: number
+          technique_id: string
+        }
+        Insert: {
+          agent_slug: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          prioridade?: number
+          technique_id: string
+        }
+        Update: {
+          agent_slug?: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          prioridade?: number
+          technique_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_techniques_technique_id_fkey"
+            columns: ["technique_id"]
+            isOneToOne: false
+            referencedRelation: "sales_techniques"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_vendor_profiles: {
+        Row: {
+          agent_slug: string
+          created_at: string
+          id: string
+          notas: string | null
+          peso: number
+          vendor_profile_id: string
+        }
+        Insert: {
+          agent_slug: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          peso?: number
+          vendor_profile_id: string
+        }
+        Update: {
+          agent_slug?: string
+          created_at?: string
+          id?: string
+          notas?: string | null
+          peso?: number
+          vendor_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_vendor_profiles_vendor_profile_id_fkey"
+            columns: ["vendor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents_config: {
         Row: {
           ativo: boolean
@@ -1189,6 +1259,63 @@ export type Database = {
           },
         ]
       }
+      sales_techniques: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          como_aplicar: string
+          cor_hex: string | null
+          created_at: string
+          descricao: string | null
+          exemplos: Json
+          fonte_autor: string | null
+          gatilho_uso: string | null
+          icone: string | null
+          id: string
+          is_default: boolean
+          nivel_dificuldade: number
+          nome: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          como_aplicar: string
+          cor_hex?: string | null
+          created_at?: string
+          descricao?: string | null
+          exemplos?: Json
+          fonte_autor?: string | null
+          gatilho_uso?: string | null
+          icone?: string | null
+          id?: string
+          is_default?: boolean
+          nivel_dificuldade?: number
+          nome: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          como_aplicar?: string
+          cor_hex?: string | null
+          created_at?: string
+          descricao?: string | null
+          exemplos?: Json
+          fonte_autor?: string | null
+          gatilho_uso?: string | null
+          icone?: string | null
+          id?: string
+          is_default?: boolean
+          nivel_dificuldade?: number
+          nome?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string
@@ -1299,6 +1426,69 @@ export type Database = {
           onboarding_step?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      vendor_profiles: {
+        Row: {
+          ativo: boolean
+          cor_hex: string | null
+          created_at: string
+          descricao: string | null
+          estilo: string | null
+          evitar_quando: string | null
+          exemplos_frases: Json
+          icone: string | null
+          id: string
+          is_default: boolean
+          nome: string
+          origem: string | null
+          principios: string | null
+          quando_usar: string | null
+          slug: string
+          tags: string[]
+          tom: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor_hex?: string | null
+          created_at?: string
+          descricao?: string | null
+          estilo?: string | null
+          evitar_quando?: string | null
+          exemplos_frases?: Json
+          icone?: string | null
+          id?: string
+          is_default?: boolean
+          nome: string
+          origem?: string | null
+          principios?: string | null
+          quando_usar?: string | null
+          slug: string
+          tags?: string[]
+          tom?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor_hex?: string | null
+          created_at?: string
+          descricao?: string | null
+          estilo?: string | null
+          evitar_quando?: string | null
+          exemplos_frases?: Json
+          icone?: string | null
+          id?: string
+          is_default?: boolean
+          nome?: string
+          origem?: string | null
+          principios?: string | null
+          quando_usar?: string | null
+          slug?: string
+          tags?: string[]
+          tom?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
