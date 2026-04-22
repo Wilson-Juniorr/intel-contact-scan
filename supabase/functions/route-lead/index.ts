@@ -59,6 +59,19 @@ Deno.serve(async (req) => {
         motivo = `Regra "${rule.nome}" → ${agente || "humano"}`;
       }
 
+      // Garantir que o agente escolhido esteja ATIVO; senão, fallback para humano.
+      if (agente) {
+        const { data: agentRow } = await sb
+          .from("agents_config")
+          .select("slug, ativo")
+          .eq("slug", agente)
+          .maybeSingle();
+        if (!agentRow || !agentRow.ativo) {
+          motivo = `${motivo} (agente ${agente} inativo → humano)`;
+          agente = null;
+        }
+      }
+
       await sb.from("lead_routing_log").insert({
         lead_id, rule_id: rule.id, rule_nome: rule.nome,
         agente_escolhido: agente, motivo,
