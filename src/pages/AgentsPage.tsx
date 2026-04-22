@@ -7,6 +7,7 @@ import { AgentHQ } from "@/components/agents/AgentHQ";
 import { AgentsPlaygroundTab } from "@/components/agents/AgentsPlaygroundTab";
 import { AgentsVendorProfilesTab } from "@/components/agents/AgentsVendorProfilesTab";
 import { AgentsTechniquesTab } from "@/components/agents/AgentsTechniquesTab";
+import { AgentsCostPanel } from "@/components/agents/AgentsCostPanel";
 
 export default function AgentsPage() {
   return (
@@ -22,7 +23,7 @@ export default function AgentsPage() {
       </div>
 
       <Tabs defaultValue="config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7 max-w-5xl">
+        <TabsList className="grid w-full grid-cols-8 max-w-6xl">
           <TabsTrigger value="config">Configuração</TabsTrigger>
           <TabsTrigger value="brains">Cérebros</TabsTrigger>
           <TabsTrigger value="techniques">Técnicas</TabsTrigger>
@@ -30,6 +31,7 @@ export default function AgentsPage() {
           <TabsTrigger value="conversations">Conversas</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="hq">Agent HQ</TabsTrigger>
+          <TabsTrigger value="costs">Custos</TabsTrigger>
         </TabsList>
         <TabsContent value="config" className="animate-fade-in"><AgentsConfigTab /></TabsContent>
         <TabsContent value="brains" className="animate-fade-in"><AgentsVendorProfilesTab /></TabsContent>
@@ -38,6 +40,7 @@ export default function AgentsPage() {
         <TabsContent value="conversations" className="animate-fade-in"><AgentsConversationsTab /></TabsContent>
         <TabsContent value="compliance" className="animate-fade-in"><AgentsComplianceTab /></TabsContent>
         <TabsContent value="hq" className="animate-fade-in"><AgentHQ /></TabsContent>
+        <TabsContent value="costs" className="animate-fade-in"><AgentsCostPanel /></TabsContent>
       </Tabs>
     </div>
   );
