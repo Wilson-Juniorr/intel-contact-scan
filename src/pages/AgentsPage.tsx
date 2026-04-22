@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { AgentsConfigTab } from "@/components/agents/AgentsConfigTab";
 import { AgentsConversationsTab } from "@/components/agents/AgentsConversationsTab";
 import { AgentsComplianceTab } from "@/components/agents/AgentsComplianceTab";
-import { AgentsMetricsTab } from "@/components/agents/AgentsMetricsTab";
+import { AgentHQ } from "@/components/agents/AgentHQ";
 import { AgentsPlaygroundTab } from "@/components/agents/AgentsPlaygroundTab";
 import { AgentsVendorProfilesTab } from "@/components/agents/AgentsVendorProfilesTab";
 import { AgentsTechniquesTab } from "@/components/agents/AgentsTechniquesTab";
@@ -29,7 +29,7 @@ export default function AgentsPage() {
           <TabsTrigger value="playground">Playground</TabsTrigger>
           <TabsTrigger value="conversations">Conversas</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="metrics">Métricas</TabsTrigger>
+          <TabsTrigger value="hq">Agent HQ</TabsTrigger>
         </TabsList>
         <TabsContent value="config" className="animate-fade-in"><AgentsConfigTab /></TabsContent>
         <TabsContent value="brains" className="animate-fade-in"><AgentsVendorProfilesTab /></TabsContent>
@@ -37,7 +37,7 @@ export default function AgentsPage() {
         <TabsContent value="playground" className="animate-fade-in"><AgentsPlaygroundTab /></TabsContent>
         <TabsContent value="conversations" className="animate-fade-in"><AgentsConversationsTab /></TabsContent>
         <TabsContent value="compliance" className="animate-fade-in"><AgentsComplianceTab /></TabsContent>
-        <TabsContent value="metrics" className="animate-fade-in"><AgentsMetricsTab /></TabsContent>
+        <TabsContent value="hq" className="animate-fade-in"><AgentHQ /></TabsContent>
       </Tabs>
     </div>
   );
