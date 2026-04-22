@@ -1,4 +1,4 @@
-// Junior SDR v3 — Gemini fine-tuning (corretor em primeira pessoa)
+// Camila SDR v3 — Gemini fine-tuning
 // Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass +
 // split por `‖` + delays humanizados + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -29,6 +29,7 @@ interface ConversationState {
   tom_cliente: Tom;
   fonte: string | null;
   turn_number: number;
+  veio_por_audio: boolean;
 }
 
 function detectarTom(msg: string): Tom {
@@ -45,6 +46,7 @@ function buildState(
   lead: any,
   conv: any,
   user_message: string,
+  is_audio: boolean,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
   const coletado: Record<string, unknown> = {};
@@ -70,6 +72,7 @@ function buildState(
     tom_cliente: detectarTom(user_message),
     fonte: null,
     turn_number: turn,
+    veio_por_audio: is_audio,
   };
 }
 
@@ -169,16 +172,17 @@ function runDeterministicCritic(
     "garantid", "imperdível", "só hoje", "100%", "melhor plano",
     // Anti-robô / infantilização
     "mastigadinho", "mastigado pro", "mastigado pra", "bonitinho pro", "bonitinho pra",
-    // Junior fala em PRIMEIRA pessoa — proibido falar dele em terceira pessoa
-    // ou prometer que outra pessoa vai assumir.
-    "o junior vai", "o junior cota", "o junior conseg", "o junior vai te",
+    // Proibido falar do Junior ou prometer transferência — Camila atende sozinha
+    "pro junior", "pra junior", "o junior vai", "o junior cota", "o junior conseg",
     "chamo o junior", "chamar o junior", "passar pro junior", "passar pra junior",
-    "passar pro corretor", "passar pra corretora", "passar pro time",
     "te direciono", "vou direcionar", "vou encaminhar", "vou transferir",
     "ele vai te atender", "ele assume", "ele entra em contato",
-    "atendente do junior", "secretária do junior", "do time do junior",
     // Revela que é bot
-    "como assistente", "sou uma ia", "sou um bot", "sou robô", "sou a camila",
+    "como assistente", "sou uma ia", "sou um bot", "sou robô",
+    // Não revelar que recebeu áudio (responder fluido como humano)
+    "recebi seu áudio", "recebi seu audio", "ouvi seu áudio", "ouvi seu audio",
+    "entendi seu áudio", "entendi seu audio", "escutei seu áudio", "escutei seu audio",
+    "seu áudio chegou", "seu audio chegou", "transcrição", "transcricao",
   ];
   for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
 
@@ -205,7 +209,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { lead_id, whatsapp_number, user_message } = body;
+    const { lead_id, whatsapp_number, user_message, is_audio } = body;
     let conversation_id: string | null = body.conversation_id ?? null;
 
     if (!lead_id || !whatsapp_number || !user_message) {
@@ -250,7 +254,7 @@ Deno.serve(async (req) => {
       supabase.from("leads").select("*, lead_memory(*)").eq("id", lead_id).maybeSingle(),
     ]);
 
-    const state = buildState(lead, conv, user_message);
+    const state = buildState(lead, conv, user_message, is_audio === true);
     const fewShot = await selectFewShot(supabase, state);
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
@@ -263,6 +267,15 @@ Deno.serve(async (req) => {
       `PALAVRAS_ULTIMA_MSG: ${state.palavras_ultima_msg}\n` +
       `TOM_CLIENTE: ${state.tom_cliente}\n` +
       `TURN: ${state.turn_number}\n` +
+      (state.veio_por_audio
+        ? "\n🎤 ESTA MENSAGEM CHEGOU COMO ÁUDIO. O texto acima é a TRANSCRIÇÃO do áudio do cliente.\n" +
+          "REGRAS PARA RESPONDER ÁUDIO:\n" +
+          "- NÃO diga 'recebi seu áudio', 'ouvi seu áudio', 'entendi seu áudio'.\n" +
+          "- NÃO repita a transcrição literal nem cite que é uma transcrição.\n" +
+          "- Responda como se estivesse numa conversa fluida — exatamente como você responderia a um texto.\n" +
+          "- Se a transcrição estiver confusa/incompleta, peça pra repetir de forma natural ('não peguei tudo, me conta de novo?').\n" +
+          "- Mantenha o split em balões e o tom humano de sempre.\n"
+        : "") +
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +

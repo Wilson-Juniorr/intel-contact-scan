@@ -610,6 +610,7 @@ Deno.serve(async (req) => {
 
     // ═══ PROCESS MEDIA ═══
     const mediaTypes = ["audio", "ptt", "image", "document"];
+    let audioTranscription: string | null = null;
     if (mediaTypes.includes(messageType) && messageId) {
       await supabase.from("whatsapp_messages").update({ processing_status: "pending" }).eq("id", messageId);
       try {
@@ -621,6 +622,10 @@ Deno.serve(async (req) => {
         if (processResult.processed && processResult.extractedText) {
           const { data: updatedMsg } = await supabase.from("whatsapp_messages").select("content").eq("id", messageId).single();
           if (updatedMsg?.content) content = updatedMsg.content;
+          // Capture transcription so we can route audio messages to the SDR
+          if (messageType === "audio" || messageType === "ptt") {
+            audioTranscription = processResult.extractedText;
+          }
         }
       } catch (e) { console.error("Media processing error (non-blocking):", e); }
     }
@@ -692,14 +697,26 @@ Deno.serve(async (req) => {
     console.log(`${direction} message saved for phone:`, normalizedPhone, "lead:", leadId);
 
     // ═══ ROUTE TO AI AGENT (Camila SDR & friends) ═══
-    // Only inbound text messages of qualified leads not in manual mode go to the router.
+    // Inbound text OR audio (after transcription) messages of qualified leads
+    // not in manual mode go to the router.
+    const isAudio = messageType === "audio" || messageType === "ptt";
+    const routableText = isAudio
+      ? (audioTranscription && audioTranscription.trim().length > 0 && !audioTranscription.includes("[Áudio não compreendido]")
+          ? audioTranscription
+          : null)
+      : (messageType === "text" && content && content.trim().length > 0 ? content : null);
+
+    // Audio bypasses the relevance gate: a lead taking the time to record audio
+    // is signal enough. Text still requires the relevance threshold.
+    const passesRelevance = isAudio
+      ? true
+      : Number(msgClassification.business_relevance_score ?? 0) >= 0.31;
+
     if (
       !isFromMe &&
       leadId &&
-      messageType === "text" &&
-      content &&
-      content.trim().length > 0 &&
-      Number(msgClassification.business_relevance_score ?? 0) >= 0.31
+      routableText &&
+      passesRelevance
     ) {
       try {
         const { data: leadFlag } = await supabase
@@ -715,7 +732,8 @@ Deno.serve(async (req) => {
               body: {
                 lead_id: leadId,
                 whatsapp_number: normalizedPhone,
-                message_text: content,
+                message_text: routableText,
+                is_audio: isAudio,
               },
             }).catch((err: any) =>
               console.error("route-message dispatch failed:", err?.message ?? err)

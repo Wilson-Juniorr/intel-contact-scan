@@ -1,6 +1,6 @@
 // Routes inbound WhatsApp messages to the right agent. Currently a stub: only
-// the SDR qualifier (Junior, em primeira pessoa) is wired up. PROMPT-06 will
-// expand the routing matrix (follow-up, fechador, negociador, etc).
+// the SDR qualifier (Camila) is wired up. PROMPT-06 will expand the routing
+// matrix (follow-up, fechador, negociador, etc).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lead_id, whatsapp_number, message_text } = await req.json();
+    const { lead_id, whatsapp_number, message_text, is_audio } = await req.json();
     if (!lead_id || !whatsapp_number || !message_text) {
       return new Response(
         JSON.stringify({
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const relevantInbound = inboundMessages.find(
       (msg) => Number(msg.business_relevance_score ?? 0) >= MIN_RELEVANCE_SCORE,
     );
-    const looksLikeLead = hasLeadIntent(message_text);
+    const looksLikeLead = hasLeadIntent(message_text) || is_audio === true;
     const hasAnyPriorOutbound = (recentMessages ?? []).some((msg) => msg.direction === "outbound");
     const isFirstMeaningfulTouch = !hasAnyPriorOutbound && inboundMessages.length <= 1;
 
@@ -129,6 +129,7 @@ Deno.serve(async (req) => {
           lead_id,
           whatsapp_number: normalizedPhone,
           user_message: message_text,
+          is_audio: is_audio === true,
         },
       },
     );
@@ -180,9 +181,9 @@ Deno.serve(async (req) => {
       await supabase.from("notifications").insert({
         user_id: lead.user_id,
         type: "lead_qualificado",
-        title: "Junior SDR qualificou um lead",
+        title: "Camila qualificou um lead",
         body:
-          `O bot Junior fez a pré-qualificação. Lead avançou para "Contato realizado" — assuma a conversa pra fechar.`,
+          `O lead avançou para "Contato realizado". Assuma a conversa no WhatsApp para cotar.`,
         lead_id,
       });
     }

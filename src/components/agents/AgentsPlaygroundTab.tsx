@@ -18,8 +18,8 @@ type ChatMsg = {
 };
 
 /**
- * Playground interno do SDR Qualificador (Junior — você em primeira pessoa).
- * - Você digita como se fosse o cliente; o Junior responde com humanização real
+ * Playground interno do SDR Qualificador (Camila).
+ * - Você digita como se fosse o cliente; ela responde com humanização real
  *   (split em balões + delay) usando a edge function `sdr-qualificador`.
  * - Mantém histórico real da conversa em `agent_conversations`,
  *   então é idêntico ao que aconteceria no WhatsApp.
@@ -76,7 +76,7 @@ export function AgentsPlaygroundTab() {
     // Cria lead novo de teste
     const { data: created, error } = await supabase.from("leads").insert({
       user_id: user.id,
-      name: `Teste Junior SDR ${norm.slice(-4)}`,
+      name: `Teste Camila ${norm.slice(-4)}`,
       phone: norm,
       type: "PF",
       stage: "novo",
@@ -131,7 +131,7 @@ export function AgentsPlaygroundTab() {
       }
 
       if (data.qualificou) {
-        toast.success("Junior qualificou o lead 🎯", {
+        toast.success("Camila qualificou o lead 🎯", {
           description: "Stage avançaria pra contato_realizado em produção.",
         });
       }
@@ -154,7 +154,7 @@ export function AgentsPlaygroundTab() {
     setConversationId(null);
     setMessages([]);
     setInput("");
-    toast.success("Conversa resetada — Junior começa do zero");
+    toast.success("Conversa resetada — Camila começa do zero");
   };
 
   const resetLead = async () => {
@@ -181,7 +181,7 @@ export function AgentsPlaygroundTab() {
               <Phone className="h-4 w-4 text-primary" /> Configuração do teste
             </CardTitle>
             <CardDescription className="text-xs">
-              Simule um cliente conversando com o Junior SDR (você em 1ª pessoa). A conversa é real (fica salva em <code className="text-[10px]">agent_conversations</code>), mas nada é enviado pro WhatsApp.
+              Simule um cliente conversando com a Camila. A conversa é real (fica salva em <code className="text-[10px]">agent_conversations</code>), mas nada é enviado pro WhatsApp.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -233,7 +233,7 @@ export function AgentsPlaygroundTab() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                Junior — SDR (você mesmo)
+                Camila — SDR Qualificador
                 <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
                   Playground
                 </Badge>
