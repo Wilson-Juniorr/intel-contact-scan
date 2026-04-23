@@ -76,6 +76,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Second gate: contact category blocks SDR even if upstream missed it.
+    const { data: categoryContact } = await supabase
+      .from("whatsapp_contacts")
+      .select("category")
+      .eq("user_id", lead.user_id)
+      .eq("phone", whatsapp_number)
+      .maybeSingle();
+    const blockingCategories = ["personal", "team", "partner", "vendor", "spam"];
+    if (categoryContact?.category && blockingCategories.includes(categoryContact.category)) {
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "contact_category_blocks", categoria: categoryContact.category }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const stage = lead.stage ?? "novo";
     if (!SDR_STAGES.includes(stage)) {
       return new Response(
