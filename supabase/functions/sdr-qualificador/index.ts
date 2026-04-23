@@ -421,9 +421,45 @@ Deno.serve(async (req) => {
       } else {
         criterios_falhados = fails;
         if (attempt >= 2) {
-          // Aceita mesmo com falhas em vez de cair em fallback
-          propostaFinal = texto || "Pode me dar um segundinho?";
-          metadata = meta;
+          // 2 tentativas falharam — NÃO enviar fallback ruim. Silencia + notifica corretor.
+          console.error(`SDR falhou 2× — critérios:`, fails);
+
+          if (lead_id) {
+            const { data: leadInfo } = await supabase
+              .from("leads").select("user_id, name, phone").eq("id", lead_id).maybeSingle();
+            if (leadInfo?.user_id) {
+              await supabase.from("notifications").insert({
+                user_id: leadInfo.user_id,
+                type: "ai_generation_failed",
+                title: "SDR travou — responda você",
+                body: `Não consegui formular uma resposta decente pra ${leadInfo.name || leadInfo.phone}.\n\nCliente disse: "${user_message.slice(0, 120)}"\n\nAssume a conversa e responde direto.`,
+                lead_id,
+              });
+            }
+          }
+
+          if (conversation_id) {
+            await supabase.from("agent_conversations").update({
+              status: "pausada",
+              ultima_atividade: new Date().toISOString(),
+            }).eq("id", conversation_id);
+
+            await supabase.from("agent_critic_log").insert({
+              conversation_id,
+              resposta_proposta: texto || "[vazio]",
+              criterios_falhados: fails,
+              regenerou: true,
+              resposta_final: "[SILENCED — notificado corretor]",
+            });
+          }
+
+          return new Response(
+            JSON.stringify({
+              ok: true, silenced: true, reason: "critic_failed_twice",
+              conversation_id, mensagens: [], delays_ms: [], qualificou: false,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
         } else {
           messages.push({
             role: "user",
@@ -433,7 +469,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!propostaFinal) propostaFinal = "Oi! Dá um segundinho que já te respondo certinho 😅";
+    if (!propostaFinal) propostaFinal = "Pode me dar um segundinho?";
 
     // Logs
     await supabase.from("agent_critic_log").insert({
