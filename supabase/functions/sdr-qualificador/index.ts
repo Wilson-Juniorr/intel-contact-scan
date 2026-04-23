@@ -3,6 +3,7 @@
 // com anti-monotonia forte + split por `‖` + delays humanizados baseados em
 // comprimento/complexidade + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { renderPersonaInPrompt } from "./persona.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
