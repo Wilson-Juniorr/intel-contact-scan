@@ -156,12 +156,25 @@ Deno.serve(async (req) => {
         })
         .eq("id", lead_id);
 
+      // Monta resumo estruturado (Onda 3)
+      const metaObj = sdrResp.metadata || {};
+      const coletado = metaObj.coletado || {};
+      const resumoLinhas = [
+        coletado.tipo && `• ${coletado.tipo}${coletado.vidas ? ` • ${coletado.vidas} vidas` : ""}`,
+        coletado.plano_atual?.operadora && `• Hoje: ${coletado.plano_atual.operadora}`,
+        coletado.orcamento && `• Orçamento: ${coletado.orcamento}`,
+        coletado.urgencia && `• Urgência: ${coletado.urgencia}`,
+        coletado.regiao && `• Região: ${coletado.regiao}`,
+      ].filter(Boolean).join("\n");
+
+      const leadName = (await supabase.from("leads").select("name,phone").eq("id", lead_id).maybeSingle()).data;
+      const displayName = leadName?.name || leadName?.phone || "lead";
+
       await supabase.from("notifications").insert({
         user_id: lead.user_id,
         type: "lead_qualificado",
-        title: "Camila qualificou um lead",
-        body:
-          `O lead avançou para "Contato realizado". Assuma a conversa no WhatsApp para cotar.`,
+        title: `🎯 SDR qualificou ${displayName}`,
+        body: resumoLinhas || `O lead avançou para "contato_realizado". Assuma a conversa no WhatsApp.`,
         lead_id,
       });
     }
