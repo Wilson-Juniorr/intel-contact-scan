@@ -15,6 +15,61 @@ const AGENT_SLUG = "sdr-qualificador";
 const SPLIT_CHAR = "‖";
 const CRITIC_MODEL = "google/gemini-2.5-flash-lite";
 
+// ═══ Detecção de "lead NOVO vindo de anúncio / interesse explícito em cotação" ═══
+// Frases típicas que pessoas mandam quando clicam num anúncio de plano de saúde
+// no Instagram/Facebook/Google ou são abordadas por uma landing page.
+// Match é case-insensitive, sem acentos, e olha trechos (não exige frase exata).
+const ANUNCIO_PATTERNS: RegExp[] = [
+  // Pedido direto de simulação/cotação/orçamento
+  /\bsimula(c|ç)ao\b/i,
+  /\bsimular\b/i,
+  /\bcota(c|ç)ao\b/i,
+  /\bcotar\b/i,
+  /\borca(m|n)ento\b/i,
+  /\bor(c|ç)ar\b/i,
+  /\bvalor(es)?\b.*\bplano/i,
+  /\bpre(c|ç)o\b.*\bplano/i,
+  /\bquanto custa\b/i,
+  /\bquanto fica\b/i,
+  /\bquanto sai\b/i,
+  // Interesse direto em plano/convênio/seguro
+  /\bquero (um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\bprecis(o|amos|ando) (de )?(um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\bgostaria de (saber|contratar|ter) (um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\binteresse (em|no|num) (plano|conv(e|ê)nio|seguro)/i,
+  /\bme interess(ei|a) (pelo|por um|pelo plano|pelo seguro|pelo conv(e|ê)nio)/i,
+  // Vindo de anúncio explicitamente
+  /\bvi (o |um |seu )?an(u|ú)ncio\b/i,
+  /\bdo an(u|ú)ncio\b/i,
+  /\bvi no (insta|instagram|facebook|face|google|tiktok|youtube)/i,
+  /\bachei (no |pelo )?(google|insta|instagram|facebook)/i,
+  /\bcliquei (no |num )?an(u|ú)ncio\b/i,
+  // Saúde/empresa específicos
+  /\bplano (de )?sa(u|ú)de\b/i,
+  /\bplano empresarial\b/i,
+  /\bplano pme\b/i,
+  /\bplano (pra|para) (mim|minha (familia|família|empresa)|meus (filhos|pais))/i,
+  // Pedido pra ser contatado / falar com corretor
+  /\bme manda (os )?valor/i,
+  /\bme passa (os )?valor/i,
+  /\bquero contratar\b/i,
+  /\bcomo fa(c|ç)o (pra|para) (contratar|adquirir|fechar)/i,
+];
+
+function isAnuncioMessage(msg: string): { match: boolean; pattern?: string } {
+  if (!msg || typeof msg !== "string") return { match: false };
+  const norm = msg
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  for (const re of ANUNCIO_PATTERNS) {
+    if (re.test(msg) || re.test(norm)) {
+      return { match: true, pattern: re.source };
+    }
+  }
+  return { match: false };
+}
+
 type Tom =
   | "cooperativo"
   | "resistente"
