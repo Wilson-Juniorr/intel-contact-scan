@@ -26,6 +26,7 @@ import { LeadConversationTab } from "@/components/leads/LeadConversationTab";
 import { LeadMemoryCard } from "@/components/leads/LeadMemoryCard";
 import { PlaybookTab } from "@/components/leads/PlaybookTab";
 import { MemberSection } from "@/components/leads/MemberSection";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   MessageCircle,
   Phone,
@@ -56,6 +57,7 @@ import {
   PhoneCall,
   BookOpen,
   Target,
+  RotateCcw,
 } from "lucide-react";
 import { FollowUpPanel } from "@/components/followup/FollowUpPanel";
 import { ClosingTimeline } from "@/components/closing/ClosingTimeline";
@@ -1411,6 +1413,8 @@ function SidebarLeadContent({
 export function LeadDetailSheet({ lead, onClose }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const { isAdmin } = useIsAdmin();
 
   if (!lead) return null;
 
@@ -1420,6 +1424,29 @@ export function LeadDetailSheet({ lead, onClose }: Props) {
     setIsFullscreen(false);
     setIsEditing(false);
     onClose();
+  };
+
+  const handleResetTestLead = async () => {
+    if (!lead) return;
+    const confirmed = window.confirm(
+      `⚠️ RESET TOTAL do número ${lead.phone}\n\nIsso apaga DEFINITIVAMENTE:\n• Lead e toda sua memória\n• Todas as mensagens WhatsApp\n• Todas as conversas com agentes IA\n• Logs, tarefas, follow-ups, lembretes\n\nUse só pra testar a SDR. Continuar?`
+    );
+    if (!confirmed) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-test-lead", {
+        body: { phone: lead.phone },
+      });
+      if (error) throw error;
+      toast.success("Lead resetado com sucesso", {
+        description: `Apagados: ${JSON.stringify(data?.summary ?? {})}`,
+      });
+      handleClose();
+    } catch (e: any) {
+      toast.error("Falha ao resetar", { description: e.message });
+    } finally {
+      setResetting(false);
+    }
   };
 
   const header = (
@@ -1446,6 +1473,25 @@ export function LeadDetailSheet({ lead, onClose }: Props) {
         </div>
       </div>
       <div className="flex items-center gap-1">
+        {isAdmin && !isEditing && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleResetTestLead();
+            }}
+            disabled={resetting}
+            title="Reset total do lead (admin/teste)"
+          >
+            {resetting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4" />
+            )}
+          </Button>
+        )}
         {!isEditing && (
           <Button
             variant="ghost"
