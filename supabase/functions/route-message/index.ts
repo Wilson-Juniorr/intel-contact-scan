@@ -1,6 +1,5 @@
-// Routes inbound WhatsApp messages to the right agent. Currently a stub: only
-// the SDR qualifier (Camila) is wired up. PROMPT-06 will expand the routing
-// matrix (follow-up, fechador, negociador, etc).
+// Routes inbound WhatsApp messages to the right agent. Today only the SDR
+// pre-qualifier is wired up. Future expansions: follow-up, closer, negotiator.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -10,20 +9,6 @@ const corsHeaders = {
 };
 
 const SDR_STAGES = ["novo", "tentativa_contato", "contato_realizado"];
-const MIN_RELEVANCE_SCORE = 0.31;
-
-function hasLeadIntent(text: string): boolean {
-  const normalized = text.toLowerCase();
-  return [
-    /cot[açc][aã]o/,
-    /plano de sa[uú]de/,
-    /or[cç]amento/,
-    /mensalidade/,
-    /operadora/,
-    /quero.*(plano|cot)/,
-    /pode me ajudar/,
-  ].some((pattern) => pattern.test(normalized));
-}
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
