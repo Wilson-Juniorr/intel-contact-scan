@@ -1,6 +1,7 @@
-// Camila SDR v3 — Gemini fine-tuning
-// Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass +
-// split por `‖` + delays humanizados + METADATA paralelo.
+// SDR Pré-Qualificador v5 — Onda Final
+// Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass
+// com anti-monotonia forte + split por `‖` + delays humanizados baseados em
+// comprimento/complexidade + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -191,10 +192,24 @@ async function callGemini(
   };
 }
 
-function calcularDelay(balao: string): number {
-  const base = Math.min(Math.max(balao.length * 25, 1500), 7000);
-  const jitter = (Math.random() * 0.4 - 0.2) * base;
-  return Math.round(base + jitter);
+// Calcula delay humanizado por balão + "thinking time" no primeiro
+// Fórmula inspirada em humano digitando no celular:
+//   - thinking (ler mensagem + pensar) = 1.8-3.5s só no 1º balão
+//   - typing = 90-140ms por caractere (humano médio celular)
+//   - send pause (tocar enviar) = 200-600ms
+//   - jitter natural = ±25%
+//   - hard min 2500ms, hard max 15000ms
+function calcularDelay(balao: string, isPrimeiroBalao: boolean, complexidadeMsg: number): number {
+  const thinking = isPrimeiroBalao
+    ? 1800 + Math.min(complexidadeMsg * 80, 1700) + Math.random() * 600
+    : 500 + Math.random() * 800;
+  const perChar = 90 + Math.random() * 50;
+  const typing = balao.length * perChar;
+  const sendPause = 200 + Math.random() * 400;
+  const raw = thinking + typing + sendPause;
+  const jitter = (Math.random() * 0.5 - 0.25) * raw;
+  const total = raw + jitter;
+  return Math.round(Math.min(Math.max(total, 2500), 15000));
 }
 
 function runDeterministicCritic(
@@ -221,11 +236,25 @@ function runDeterministicCritic(
   if (palavrasTotal <= 18 && baloes.length >= 3) {
     fails.push("fragmentacao_excessiva_para_resposta_curta");
   }
-  // Anti-monotonia: se os 2 últimos turnos do agente já tiveram 3 balões, não repetir 3
-  if (ultimosBaloes.length >= 2 &&
-      ultimosBaloes.slice(-2).every((n) => n === 3) &&
-      baloes.length === 3) {
-    fails.push("padrao_3_baloes_repetido_em_3_turnos");
+  // Anti-monotonia FORTE: obriga variação turn-a-turn
+  if (ultimosBaloes.length >= 1) {
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 3 && baloes.length === 3) {
+      fails.push("padrao_3_baloes_repetido");
+    }
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 4 && baloes.length === 4) {
+      fails.push("padrao_4_baloes_repetido");
+    }
+    if (ultimosBaloes.length >= 2 &&
+        ultimosBaloes[ultimosBaloes.length - 1] === ultimosBaloes[ultimosBaloes.length - 2] &&
+        baloes.length === ultimosBaloes[ultimosBaloes.length - 1]) {
+      fails.push(`padrao_${baloes.length}_baloes_repetido_3_vezes`);
+    }
+  }
+  if (state.palavras_ultima_msg <= 8 && baloes.length > 2) {
+    fails.push("excesso_baloes_para_msg_curta_do_cliente");
+  }
+  if (state.tom_cliente === "emocional" && baloes.length > 2) {
+    fails.push("excesso_baloes_em_contexto_emocional");
   }
 
   for (const b of baloes) {
@@ -235,22 +264,21 @@ function runDeterministicCritic(
 
   const lower = texto.toLowerCase();
   const blocklist = [
+    // Robotismo / corporativês
     "em que posso ajudá", "estou à disposição", "prezado", "caro cliente",
     "obrigado por entrar em contato", "nosso atendimento", "maravilhoso!",
+    // Compliance ANS
     "garantid", "imperdível", "só hoje", "100%", "melhor plano",
-    // Anti-robô / infantilização
+    // Anti-infantilização
     "mastigadinho", "mastigado pro", "mastigado pra", "bonitinho pro", "bonitinho pra",
-    // Proibido falar do Junior ou prometer transferência — Camila atende sozinha
-    "pro junior", "pra junior", "o junior vai", "o junior cota", "o junior conseg",
-    "chamo o junior", "chamar o junior", "passar pro junior", "passar pra junior",
-    "te direciono", "vou direcionar", "vou encaminhar", "vou transferir",
-    "ele vai te atender", "ele assume", "ele entra em contato",
-    // Revela que é bot
-    "como assistente", "sou uma ia", "sou um bot", "sou robô",
-    // Não revelar que recebeu áudio (responder fluido como humano)
+    // Revelar que é bot
+    "como assistente", "sou uma ia", "sou um bot", "sou robô", "sou uma inteligência",
+    // Áudio — nunca mencionar transcrição
     "recebi seu áudio", "recebi seu audio", "ouvi seu áudio", "ouvi seu audio",
     "entendi seu áudio", "entendi seu audio", "escutei seu áudio", "escutei seu audio",
     "seu áudio chegou", "seu audio chegou", "transcrição", "transcricao",
+    // Frases que quebram o papel de SDR
+    "sou o corretor", "eu mesmo cotando", "eu faço a cotação", "te mando a proposta",
   ];
   for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
 
@@ -393,9 +421,45 @@ Deno.serve(async (req) => {
       } else {
         criterios_falhados = fails;
         if (attempt >= 2) {
-          // Aceita mesmo com falhas em vez de cair em fallback
-          propostaFinal = texto || "Pode me dar um segundinho?";
-          metadata = meta;
+          // 2 tentativas falharam — NÃO enviar fallback ruim. Silencia + notifica corretor.
+          console.error(`SDR falhou 2× — critérios:`, fails);
+
+          if (lead_id) {
+            const { data: leadInfo } = await supabase
+              .from("leads").select("user_id, name, phone").eq("id", lead_id).maybeSingle();
+            if (leadInfo?.user_id) {
+              await supabase.from("notifications").insert({
+                user_id: leadInfo.user_id,
+                type: "ai_generation_failed",
+                title: "SDR travou — responda você",
+                body: `Não consegui formular uma resposta decente pra ${leadInfo.name || leadInfo.phone}.\n\nCliente disse: "${user_message.slice(0, 120)}"\n\nAssume a conversa e responde direto.`,
+                lead_id,
+              });
+            }
+          }
+
+          if (conversation_id) {
+            await supabase.from("agent_conversations").update({
+              status: "pausada",
+              ultima_atividade: new Date().toISOString(),
+            }).eq("id", conversation_id);
+
+            await supabase.from("agent_critic_log").insert({
+              conversation_id,
+              resposta_proposta: texto || "[vazio]",
+              criterios_falhados: fails,
+              regenerou: true,
+              resposta_final: "[SILENCED — notificado corretor]",
+            });
+          }
+
+          return new Response(
+            JSON.stringify({
+              ok: true, silenced: true, reason: "critic_failed_twice",
+              conversation_id, mensagens: [], delays_ms: [], qualificou: false,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
         } else {
           messages.push({
             role: "user",
@@ -405,7 +469,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!propostaFinal) propostaFinal = "Oi! Dá um segundinho que já te respondo certinho 😅";
+    if (!propostaFinal) propostaFinal = "Pode me dar um segundinho?";
 
     // Logs
     await supabase.from("agent_critic_log").insert({
@@ -418,7 +482,8 @@ Deno.serve(async (req) => {
 
     // Split em balões
     const baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
-    const delays = baloes.map((b) => calcularDelay(b));
+    const palavrasClienteUlt = state.palavras_ultima_msg ?? 5;
+    const delays = baloes.map((b, i) => calcularDelay(b, i === 0, palavrasClienteUlt));
 
     await supabase.from("agent_split_log").insert({
       conversation_id,
