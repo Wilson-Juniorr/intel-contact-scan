@@ -434,6 +434,22 @@ Deno.serve(async (req) => {
     const systemWithContext = personaPrompt +
       brainsBlock +
       techniquesBlock +
+      "\n\n═══ CONTEXTO DO CLIENTE (memória do CRM — USE ATIVAMENTE) ═══\n" +
+      `ESTÁGIO_FUNIL: ${state.contexto_cliente.estagio ?? "novo"}\n` +
+      `OPERADORA_ATUAL: ${state.contexto_cliente.operadora_atual ?? "nenhuma cadastrada"}\n` +
+      `COTAÇÃO_JÁ_ENVIADA: ${state.contexto_cliente.cotacao_enviada ? "SIM" : "não"}\n` +
+      `DIAS_DESDE_ÚLTIMA_ATIVIDADE: ${state.contexto_cliente.ultima_atividade_dias ?? "n/a"}\n` +
+      (state.contexto_cliente.memoria_resumo
+        ? `\n📋 RESUMO DO HISTÓRICO COM ESTE CLIENTE:\n${state.contexto_cliente.memoria_resumo}\n`
+        : "") +
+      (Object.keys(state.contexto_cliente.historico_estruturado).length
+        ? `\n📊 DADOS ESTRUTURADOS DA MEMÓRIA: ${JSON.stringify(state.contexto_cliente.historico_estruturado)}\n`
+        : "") +
+      "\n⚠️ INSTRUÇÃO CRÍTICA SOBRE O CONTEXTO:\n" +
+      "- Se houver RESUMO DO HISTÓRICO acima, esse cliente JÁ CONVERSOU com a gente. NÃO trate como lead novo.\n" +
+      "- NÃO faça perguntas de qualificação cujas respostas já estão no histórico.\n" +
+      "- Conecte explicitamente sua mensagem ao que ele já disse antes (ex: 'da última vez você falou em X, ainda faz sentido?').\n" +
+      "- Se o histórico mostra que ele é cliente ativo (boleto, app, carteirinha, 2ª via), passe pro corretor humano IMEDIATAMENTE.\n" +
       "\n\n═══ ESTADO ATUAL DA CONVERSA ═══\n" +
       `COLETADO: ${JSON.stringify(state.coletado)}\n` +
       `FALTA: ${JSON.stringify(state.falta)}\n` +
@@ -453,6 +469,12 @@ Deno.serve(async (req) => {
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +
+      "\n\n═══ META-RACIOCÍNIO OBRIGATÓRIO ═══\n" +
+      "Antes de responder, escolha CONSCIENTEMENTE:\n" +
+      "1. UM cérebro principal (da lista acima) que vai liderar este turno\n" +
+      "2. UMA técnica concreta (da lista acima) que você vai aplicar\n" +
+      "3. Como o CONTEXTO DO CLIENTE acima muda sua abordagem\n" +
+      "Reporte essas 3 escolhas no METADATA (campos: cerebro_principal, tecnica_aplicada, ajuste_por_contexto).\n" +
       `\n${fewShot}\n`;
 
     const messages = [...historico, { role: "user", content: user_message }];
