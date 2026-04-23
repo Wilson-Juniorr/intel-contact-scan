@@ -482,7 +482,8 @@ Deno.serve(async (req) => {
 
     // Split em balões
     const baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
-    const delays = baloes.map((b) => calcularDelay(b));
+    const palavrasClienteUlt = state.palavras_ultima_msg ?? 5;
+    const delays = baloes.map((b, i) => calcularDelay(b, i === 0, palavrasClienteUlt));
 
     await supabase.from("agent_split_log").insert({
       conversation_id,
