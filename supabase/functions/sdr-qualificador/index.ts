@@ -264,22 +264,21 @@ function runDeterministicCritic(
 
   const lower = texto.toLowerCase();
   const blocklist = [
+    // Robotismo / corporativês
     "em que posso ajudá", "estou à disposição", "prezado", "caro cliente",
     "obrigado por entrar em contato", "nosso atendimento", "maravilhoso!",
+    // Compliance ANS
     "garantid", "imperdível", "só hoje", "100%", "melhor plano",
-    // Anti-robô / infantilização
+    // Anti-infantilização
     "mastigadinho", "mastigado pro", "mastigado pra", "bonitinho pro", "bonitinho pra",
-    // Proibido falar do Junior ou prometer transferência — Camila atende sozinha
-    "pro junior", "pra junior", "o junior vai", "o junior cota", "o junior conseg",
-    "chamo o junior", "chamar o junior", "passar pro junior", "passar pra junior",
-    "te direciono", "vou direcionar", "vou encaminhar", "vou transferir",
-    "ele vai te atender", "ele assume", "ele entra em contato",
-    // Revela que é bot
-    "como assistente", "sou uma ia", "sou um bot", "sou robô",
-    // Não revelar que recebeu áudio (responder fluido como humano)
+    // Revelar que é bot
+    "como assistente", "sou uma ia", "sou um bot", "sou robô", "sou uma inteligência",
+    // Áudio — nunca mencionar transcrição
     "recebi seu áudio", "recebi seu audio", "ouvi seu áudio", "ouvi seu audio",
     "entendi seu áudio", "entendi seu audio", "escutei seu áudio", "escutei seu audio",
     "seu áudio chegou", "seu audio chegou", "transcrição", "transcricao",
+    // Frases que quebram o papel de SDR
+    "sou o corretor", "eu mesmo cotando", "eu faço a cotação", "te mando a proposta",
   ];
   for (const p of blocklist) if (lower.includes(p)) fails.push(`blocklist:${p}`);
 
