@@ -13,6 +13,7 @@ import { Save, Download, Eye, EyeOff } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useLeadsContext } from "@/contexts/LeadsContext";
 import { TeamTab } from "@/components/settings/TeamTab";
+import { ComplianceCard } from "@/components/settings/ComplianceCard";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -33,7 +34,12 @@ export default function SettingsPage() {
         </TabsList>
         <TabsContent value="profile"><ProfileTab /></TabsContent>
         <TabsContent value="whatsapp"><WhatsAppTab /></TabsContent>
-        <TabsContent value="ai"><AITab /></TabsContent>
+        <TabsContent value="ai">
+          <div className="space-y-6">
+            <ComplianceCard />
+            <AITab />
+          </div>
+        </TabsContent>
         <TabsContent value="data"><DataTab /></TabsContent>
         <TabsContent value="team"><TeamTab /></TabsContent>
       </Tabs>
