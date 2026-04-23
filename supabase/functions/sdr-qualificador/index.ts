@@ -374,6 +374,52 @@ Deno.serve(async (req) => {
     ]);
 
     const state = buildState(lead, conv, user_message, is_audio === true);
+
+    // ═══ GUARDS: situações onde o SDR NÃO deve responder ═══
+    // Cliente já em fase avançada do funil ou já assumido pelo corretor
+    const ESTAGIOS_AVANCADOS = [
+      "negociacao", "fechamento", "ganho", "implantacao",
+      "cliente_ativo", "cotacao_enviada", "proposta_enviada",
+    ];
+    const motivoSilenciar: string | null =
+      state.contexto_cliente.assumido_corretor
+        ? "lead_assumido_pelo_corretor"
+        : state.contexto_cliente.ja_e_cliente
+        ? "cliente_existente_detectado_na_memoria"
+        : (state.contexto_cliente.estagio && ESTAGIOS_AVANCADOS.includes(state.contexto_cliente.estagio))
+        ? `estagio_avancado:${state.contexto_cliente.estagio}`
+        : null;
+
+    if (motivoSilenciar) {
+      console.log(`SDR silenciado para lead ${lead_id}: ${motivoSilenciar}`);
+      // Pausa conversa e notifica corretor
+      if (lead?.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: lead.user_id,
+          type: "sdr_silenced_existing_client",
+          title: motivoSilenciar === "cliente_existente_detectado_na_memoria"
+            ? "SDR pausou — cliente existente"
+            : motivoSilenciar.startsWith("estagio")
+            ? "SDR pausou — lead em estágio avançado"
+            : "SDR pausou — lead já está com você",
+          body: `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`,
+          lead_id,
+        });
+      }
+      if (conversation_id) {
+        await supabase.from("agent_conversations").update({
+          status: "pausada",
+          ultima_atividade: new Date().toISOString(),
+          conversation_state: state as any,
+          mensagens: [...((conv?.mensagens ?? []) as any[]), { role: "user", content: user_message }],
+        }).eq("id", conversation_id);
+      }
+      return new Response(
+        JSON.stringify({ ok: false, silenced: true, reason: motivoSilenciar }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const [fewShot, brainsBlock, techniquesBlock] = await Promise.all([
       selectFewShot(supabase, state),
       buildBrainsBlock(supabase),
