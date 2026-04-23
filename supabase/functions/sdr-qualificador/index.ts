@@ -32,6 +32,16 @@ interface ConversationState {
   fonte: string | null;
   turn_number: number;
   veio_por_audio: boolean;
+  contexto_cliente: {
+    estagio: string | null;
+    ja_e_cliente: boolean;
+    assumido_corretor: boolean;
+    operadora_atual: string | null;
+    cotacao_enviada: boolean;
+    memoria_resumo: string | null;
+    historico_estruturado: Record<string, unknown>;
+    ultima_atividade_dias: number | null;
+  };
 }
 
 function detectarTom(msg: string): Tom {
@@ -51,6 +61,7 @@ function buildState(
   is_audio: boolean,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
+  const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
   const coletado: Record<string, unknown> = {};
   if (lead?.name && !/^\+?\d+$/.test(lead.name)) coletado.nome = lead.name;
   if (lead?.type) coletado.tipo = lead.type;
@@ -66,6 +77,18 @@ function buildState(
   const palavras = user_message.trim().split(/\s+/).filter(Boolean).length;
   const turn = ((conv?.mensagens ?? []) as any[]).filter((m) => m.role === "assistant").length + 1;
 
+  // Detecta se já é cliente: tem operadora cadastrada OU summary menciona "já é cliente"/"cliente nosso"/"convênio ativo"
+  const summaryLower = (memSummary ?? "").toLowerCase();
+  const ja_e_cliente = Boolean(
+    lead?.operator ||
+    /j[aá] (é|e) cliente|cliente nosso|conv[êe]nio ativo|tem plano (ativo|conosco)|aplicativo do conv[êe]nio|2[ªa] via|segunda via|boleto do conv[êe]nio|carteirinha/.test(summaryLower)
+  );
+
+  const ultimaAt = lead?.updated_at || lead?.last_contact_at;
+  const ultimaAtividadeDias = ultimaAt
+    ? Math.floor((Date.now() - new Date(ultimaAt).getTime()) / 86400000)
+    : null;
+
   return {
     coletado,
     falta,
@@ -75,6 +98,16 @@ function buildState(
     fonte: null,
     turn_number: turn,
     veio_por_audio: is_audio,
+    contexto_cliente: {
+      estagio: lead?.stage ?? null,
+      ja_e_cliente,
+      assumido_corretor: Boolean(lead?.assumed_at) || lead?.in_manual_conversation === true,
+      operadora_atual: lead?.operator ?? null,
+      cotacao_enviada: Boolean(lead?.last_quote_sent_at) || lead?.stage === "cotacao_enviada",
+      memoria_resumo: memSummary,
+      historico_estruturado: mem,
+      ultima_atividade_dias: ultimaAtividadeDias,
+    },
   };
 }
 
