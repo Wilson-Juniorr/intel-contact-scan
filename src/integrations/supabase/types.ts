@@ -401,6 +401,44 @@ export type Database = {
           },
         ]
       }
+      agent_persona_config: {
+        Row: {
+          agent_slug: string
+          cidade: string | null
+          nome_assistente: string | null
+          nome_corretor: string | null
+          nome_empresa: string | null
+          segmento: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_slug: string
+          cidade?: string | null
+          nome_assistente?: string | null
+          nome_corretor?: string | null
+          nome_empresa?: string | null
+          segmento?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_slug?: string
+          cidade?: string | null
+          nome_assistente?: string | null
+          nome_corretor?: string | null
+          nome_empresa?: string | null
+          segmento?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_persona_config_agent_slug_fkey"
+            columns: ["agent_slug"]
+            isOneToOne: true
+            referencedRelation: "agents_config"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       agent_split_log: {
         Row: {
           conversation_id: string | null
