@@ -1,6 +1,7 @@
-// Camila SDR v3 — Gemini fine-tuning
-// Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass +
-// split por `‖` + delays humanizados + METADATA paralelo.
+// SDR Pré-Qualificador v5 — Onda Final
+// Pipeline: estado da conversa + few-shot dinâmico + LLM Gemini + critic pass
+// com anti-monotonia forte + split por `‖` + delays humanizados baseados em
+// comprimento/complexidade + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
