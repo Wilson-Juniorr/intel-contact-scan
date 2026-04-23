@@ -229,30 +229,19 @@ function runDeterministicCritic(
 
   // Limites duros de quantidade
   if (baloes.length > 4) fails.push("baloes_acima_do_maximo_4");
-  // Cliente respondeu curto → resposta deve ser curta (1-2 balões no máximo)
-  if (state.palavras_ultima_msg <= 5 && baloes.length > 2) {
+  // Cliente respondeu MUITO curto (1-3 palavras) → resposta de 3+ balões é exagero
+  if (state.palavras_ultima_msg <= 3 && baloes.length > 2) {
     fails.push("excesso_baloes_para_msg_curta_do_cliente");
   }
   // Resposta curta total não pode ser fragmentada em 3+
   if (palavrasTotal <= 18 && baloes.length >= 3) {
     fails.push("fragmentacao_excessiva_para_resposta_curta");
   }
-  // Anti-monotonia FORTE: obriga variação turn-a-turn
-  if (ultimosBaloes.length >= 1) {
-    if (ultimosBaloes[ultimosBaloes.length - 1] === 3 && baloes.length === 3) {
-      fails.push("padrao_3_baloes_repetido");
-    }
-    if (ultimosBaloes[ultimosBaloes.length - 1] === 4 && baloes.length === 4) {
-      fails.push("padrao_4_baloes_repetido");
-    }
-    if (ultimosBaloes.length >= 2 &&
-        ultimosBaloes[ultimosBaloes.length - 1] === ultimosBaloes[ultimosBaloes.length - 2] &&
-        baloes.length === ultimosBaloes[ultimosBaloes.length - 1]) {
-      fails.push(`padrao_${baloes.length}_baloes_repetido_3_vezes`);
-    }
-  }
-  if (state.palavras_ultima_msg <= 8 && baloes.length > 2) {
-    fails.push("excesso_baloes_para_msg_curta_do_cliente");
+  // Anti-monotonia: bloqueia só 4 turnos seguidos com mesma quantidade
+  // (suavizado — exigir variação turn-a-turn estrangulava o agent)
+  if (ultimosBaloes.length >= 3 &&
+      ultimosBaloes.slice(-3).every((n) => n === baloes.length)) {
+    fails.push(`padrao_${baloes.length}_baloes_repetido_4_vezes`);
   }
   if (state.tom_cliente === "emocional" && baloes.length > 2) {
     fails.push("excesso_baloes_em_contexto_emocional");
