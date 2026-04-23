@@ -236,11 +236,25 @@ function runDeterministicCritic(
   if (palavrasTotal <= 18 && baloes.length >= 3) {
     fails.push("fragmentacao_excessiva_para_resposta_curta");
   }
-  // Anti-monotonia: se os 2 últimos turnos do agente já tiveram 3 balões, não repetir 3
-  if (ultimosBaloes.length >= 2 &&
-      ultimosBaloes.slice(-2).every((n) => n === 3) &&
-      baloes.length === 3) {
-    fails.push("padrao_3_baloes_repetido_em_3_turnos");
+  // Anti-monotonia FORTE: obriga variação turn-a-turn
+  if (ultimosBaloes.length >= 1) {
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 3 && baloes.length === 3) {
+      fails.push("padrao_3_baloes_repetido");
+    }
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 4 && baloes.length === 4) {
+      fails.push("padrao_4_baloes_repetido");
+    }
+    if (ultimosBaloes.length >= 2 &&
+        ultimosBaloes[ultimosBaloes.length - 1] === ultimosBaloes[ultimosBaloes.length - 2] &&
+        baloes.length === ultimosBaloes[ultimosBaloes.length - 1]) {
+      fails.push(`padrao_${baloes.length}_baloes_repetido_3_vezes`);
+    }
+  }
+  if (state.palavras_ultima_msg <= 8 && baloes.length > 2) {
+    fails.push("excesso_baloes_para_msg_curta_do_cliente");
+  }
+  if (state.tom_cliente === "emocional" && baloes.length > 2) {
+    fails.push("excesso_baloes_em_contexto_emocional");
   }
 
   for (const b of baloes) {
