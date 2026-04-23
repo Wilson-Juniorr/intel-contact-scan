@@ -315,6 +315,31 @@ function runDeterministicCritic(
   if (state.palavras_ultima_msg <= 5 && meta && meta.usou_mirror_ou_label === false) {
     fails.push("nao_aplicou_mirror_em_resposta_curta");
   }
+
+  // Força meta-raciocínio: agente DEVE declarar cérebro + técnica usados.
+  // Só checa a partir do turno 2 (turno 1 ainda pode ser saudação genérica).
+  if (state.turn_number >= 2 && meta) {
+    if (!meta.cerebro_principal || typeof meta.cerebro_principal !== "string" || meta.cerebro_principal.length < 2) {
+      fails.push("nao_declarou_cerebro_principal");
+    }
+    if (!meta.tecnica_aplicada || typeof meta.tecnica_aplicada !== "string" || meta.tecnica_aplicada.length < 2) {
+      fails.push("nao_declarou_tecnica_aplicada");
+    }
+  }
+
+  // Se há resumo de cliente conhecido, agente NÃO pode tratar como lead novo
+  if (state.contexto_cliente?.memoria_resumo) {
+    const tl = texto.toLowerCase();
+    const padroesNovo = [
+      "como posso te ajudar hoje", "em que posso ajudar", "qual seu nome",
+      "qual o seu nome", "primeira vez", "vi seu interesse",
+      "vi que você se interessou", "tudo bem com você",
+    ];
+    for (const p of padroesNovo) {
+      if (tl.includes(p)) { fails.push("tratou_cliente_conhecido_como_novo"); break; }
+    }
+  }
+
   return fails;
 }
 
