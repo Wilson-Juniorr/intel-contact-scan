@@ -63,7 +63,19 @@ export function AgentsConfigTab() {
   useEffect(() => { load(); }, []);
 
   const toggleActive = async (a: Agent) => {
-    await supabase.from("agents_config").update({ ativo: !a.ativo }).eq("id", a.id);
+    const { data, error } = await supabase
+      .from("agents_config")
+      .update({ ativo: !a.ativo })
+      .eq("id", a.id)
+      .select("id");
+    if (error) {
+      toast.error("Erro ao alterar agent: " + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      toast.error("Sem permissão para alterar agents (precisa ser admin/supervisor).");
+      return;
+    }
     toast.success(`Agent ${!a.ativo ? "ativado" : "desativado"}`);
     load();
   };
