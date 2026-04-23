@@ -32,6 +32,16 @@ interface ConversationState {
   fonte: string | null;
   turn_number: number;
   veio_por_audio: boolean;
+  contexto_cliente: {
+    estagio: string | null;
+    ja_e_cliente: boolean;
+    assumido_corretor: boolean;
+    operadora_atual: string | null;
+    cotacao_enviada: boolean;
+    memoria_resumo: string | null;
+    historico_estruturado: Record<string, unknown>;
+    ultima_atividade_dias: number | null;
+  };
 }
 
 function detectarTom(msg: string): Tom {
@@ -51,6 +61,7 @@ function buildState(
   is_audio: boolean,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
+  const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
   const coletado: Record<string, unknown> = {};
   if (lead?.name && !/^\+?\d+$/.test(lead.name)) coletado.nome = lead.name;
   if (lead?.type) coletado.tipo = lead.type;
@@ -66,6 +77,18 @@ function buildState(
   const palavras = user_message.trim().split(/\s+/).filter(Boolean).length;
   const turn = ((conv?.mensagens ?? []) as any[]).filter((m) => m.role === "assistant").length + 1;
 
+  // Detecta se já é cliente: tem operadora cadastrada OU summary menciona "já é cliente"/"cliente nosso"/"convênio ativo"
+  const summaryLower = (memSummary ?? "").toLowerCase();
+  const ja_e_cliente = Boolean(
+    lead?.operator ||
+    /j[aá] (é|e) cliente|cliente nosso|conv[êe]nio ativo|tem plano (ativo|conosco)|aplicativo do conv[êe]nio|2[ªa] via|segunda via|boleto do conv[êe]nio|carteirinha/.test(summaryLower)
+  );
+
+  const ultimaAt = lead?.updated_at || lead?.last_contact_at;
+  const ultimaAtividadeDias = ultimaAt
+    ? Math.floor((Date.now() - new Date(ultimaAt).getTime()) / 86400000)
+    : null;
+
   return {
     coletado,
     falta,
@@ -75,6 +98,16 @@ function buildState(
     fonte: null,
     turn_number: turn,
     veio_por_audio: is_audio,
+    contexto_cliente: {
+      estagio: lead?.stage ?? null,
+      ja_e_cliente,
+      assumido_corretor: Boolean(lead?.assumed_at) || lead?.in_manual_conversation === true,
+      operadora_atual: lead?.operator ?? null,
+      cotacao_enviada: Boolean(lead?.last_quote_sent_at) || lead?.stage === "cotacao_enviada",
+      memoria_resumo: memSummary,
+      historico_estruturado: mem,
+      ultima_atividade_dias: ultimaAtividadeDias,
+    },
   };
 }
 
@@ -282,6 +315,31 @@ function runDeterministicCritic(
   if (state.palavras_ultima_msg <= 5 && meta && meta.usou_mirror_ou_label === false) {
     fails.push("nao_aplicou_mirror_em_resposta_curta");
   }
+
+  // Força meta-raciocínio: agente DEVE declarar cérebro + técnica usados.
+  // Só checa a partir do turno 2 (turno 1 ainda pode ser saudação genérica).
+  if (state.turn_number >= 2 && meta) {
+    if (!meta.cerebro_principal || typeof meta.cerebro_principal !== "string" || meta.cerebro_principal.length < 2) {
+      fails.push("nao_declarou_cerebro_principal");
+    }
+    if (!meta.tecnica_aplicada || typeof meta.tecnica_aplicada !== "string" || meta.tecnica_aplicada.length < 2) {
+      fails.push("nao_declarou_tecnica_aplicada");
+    }
+  }
+
+  // Se há resumo de cliente conhecido, agente NÃO pode tratar como lead novo
+  if (state.contexto_cliente?.memoria_resumo) {
+    const tl = texto.toLowerCase();
+    const padroesNovo = [
+      "como posso te ajudar hoje", "em que posso ajudar", "qual seu nome",
+      "qual o seu nome", "primeira vez", "vi seu interesse",
+      "vi que você se interessou", "tudo bem com você",
+    ];
+    for (const p of padroesNovo) {
+      if (tl.includes(p)) { fails.push("tratou_cliente_conhecido_como_novo"); break; }
+    }
+  }
+
   return fails;
 }
 
@@ -341,6 +399,52 @@ Deno.serve(async (req) => {
     ]);
 
     const state = buildState(lead, conv, user_message, is_audio === true);
+
+    // ═══ GUARDS: situações onde o SDR NÃO deve responder ═══
+    // Cliente já em fase avançada do funil ou já assumido pelo corretor
+    const ESTAGIOS_AVANCADOS = [
+      "negociacao", "fechamento", "ganho", "implantacao",
+      "cliente_ativo", "cotacao_enviada", "proposta_enviada",
+    ];
+    const motivoSilenciar: string | null =
+      state.contexto_cliente.assumido_corretor
+        ? "lead_assumido_pelo_corretor"
+        : state.contexto_cliente.ja_e_cliente
+        ? "cliente_existente_detectado_na_memoria"
+        : (state.contexto_cliente.estagio && ESTAGIOS_AVANCADOS.includes(state.contexto_cliente.estagio))
+        ? `estagio_avancado:${state.contexto_cliente.estagio}`
+        : null;
+
+    if (motivoSilenciar) {
+      console.log(`SDR silenciado para lead ${lead_id}: ${motivoSilenciar}`);
+      // Pausa conversa e notifica corretor
+      if (lead?.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: lead.user_id,
+          type: "sdr_silenced_existing_client",
+          title: motivoSilenciar === "cliente_existente_detectado_na_memoria"
+            ? "SDR pausou — cliente existente"
+            : motivoSilenciar.startsWith("estagio")
+            ? "SDR pausou — lead em estágio avançado"
+            : "SDR pausou — lead já está com você",
+          body: `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`,
+          lead_id,
+        });
+      }
+      if (conversation_id) {
+        await supabase.from("agent_conversations").update({
+          status: "pausada",
+          ultima_atividade: new Date().toISOString(),
+          conversation_state: state as any,
+          mensagens: [...((conv?.mensagens ?? []) as any[]), { role: "user", content: user_message }],
+        }).eq("id", conversation_id);
+      }
+      return new Response(
+        JSON.stringify({ ok: false, silenced: true, reason: motivoSilenciar }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const [fewShot, brainsBlock, techniquesBlock] = await Promise.all([
       selectFewShot(supabase, state),
       buildBrainsBlock(supabase),
@@ -355,6 +459,22 @@ Deno.serve(async (req) => {
     const systemWithContext = personaPrompt +
       brainsBlock +
       techniquesBlock +
+      "\n\n═══ CONTEXTO DO CLIENTE (memória do CRM — USE ATIVAMENTE) ═══\n" +
+      `ESTÁGIO_FUNIL: ${state.contexto_cliente.estagio ?? "novo"}\n` +
+      `OPERADORA_ATUAL: ${state.contexto_cliente.operadora_atual ?? "nenhuma cadastrada"}\n` +
+      `COTAÇÃO_JÁ_ENVIADA: ${state.contexto_cliente.cotacao_enviada ? "SIM" : "não"}\n` +
+      `DIAS_DESDE_ÚLTIMA_ATIVIDADE: ${state.contexto_cliente.ultima_atividade_dias ?? "n/a"}\n` +
+      (state.contexto_cliente.memoria_resumo
+        ? `\n📋 RESUMO DO HISTÓRICO COM ESTE CLIENTE:\n${state.contexto_cliente.memoria_resumo}\n`
+        : "") +
+      (Object.keys(state.contexto_cliente.historico_estruturado).length
+        ? `\n📊 DADOS ESTRUTURADOS DA MEMÓRIA: ${JSON.stringify(state.contexto_cliente.historico_estruturado)}\n`
+        : "") +
+      "\n⚠️ INSTRUÇÃO CRÍTICA SOBRE O CONTEXTO:\n" +
+      "- Se houver RESUMO DO HISTÓRICO acima, esse cliente JÁ CONVERSOU com a gente. NÃO trate como lead novo.\n" +
+      "- NÃO faça perguntas de qualificação cujas respostas já estão no histórico.\n" +
+      "- Conecte explicitamente sua mensagem ao que ele já disse antes (ex: 'da última vez você falou em X, ainda faz sentido?').\n" +
+      "- Se o histórico mostra que ele é cliente ativo (boleto, app, carteirinha, 2ª via), passe pro corretor humano IMEDIATAMENTE.\n" +
       "\n\n═══ ESTADO ATUAL DA CONVERSA ═══\n" +
       `COLETADO: ${JSON.stringify(state.coletado)}\n` +
       `FALTA: ${JSON.stringify(state.falta)}\n` +
@@ -374,6 +494,12 @@ Deno.serve(async (req) => {
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +
+      "\n\n═══ META-RACIOCÍNIO OBRIGATÓRIO ═══\n" +
+      "Antes de responder, escolha CONSCIENTEMENTE:\n" +
+      "1. UM cérebro principal (da lista acima) que vai liderar este turno\n" +
+      "2. UMA técnica concreta (da lista acima) que você vai aplicar\n" +
+      "3. Como o CONTEXTO DO CLIENTE acima muda sua abordagem\n" +
+      "Reporte essas 3 escolhas no METADATA (campos: cerebro_principal, tecnica_aplicada, ajuste_por_contexto).\n" +
       `\n${fewShot}\n`;
 
     const messages = [...historico, { role: "user", content: user_message }];
