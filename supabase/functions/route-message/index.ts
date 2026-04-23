@@ -118,9 +118,9 @@ Deno.serve(async (req) => {
     await supabase.from("router_decisions").insert({
       conversation_id: sdrResp.conversation_id ?? null,
       message_in: message_text.slice(0, 500),
-      contexto_avaliado: { stage, lead_id, is_first_meaningful_touch: isFirstMeaningfulTouch, business_relevance_score: relevantInbound?.business_relevance_score ?? null },
+      contexto_avaliado: { stage, lead_id },
       agent_escolhido: "sdr-qualificador",
-      motivo: isFirstMeaningfulTouch ? `novo_lead: stage=${stage}` : `lead_existente: stage=${stage}`,
+      motivo: `stage=${stage}`,
     });
 
     // 5. Send each balloon with a humanized delay via send-whatsapp
