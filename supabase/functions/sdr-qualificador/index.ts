@@ -565,6 +565,11 @@ Deno.serve(async (req) => {
       `PALAVRAS_ULTIMA_MSG: ${state.palavras_ultima_msg}\n` +
       `TOM_CLIENTE: ${state.tom_cliente}\n` +
       `TURN: ${state.turn_number}\n` +
+      (anuncio.match
+        ? `\n🎯 LEAD NOVO DE ANÚNCIO DETECTADO (gatilho: ${anuncio.pattern}). Trate como interesse ATIVO em cotação — não pergunte se ele quer um plano, ele já disse que quer. Foco em qualificar (tipo PF/PJ, vidas, plano atual, urgência) com calor humano, não questionário.\n`
+        : isLeadNovoSemHistorico
+        ? `\n🆕 LEAD NOVO sem histórico ainda — abordagem consultiva, descubra o que ele busca antes de qualificar.\n`
+        : "") +
       (state.veio_por_audio
         ? "\n🎤 ESTA MENSAGEM CHEGOU COMO ÁUDIO. O texto acima é a TRANSCRIÇÃO do áudio do cliente.\n" +
           "REGRAS PARA RESPONDER ÁUDIO:\n" +
