@@ -455,13 +455,22 @@ Deno.serve(async (req) => {
 
     const state = buildState(lead, conv, user_message, is_audio === true);
 
+    // ═══ Detecta intenção de "lead novo de anúncio" (whitelist) ═══
+    const anuncio = isAnuncioMessage(user_message);
+    const isLeadNovoSemHistorico =
+      !state.contexto_cliente.memoria_resumo &&
+      !state.contexto_cliente.operadora_atual &&
+      (state.contexto_cliente.estagio === null ||
+        state.contexto_cliente.estagio === "novo" ||
+        state.contexto_cliente.estagio === "lead_novo");
+
     // ═══ GUARDS: situações onde o SDR NÃO deve responder ═══
     // Cliente já em fase avançada do funil ou já assumido pelo corretor
     const ESTAGIOS_AVANCADOS = [
       "negociacao", "fechamento", "ganho", "implantacao",
       "cliente_ativo", "cotacao_enviada", "proposta_enviada",
     ];
-    const motivoSilenciar: string | null =
+    let motivoSilenciar: string | null =
       state.contexto_cliente.assumido_corretor
         ? "lead_assumido_pelo_corretor"
         : state.contexto_cliente.ja_e_cliente
@@ -470,19 +479,38 @@ Deno.serve(async (req) => {
         ? `estagio_avancado:${state.contexto_cliente.estagio}`
         : null;
 
+    // Regra extra: se NÃO bateu nenhum guard acima MAS também não é claramente
+    // um lead novo de anúncio (padrão "quero cotação", "vi anúncio", etc.) E
+    // já existe algum histórico, prefere silenciar e notificar o corretor.
+    // Lead 100% sem histórico + sem padrão claro continua passando (turno 1
+    // pode ser só "oi" — o agente puxa contexto).
+    if (!motivoSilenciar && !anuncio.match && !isLeadNovoSemHistorico) {
+      motivoSilenciar = "lead_existente_sem_intencao_clara_de_cotacao";
+    }
+
+    console.log(`[SDR routing] lead=${lead_id} anuncio_match=${anuncio.match} pattern=${anuncio.pattern ?? "-"} novo_sem_historico=${isLeadNovoSemHistorico} motivoSilenciar=${motivoSilenciar ?? "ATENDER"}`);
+
     if (motivoSilenciar) {
       console.log(`SDR silenciado para lead ${lead_id}: ${motivoSilenciar}`);
       // Pausa conversa e notifica corretor
       if (lead?.user_id) {
-        await supabase.from("notifications").insert({
-          user_id: lead.user_id,
-          type: "sdr_silenced_existing_client",
-          title: motivoSilenciar === "cliente_existente_detectado_na_memoria"
+        const titulo =
+          motivoSilenciar === "cliente_existente_detectado_na_memoria"
             ? "SDR pausou — cliente existente"
             : motivoSilenciar.startsWith("estagio")
             ? "SDR pausou — lead em estágio avançado"
-            : "SDR pausou — lead já está com você",
-          body: `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`,
+            : motivoSilenciar === "lead_existente_sem_intencao_clara_de_cotacao"
+            ? "SDR pausou — lead antigo retomou contato"
+            : "SDR pausou — lead já está com você";
+        const corpo =
+          motivoSilenciar === "lead_existente_sem_intencao_clara_de_cotacao"
+            ? `${lead.name || lead.phone} mandou mensagem mas NÃO parece um lead novo de anúncio (sem palavras como "simulação", "cotação", "vi anúncio").\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`
+            : `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`;
+        await supabase.from("notifications").insert({
+          user_id: lead.user_id,
+          type: "sdr_silenced_existing_client",
+          title: titulo,
+          body: corpo,
           lead_id,
         });
       }
