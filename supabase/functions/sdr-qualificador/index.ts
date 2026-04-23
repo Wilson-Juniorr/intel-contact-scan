@@ -323,11 +323,17 @@ Deno.serve(async (req) => {
     ]);
 
     const state = buildState(lead, conv, user_message, is_audio === true);
-    const fewShot = await selectFewShot(supabase, state);
+    const [fewShot, brainsBlock, techniquesBlock] = await Promise.all([
+      selectFewShot(supabase, state),
+      buildBrainsBlock(supabase),
+      buildTechniquesBlock(supabase),
+    ]);
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
     const systemWithContext = (agent.system_prompt as string) +
+      brainsBlock +
+      techniquesBlock +
       "\n\n═══ ESTADO ATUAL DA CONVERSA ═══\n" +
       `COLETADO: ${JSON.stringify(state.coletado)}\n` +
       `FALTA: ${JSON.stringify(state.falta)}\n` +
