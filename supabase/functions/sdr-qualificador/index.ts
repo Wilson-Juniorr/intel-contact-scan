@@ -15,6 +15,61 @@ const AGENT_SLUG = "sdr-qualificador";
 const SPLIT_CHAR = "‖";
 const CRITIC_MODEL = "google/gemini-2.5-flash-lite";
 
+// ═══ Detecção de "lead NOVO vindo de anúncio / interesse explícito em cotação" ═══
+// Frases típicas que pessoas mandam quando clicam num anúncio de plano de saúde
+// no Instagram/Facebook/Google ou são abordadas por uma landing page.
+// Match é case-insensitive, sem acentos, e olha trechos (não exige frase exata).
+const ANUNCIO_PATTERNS: RegExp[] = [
+  // Pedido direto de simulação/cotação/orçamento
+  /\bsimula(c|ç)ao\b/i,
+  /\bsimular\b/i,
+  /\bcota(c|ç)ao\b/i,
+  /\bcotar\b/i,
+  /\borca(m|n)ento\b/i,
+  /\bor(c|ç)ar\b/i,
+  /\bvalor(es)?\b.*\bplano/i,
+  /\bpre(c|ç)o\b.*\bplano/i,
+  /\bquanto custa\b/i,
+  /\bquanto fica\b/i,
+  /\bquanto sai\b/i,
+  // Interesse direto em plano/convênio/seguro
+  /\bquero (um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\bprecis(o|amos|ando) (de )?(um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\bgostaria de (saber|contratar|ter) (um |uma )?(plano|conv(e|ê)nio|seguro)/i,
+  /\binteresse (em|no|num) (plano|conv(e|ê)nio|seguro)/i,
+  /\bme interess(ei|a) (pelo|por um|pelo plano|pelo seguro|pelo conv(e|ê)nio)/i,
+  // Vindo de anúncio explicitamente
+  /\bvi (o |um |seu )?an(u|ú)ncio\b/i,
+  /\bdo an(u|ú)ncio\b/i,
+  /\bvi no (insta|instagram|facebook|face|google|tiktok|youtube)/i,
+  /\bachei (no |pelo )?(google|insta|instagram|facebook)/i,
+  /\bcliquei (no |num )?an(u|ú)ncio\b/i,
+  // Saúde/empresa específicos
+  /\bplano (de )?sa(u|ú)de\b/i,
+  /\bplano empresarial\b/i,
+  /\bplano pme\b/i,
+  /\bplano (pra|para) (mim|minha (familia|família|empresa)|meus (filhos|pais))/i,
+  // Pedido pra ser contatado / falar com corretor
+  /\bme manda (os )?valor/i,
+  /\bme passa (os )?valor/i,
+  /\bquero contratar\b/i,
+  /\bcomo fa(c|ç)o (pra|para) (contratar|adquirir|fechar)/i,
+];
+
+function isAnuncioMessage(msg: string): { match: boolean; pattern?: string } {
+  if (!msg || typeof msg !== "string") return { match: false };
+  const norm = msg
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  for (const re of ANUNCIO_PATTERNS) {
+    if (re.test(msg) || re.test(norm)) {
+      return { match: true, pattern: re.source };
+    }
+  }
+  return { match: false };
+}
+
 type Tom =
   | "cooperativo"
   | "resistente"
@@ -400,13 +455,22 @@ Deno.serve(async (req) => {
 
     const state = buildState(lead, conv, user_message, is_audio === true);
 
+    // ═══ Detecta intenção de "lead novo de anúncio" (whitelist) ═══
+    const anuncio = isAnuncioMessage(user_message);
+    const isLeadNovoSemHistorico =
+      !state.contexto_cliente.memoria_resumo &&
+      !state.contexto_cliente.operadora_atual &&
+      (state.contexto_cliente.estagio === null ||
+        state.contexto_cliente.estagio === "novo" ||
+        state.contexto_cliente.estagio === "lead_novo");
+
     // ═══ GUARDS: situações onde o SDR NÃO deve responder ═══
     // Cliente já em fase avançada do funil ou já assumido pelo corretor
     const ESTAGIOS_AVANCADOS = [
       "negociacao", "fechamento", "ganho", "implantacao",
       "cliente_ativo", "cotacao_enviada", "proposta_enviada",
     ];
-    const motivoSilenciar: string | null =
+    let motivoSilenciar: string | null =
       state.contexto_cliente.assumido_corretor
         ? "lead_assumido_pelo_corretor"
         : state.contexto_cliente.ja_e_cliente
@@ -415,19 +479,38 @@ Deno.serve(async (req) => {
         ? `estagio_avancado:${state.contexto_cliente.estagio}`
         : null;
 
+    // Regra extra: se NÃO bateu nenhum guard acima MAS também não é claramente
+    // um lead novo de anúncio (padrão "quero cotação", "vi anúncio", etc.) E
+    // já existe algum histórico, prefere silenciar e notificar o corretor.
+    // Lead 100% sem histórico + sem padrão claro continua passando (turno 1
+    // pode ser só "oi" — o agente puxa contexto).
+    if (!motivoSilenciar && !anuncio.match && !isLeadNovoSemHistorico) {
+      motivoSilenciar = "lead_existente_sem_intencao_clara_de_cotacao";
+    }
+
+    console.log(`[SDR routing] lead=${lead_id} anuncio_match=${anuncio.match} pattern=${anuncio.pattern ?? "-"} novo_sem_historico=${isLeadNovoSemHistorico} motivoSilenciar=${motivoSilenciar ?? "ATENDER"}`);
+
     if (motivoSilenciar) {
       console.log(`SDR silenciado para lead ${lead_id}: ${motivoSilenciar}`);
       // Pausa conversa e notifica corretor
       if (lead?.user_id) {
-        await supabase.from("notifications").insert({
-          user_id: lead.user_id,
-          type: "sdr_silenced_existing_client",
-          title: motivoSilenciar === "cliente_existente_detectado_na_memoria"
+        const titulo =
+          motivoSilenciar === "cliente_existente_detectado_na_memoria"
             ? "SDR pausou — cliente existente"
             : motivoSilenciar.startsWith("estagio")
             ? "SDR pausou — lead em estágio avançado"
-            : "SDR pausou — lead já está com você",
-          body: `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`,
+            : motivoSilenciar === "lead_existente_sem_intencao_clara_de_cotacao"
+            ? "SDR pausou — lead antigo retomou contato"
+            : "SDR pausou — lead já está com você";
+        const corpo =
+          motivoSilenciar === "lead_existente_sem_intencao_clara_de_cotacao"
+            ? `${lead.name || lead.phone} mandou mensagem mas NÃO parece um lead novo de anúncio (sem palavras como "simulação", "cotação", "vi anúncio").\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`
+            : `Não respondi ${lead.name || lead.phone} pelo SDR (${motivoSilenciar}).\n\nCliente disse: "${user_message.slice(0, 140)}"\n\nResponde direto.`;
+        await supabase.from("notifications").insert({
+          user_id: lead.user_id,
+          type: "sdr_silenced_existing_client",
+          title: titulo,
+          body: corpo,
           lead_id,
         });
       }
@@ -482,6 +565,11 @@ Deno.serve(async (req) => {
       `PALAVRAS_ULTIMA_MSG: ${state.palavras_ultima_msg}\n` +
       `TOM_CLIENTE: ${state.tom_cliente}\n` +
       `TURN: ${state.turn_number}\n` +
+      (anuncio.match
+        ? `\n🎯 LEAD NOVO DE ANÚNCIO DETECTADO (gatilho: ${anuncio.pattern}). Trate como interesse ATIVO em cotação — não pergunte se ele quer um plano, ele já disse que quer. Foco em qualificar (tipo PF/PJ, vidas, plano atual, urgência) com calor humano, não questionário.\n`
+        : isLeadNovoSemHistorico
+        ? `\n🆕 LEAD NOVO sem histórico ainda — abordagem consultiva, descubra o que ele busca antes de qualificar.\n`
+        : "") +
       (state.veio_por_audio
         ? "\n🎤 ESTA MENSAGEM CHEGOU COMO ÁUDIO. O texto acima é a TRANSCRIÇÃO do áudio do cliente.\n" +
           "REGRAS PARA RESPONDER ÁUDIO:\n" +
