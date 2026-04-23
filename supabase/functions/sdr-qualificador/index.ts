@@ -360,7 +360,10 @@ Deno.serve(async (req) => {
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
-    const systemWithContext = (agent.system_prompt as string) +
+    const rawPrompt = agent.system_prompt as string;
+    const personaPrompt = await renderPersonaInPrompt(supabase, rawPrompt, AGENT_SLUG);
+
+    const systemWithContext = personaPrompt +
       brainsBlock +
       techniquesBlock +
       "\n\n═══ ESTADO ATUAL DA CONVERSA ═══\n" +
