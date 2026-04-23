@@ -720,6 +720,89 @@ export type Database = {
           },
         ]
       }
+      compliance_settings: {
+        Row: {
+          ativo: boolean
+          timezone: string
+          updated_at: string | null
+          user_id: string
+          weekdays_only: boolean
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          ativo?: boolean
+          timezone?: string
+          updated_at?: string | null
+          user_id: string
+          weekdays_only?: boolean
+          window_end?: string
+          window_start?: string
+        }
+        Update: {
+          ativo?: boolean
+          timezone?: string
+          updated_at?: string | null
+          user_id?: string
+          weekdays_only?: boolean
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      conversation_classifications: {
+        Row: {
+          categoria: Database["public"]["Enums"]["contact_category"]
+          confianca: number
+          contact_id: string | null
+          created_at: string | null
+          id: string
+          mensagens_analisadas: number | null
+          modelo: string | null
+          overridden_by_junior: boolean | null
+          phone: string
+          razao: string | null
+          sinais: string[] | null
+          user_id: string
+        }
+        Insert: {
+          categoria: Database["public"]["Enums"]["contact_category"]
+          confianca: number
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          mensagens_analisadas?: number | null
+          modelo?: string | null
+          overridden_by_junior?: boolean | null
+          phone: string
+          razao?: string | null
+          sinais?: string[] | null
+          user_id: string
+        }
+        Update: {
+          categoria?: Database["public"]["Enums"]["contact_category"]
+          confianca?: number
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          mensagens_analisadas?: number | null
+          modelo?: string | null
+          overridden_by_junior?: boolean | null
+          phone?: string
+          razao?: string | null
+          sinais?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_classifications_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_up_queue: {
         Row: {
           attempt_number: number
@@ -1179,6 +1262,8 @@ export type Database = {
       leads: {
         Row: {
           approved_value: number | null
+          assumed_at: string | null
+          assumed_by: string | null
           created_at: string
           deleted_at: string | null
           email: string | null
@@ -1204,6 +1289,8 @@ export type Database = {
         }
         Insert: {
           approved_value?: number | null
+          assumed_at?: string | null
+          assumed_by?: string | null
           created_at?: string
           deleted_at?: string | null
           email?: string | null
@@ -1229,6 +1316,8 @@ export type Database = {
         }
         Update: {
           approved_value?: number | null
+          assumed_at?: string | null
+          assumed_by?: string | null
           created_at?: string
           deleted_at?: string | null
           email?: string | null
@@ -1676,6 +1765,56 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_messages: {
+        Row: {
+          agent_slug: string | null
+          created_at: string | null
+          error: string | null
+          id: string
+          lead_id: string | null
+          message: string
+          phone: string
+          send_at: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          agent_slug?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          lead_id?: string | null
+          message: string
+          phone: string
+          send_at: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          agent_slug?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          lead_id?: string | null
+          message?: string
+          phone?: string
+          send_at?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           created_at: string
@@ -1854,6 +1993,10 @@ export type Database = {
       }
       whatsapp_contacts: {
         Row: {
+          category: Database["public"]["Enums"]["contact_category"] | null
+          category_classified_at: string | null
+          category_confidence: number | null
+          category_source: string | null
           contact_name: string | null
           created_at: string
           id: string
@@ -1864,6 +2007,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["contact_category"] | null
+          category_classified_at?: string | null
+          category_confidence?: number | null
+          category_source?: string | null
           contact_name?: string | null
           created_at?: string
           id?: string
@@ -1874,6 +2021,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["contact_category"] | null
+          category_classified_at?: string | null
+          category_confidence?: number | null
+          category_source?: string | null
           contact_name?: string | null
           created_at?: string
           id?: string
@@ -1992,6 +2143,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "supervisor" | "corretor" | "viewer"
+      contact_category:
+        | "lead_novo"
+        | "lead_retorno"
+        | "personal"
+        | "team"
+        | "partner"
+        | "vendor"
+        | "spam"
+        | "ambiguo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2120,6 +2280,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "supervisor", "corretor", "viewer"],
+      contact_category: [
+        "lead_novo",
+        "lead_retorno",
+        "personal",
+        "team",
+        "partner",
+        "vendor",
+        "spam",
+        "ambiguo",
+      ],
     },
   },
 } as const
