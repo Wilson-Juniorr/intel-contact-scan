@@ -102,6 +102,56 @@ async function selectFewShot(
   return out;
 }
 
+async function buildBrainsBlock(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from("agent_vendor_profiles")
+    .select("peso, notas, vendor_profiles(nome, origem, tom, estilo, principios, quando_usar, evitar_quando, exemplos_frases)")
+    .eq("agent_slug", AGENT_SLUG)
+    .order("peso", { ascending: false });
+  if (!data || data.length === 0) return "";
+  let out = "\n## 🧠 CÉREBROS QUE TE FORMAM (combine o melhor de cada um — ordenado por peso)\n";
+  for (const row of data) {
+    const v = (row as any).vendor_profiles;
+    if (!v) continue;
+    out += `\n### ${v.nome}${v.origem ? ` (${v.origem})` : ""} — peso ${row.peso}/10\n`;
+    if (v.tom) out += `- Tom: ${v.tom}\n`;
+    if (v.estilo) out += `- Estilo: ${v.estilo}\n`;
+    if (v.principios) out += `- Princípios: ${v.principios}\n`;
+    if (v.quando_usar) out += `- Quando usar: ${v.quando_usar}\n`;
+    if (v.evitar_quando) out += `- Evitar quando: ${v.evitar_quando}\n`;
+    const frases = Array.isArray(v.exemplos_frases) ? v.exemplos_frases : [];
+    if (frases.length) {
+      out += `- Frases-modelo:\n`;
+      for (const f of frases.slice(0, 3)) out += `  • "${f}"\n`;
+    }
+  }
+  return out;
+}
+
+async function buildTechniquesBlock(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from("agent_techniques")
+    .select("prioridade, notas, sales_techniques(nome, categoria, descricao, como_aplicar, gatilho_uso, exemplos)")
+    .eq("agent_slug", AGENT_SLUG)
+    .order("prioridade", { ascending: false });
+  if (!data || data.length === 0) return "";
+  let out = "\n## 🎯 TÉCNICAS QUE VOCÊ DOMINA (use a apropriada ao momento)\n";
+  for (const row of data) {
+    const t = (row as any).sales_techniques;
+    if (!t) continue;
+    out += `\n### ${t.nome} — prioridade ${row.prioridade}/10 (${t.categoria})\n`;
+    if (t.descricao) out += `${t.descricao}\n`;
+    out += `Como aplicar: ${t.como_aplicar}\n`;
+    if (t.gatilho_uso) out += `Use quando: ${t.gatilho_uso}\n`;
+    const exs = Array.isArray(t.exemplos) ? t.exemplos : [];
+    if (exs.length) {
+      const ex = exs[0];
+      if (ex?.cliente && ex?.agente) out += `Exemplo: Cliente: "${ex.cliente}" → Você: "${ex.agente}"\n`;
+    }
+  }
+  return out;
+}
+
 function parseResponse(raw: string): { texto: string; meta: any | null } {
   const m = raw.match(/<METADATA>([\s\S]*?)<\/METADATA>/);
   if (!m) return { texto: raw.trim(), meta: null };
