@@ -84,28 +84,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: recentMessages } = await supabase
-      .from("whatsapp_messages")
-      .select("direction, business_relevance_score, message_category, created_at")
-      .eq("lead_id", lead_id)
-      .order("created_at", { ascending: false })
-      .limit(8);
-
-    const inboundMessages = (recentMessages ?? []).filter((msg) => msg.direction === "inbound");
-    const relevantInbound = inboundMessages.find(
-      (msg) => Number(msg.business_relevance_score ?? 0) >= MIN_RELEVANCE_SCORE,
-    );
-    const looksLikeLead = hasLeadIntent(message_text) || is_audio === true;
-    const hasAnyPriorOutbound = (recentMessages ?? []).some((msg) => msg.direction === "outbound");
-    const isFirstMeaningfulTouch = !hasAnyPriorOutbound && inboundMessages.length <= 1;
-
-    if (!relevantInbound && !looksLikeLead) {
-      return new Response(
-        JSON.stringify({ ok: true, skipped: "non_lead_message" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     // 2. Check if the SDR agent is enabled
     const { data: agentRow } = await supabase
       .from("agents_config")
