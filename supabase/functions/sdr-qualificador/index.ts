@@ -192,10 +192,24 @@ async function callGemini(
   };
 }
 
-function calcularDelay(balao: string): number {
-  const base = Math.min(Math.max(balao.length * 25, 1500), 7000);
-  const jitter = (Math.random() * 0.4 - 0.2) * base;
-  return Math.round(base + jitter);
+// Calcula delay humanizado por balão + "thinking time" no primeiro
+// Fórmula inspirada em humano digitando no celular:
+//   - thinking (ler mensagem + pensar) = 1.8-3.5s só no 1º balão
+//   - typing = 90-140ms por caractere (humano médio celular)
+//   - send pause (tocar enviar) = 200-600ms
+//   - jitter natural = ±25%
+//   - hard min 2500ms, hard max 15000ms
+function calcularDelay(balao: string, isPrimeiroBalao: boolean, complexidadeMsg: number): number {
+  const thinking = isPrimeiroBalao
+    ? 1800 + Math.min(complexidadeMsg * 80, 1700) + Math.random() * 600
+    : 500 + Math.random() * 800;
+  const perChar = 90 + Math.random() * 50;
+  const typing = balao.length * perChar;
+  const sendPause = 200 + Math.random() * 400;
+  const raw = thinking + typing + sendPause;
+  const jitter = (Math.random() * 0.5 - 0.25) * raw;
+  const total = raw + jitter;
+  return Math.round(Math.min(Math.max(total, 2500), 15000));
 }
 
 function runDeterministicCritic(
