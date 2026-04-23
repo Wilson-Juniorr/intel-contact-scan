@@ -114,13 +114,37 @@ Deno.serve(async (req) => {
         const blockedByWeekday = settings.weekdays_only && isWeekend;
 
         if (outsideWindow || blockedByWeekday) {
-          // Próximo horário válido (em UTC, simplificado: usa offset atual)
-          const next = new Date(now);
-          next.setHours(sh, sm, 0, 0);
-          if (currentMinutes >= endMin) next.setDate(next.getDate() + 1);
+          // Calcula "próxima janela válida" considerando timezone do user
+          // (Brasil fixo UTC-3 desde 2019)
+          const BR_OFFSET = "-03:00";
+          const pad = (n: number) => String(n).padStart(2, "0");
+
+          const spDateFmt = new Intl.DateTimeFormat("en-CA", {
+            timeZone: settings.timezone,
+            year: "numeric", month: "2-digit", day: "2-digit",
+          });
+          const [yStr, mStr, dStr] = spDateFmt.format(now).split("-");
+          const y = parseInt(yStr, 10);
+          const m = parseInt(mStr, 10);
+          const d = parseInt(dStr, 10);
+
+          const startStr = String(settings.window_start).slice(0, 5); // "08:00"
+          let next = new Date(`${y}-${pad(m)}-${pad(d)}T${startStr}:00${BR_OFFSET}`);
+
+          // Se já passou, avança até achar um dia válido
+          while (next.getTime() <= now.getTime()) {
+            next = new Date(next.getTime() + 86_400_000);
+          }
+
           if (settings.weekdays_only) {
-            while (next.getDay() === 0 || next.getDay() === 6) {
-              next.setDate(next.getDate() + 1);
+            const wkFmt = new Intl.DateTimeFormat("en-US", {
+              timeZone: settings.timezone,
+              weekday: "short",
+            });
+            while (true) {
+              const wk = wkFmt.format(next);
+              if (wk !== "Sat" && wk !== "Sun") break;
+              next = new Date(next.getTime() + 86_400_000);
             }
           }
 
