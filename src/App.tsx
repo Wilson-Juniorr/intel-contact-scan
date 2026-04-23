@@ -20,6 +20,7 @@ const TodayPage = lazy(() => import("./pages/TodayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
 const AgentsPage = lazy(() => import("@/pages/AgentsPage"));
+const ContactCategoriesPage = lazy(() => import("./pages/ContactCategoriesPage"));
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ function ProtectedRoutes() {
           <Route path="/settings" element={<SuspenseWrap><SettingsPage /></SuspenseWrap>} />
           <Route path="/activity" element={<SuspenseWrap><ActivityPage /></SuspenseWrap>} />
           <Route path="/agents" element={<SuspenseWrap><AgentsPage /></SuspenseWrap>} />
+          <Route path="/contatos/categorias" element={<SuspenseWrap><ContactCategoriesPage /></SuspenseWrap>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>

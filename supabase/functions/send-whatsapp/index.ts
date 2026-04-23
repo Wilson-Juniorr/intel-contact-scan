@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const isInternalServiceCall = token === SUPABASE_SERVICE_ROLE_KEY;
-    const { phone, message, lead_id, user_id } = await req.json();
+    const { phone, message, lead_id, user_id, skip_window_check, agent_slug } = await req.json();
 
     if (!phone || !message) {
       return new Response(
@@ -84,6 +84,66 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // ═══ COMPLIANCE — janela de horário (Onda 1) ═══
+    if (!skip_window_check) {
+      const { data: settings } = await serviceSupabase
+        .from("compliance_settings")
+        .select("window_start, window_end, timezone, weekdays_only, ativo")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (settings?.ativo) {
+        const now = new Date();
+        const fmt = new Intl.DateTimeFormat("pt-BR", {
+          timeZone: settings.timezone,
+          hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false,
+        }).formatToParts(now);
+        const hour = parseInt(fmt.find((p) => p.type === "hour")!.value, 10);
+        const minute = parseInt(fmt.find((p) => p.type === "minute")!.value, 10);
+        const weekday = fmt.find((p) => p.type === "weekday")!.value.toLowerCase();
+        const isWeekend = weekday.startsWith("sáb") || weekday.startsWith("sab") || weekday.startsWith("dom");
+
+        const currentMinutes = hour * 60 + minute;
+        const [sh, sm] = String(settings.window_start).split(":").map(Number);
+        const [eh, em] = String(settings.window_end).split(":").map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin = eh * 60 + em;
+
+        const outsideWindow = currentMinutes < startMin || currentMinutes >= endMin;
+        const blockedByWeekday = settings.weekdays_only && isWeekend;
+
+        if (outsideWindow || blockedByWeekday) {
+          // Próximo horário válido (em UTC, simplificado: usa offset atual)
+          const next = new Date(now);
+          next.setHours(sh, sm, 0, 0);
+          if (currentMinutes >= endMin) next.setDate(next.getDate() + 1);
+          if (settings.weekdays_only) {
+            while (next.getDay() === 0 || next.getDay() === 6) {
+              next.setDate(next.getDate() + 1);
+            }
+          }
+
+          await serviceSupabase.from("scheduled_messages").insert({
+            user_id: userId,
+            lead_id: lead_id ?? null,
+            phone,
+            message,
+            agent_slug: agent_slug ?? null,
+            send_at: next.toISOString(),
+            status: "queued",
+          });
+
+          return new Response(JSON.stringify({
+            success: true,
+            queued: true,
+            send_at: next.toISOString(),
+            reason: outsideWindow ? "outside_hours" : "weekend",
+          }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
+    // ═══ fim compliance ═══
 
     // Formata número: remove tudo que não é dígito, garante formato correto
     const cleanPhone = phone.replace(/\D/g, "");

@@ -11,6 +11,7 @@ import {
   Settings,
   ClipboardList,
   Sparkles,
+  Tags,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,6 +44,7 @@ const navItems = [
   { title: "Follow-Up", url: "/follow-up", icon: Clock },
   { title: "Assistente IA", url: "/assistant", icon: Bot },
   { title: "Agents", url: "/agents", icon: Sparkles },
+  { title: "Categorias", url: "/contatos/categorias", icon: Tags },
   { title: "Configurações", url: "/settings", icon: Settings },
   { title: "Atividades", url: "/activity", icon: ClipboardList },
 ];

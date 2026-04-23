@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Pause, UserCog } from "lucide-react";
+import { Bot, Pause, UserCog, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Props {
   leadId: string;
@@ -21,6 +23,7 @@ export function AgentStatusIndicator({
   inManualConversation = false,
 }: Props) {
   const [agent, setAgent] = useState<AgentState | null>(null);
+  const [assumedAt, setAssumedAt] = useState<string | null>(null);
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -37,6 +40,13 @@ export function AgentStatusIndicator({
         .maybeSingle();
 
       if (!active) return;
+
+      const { data: leadRow } = await supabase
+        .from("leads")
+        .select("assumed_at")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (active) setAssumedAt((leadRow as any)?.assumed_at ?? null);
 
       if (!conv) {
         setAgent(null);
@@ -106,6 +116,7 @@ export function AgentStatusIndicator({
   const isPaused = inManualConversation || agent?.status === "pausada";
 
   return (
+    <>
     <div className="px-3 py-2 bg-[#1f2c33] border-b border-[#0b141a] flex items-center gap-2">
       <div
         className={`h-7 w-7 rounded-full flex items-center justify-center ${
@@ -178,5 +189,16 @@ export function AgentStatusIndicator({
         {inManualConversation ? "Devolver pra Camila" : "Assumir manualmente"}
       </Button>
     </div>
+    {inManualConversation && assumedAt && (
+      <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2 text-[11px] text-amber-300">
+        <Clock className="h-3 w-3 shrink-0" />
+        <span className="truncate">
+          🖐 Assumido há {formatDistanceToNow(new Date(assumedAt), { locale: ptBR })}
+          {" — auto-devolve em "}
+          {formatDistanceToNow(new Date(new Date(assumedAt).getTime() + 24 * 3600 * 1000), { locale: ptBR })}
+        </span>
+      </div>
+    )}
+    </>
   );
 }
