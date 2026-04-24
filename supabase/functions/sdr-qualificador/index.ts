@@ -811,6 +811,11 @@ Deno.serve(async (req) => {
       { conversation_id, direcao: "outgoing", conteudo: propostaFinal, tokens_out: totalOut },
     ]);
 
+    // Persiste o que o SDR aprendeu neste turno → usado por buildState no próximo
+    if (metadata && lead) {
+      await syncLeadDataFromMetadata(supabase, lead, lead_id, metadata);
+    }
+
     const qualificou = !!metadata?.deve_transferir_junior;
 
     return new Response(
