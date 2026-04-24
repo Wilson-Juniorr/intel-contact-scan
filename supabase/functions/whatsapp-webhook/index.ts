@@ -731,7 +731,7 @@ Deno.serve(async (req) => {
           .eq("id", leadId)
           .maybeSingle();
         if (leadFlag?.in_manual_conversation) {
-          console.log(`Camila bloqueada: lead ${leadId} em conversa manual`);
+          console.log(`SDR bloqueada: lead ${leadId} em conversa manual`);
         } else {
           // Categoria cacheada do contato (busca por todas variantes do telefone)
           let contactCategory: string | null = null;
@@ -746,7 +746,7 @@ Deno.serve(async (req) => {
           }
 
           if (contactCategory && blockingCategories.includes(contactCategory)) {
-            console.log(`Camila bloqueada: categoria=${contactCategory}`);
+            console.log(`SDR bloqueada: categoria=${contactCategory}`);
             await supabase.from("action_log").insert({
               user_id: userId,
               lead_id: leadId,
@@ -762,7 +762,7 @@ Deno.serve(async (req) => {
               const cat = classResp?.categoria;
               const conf = Number(classResp?.confianca ?? 0);
               if (cat && blockingCategories.includes(cat) && conf >= 0.85) {
-                console.log(`Camila bloqueada após classificação: ${cat} (${conf})`);
+                console.log(`SDR bloqueada após classificação: ${cat} (${conf})`);
                 await supabase.from("action_log").insert({
                   user_id: userId,
                   lead_id: leadId,
@@ -770,7 +770,7 @@ Deno.serve(async (req) => {
                   metadata: { categoria: cat, confianca: conf },
                 });
               } else if (cat === "ambiguo") {
-                console.log(`Categoria ambígua — Junior notificado, Camila aguarda`);
+                console.log(`Categoria ambígua — corretor notificado, SDR aguarda`);
               } else {
                 dispatchRoute();
               }

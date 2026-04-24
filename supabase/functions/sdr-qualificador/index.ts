@@ -325,12 +325,25 @@ function runDeterministicCritic(
   if (palavrasTotal <= 18 && baloes.length >= 3) {
     fails.push("fragmentacao_excessiva_para_resposta_curta");
   }
-  // Anti-monotonia: bloqueia só 4 turnos seguidos com mesma quantidade
-  // (suavizado — exigir variação turn-a-turn estrangulava o agent)
-  if (ultimosBaloes.length >= 3 &&
-      ultimosBaloes.slice(-3).every((n) => n === baloes.length)) {
-    fails.push(`padrao_${baloes.length}_baloes_repetido_4_vezes`);
+  // Anti-monotonia FORTE: obriga variação turn-a-turn
+  if (ultimosBaloes.length >= 1) {
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 3 && baloes.length === 3) {
+      fails.push("padrao_3_baloes_repetido");
+    }
+    if (ultimosBaloes[ultimosBaloes.length - 1] === 4 && baloes.length === 4) {
+      fails.push("padrao_4_baloes_repetido");
+    }
+    if (ultimosBaloes.length >= 2 &&
+        ultimosBaloes[ultimosBaloes.length - 1] === ultimosBaloes[ultimosBaloes.length - 2] &&
+        baloes.length === ultimosBaloes[ultimosBaloes.length - 1]) {
+      fails.push(`padrao_${baloes.length}_baloes_repetido_3_vezes`);
+    }
   }
+  // Preferência por 1-2 balões quando cliente foi breve
+  if (state.palavras_ultima_msg <= 8 && baloes.length > 2) {
+    fails.push("excesso_baloes_para_msg_curta_do_cliente");
+  }
+  // Preferência forte por balão único em contexto emocional
   if (state.tom_cliente === "emocional" && baloes.length > 2) {
     fails.push("excesso_baloes_em_contexto_emocional");
   }
