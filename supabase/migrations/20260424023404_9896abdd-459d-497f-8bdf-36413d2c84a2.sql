@@ -1,0 +1,1 @@
+ALTER TABLE public.compliance_settings ALTER COLUMN ativo SET DEFAULT false;
