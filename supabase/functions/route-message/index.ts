@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     const mensagens: string[] = sdrResp.mensagens ?? [];
     const delays: number[] = sdrResp.delays_ms ?? [];
     for (let i = 0; i < mensagens.length; i++) {
-      const delay = Math.min(delays[i] ?? 3000, 8000);
+      const delay = Math.min(delays[i] ?? 3000, 15000);
       await new Promise((r) => setTimeout(r, delay));
       try {
         await supabase.functions.invoke("send-whatsapp", {
