@@ -125,6 +125,14 @@ function buildState(
   if (mem.orcamento) coletado.orcamento = mem.orcamento;
   if (mem.rede_hospitais) coletado.rede = mem.rede_hospitais;
   if (mem.urgencia) coletado.urgencia = mem.urgencia;
+  // Campos aprendidos pelo SDR em turnos anteriores (via syncLeadDataFromMetadata)
+  if (mem.regiao) coletado.regiao = mem.regiao;
+  if (mem.o_que_busca) coletado.o_que_busca = mem.o_que_busca;
+  if (mem.horario) coletado.horario = mem.horario;
+  // Permite que memória sobreescreva defaults de lead.type e lead.lives
+  // caso o lead tenha sido criado com tipo "PF" default mas cliente esclareceu que é PJ
+  if (mem.tipo && !coletado.tipo) coletado.tipo = mem.tipo;
+  if (mem.vidas && !coletado.vidas) coletado.vidas = mem.vidas;
 
   const camposBase = ["tipo", "vidas", "plano_atual", "o_que_busca", "regiao", "horario"];
   const falta = camposBase.filter((k) => !(k in coletado));
