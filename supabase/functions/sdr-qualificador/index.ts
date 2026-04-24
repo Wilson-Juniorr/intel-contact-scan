@@ -125,6 +125,14 @@ function buildState(
   if (mem.orcamento) coletado.orcamento = mem.orcamento;
   if (mem.rede_hospitais) coletado.rede = mem.rede_hospitais;
   if (mem.urgencia) coletado.urgencia = mem.urgencia;
+  // Campos aprendidos pelo SDR em turnos anteriores (via syncLeadDataFromMetadata)
+  if (mem.regiao) coletado.regiao = mem.regiao;
+  if (mem.o_que_busca) coletado.o_que_busca = mem.o_que_busca;
+  if (mem.horario) coletado.horario = mem.horario;
+  // Permite que memória sobreescreva defaults de lead.type e lead.lives
+  // caso o lead tenha sido criado com tipo "PF" default mas cliente esclareceu que é PJ
+  if (mem.tipo && !coletado.tipo) coletado.tipo = mem.tipo;
+  if (mem.vidas && !coletado.vidas) coletado.vidas = mem.vidas;
 
   const camposBase = ["tipo", "vidas", "plano_atual", "o_que_busca", "regiao", "horario"];
   const falta = camposBase.filter((k) => !(k in coletado));
@@ -409,6 +417,79 @@ function runDeterministicCritic(
   }
 
   return fails;
+}
+
+// Escreve de volta no banco o que o SDR aprendeu neste turno.
+// Isso garante que buildState() no próximo turno veja o COLETADO correto.
+async function syncLeadDataFromMetadata(
+  supabase: any,
+  lead: any,
+  lead_id: string,
+  metadata: any,
+): Promise<void> {
+  const coletadoMeta = metadata?.coletado ?? {};
+  if (!coletadoMeta || Object.keys(coletadoMeta).length === 0) return;
+
+  // 1. Atualiza campos estruturados da tabela leads
+  const leadUpdates: Record<string, any> = {};
+
+  const tipoRaw = String(coletadoMeta.tipo ?? "").toUpperCase();
+  if (tipoRaw === "PF") leadUpdates.type = "PF";
+  else if (tipoRaw === "PJ" || tipoRaw.includes("PME") || tipoRaw.includes("EMPRESA")) {
+    leadUpdates.type = "PJ";
+  }
+
+  const vidasNum = Number(coletadoMeta.vidas);
+  if (!isNaN(vidasNum) && vidasNum > 0 && vidasNum <= 999) {
+    leadUpdates.lives = vidasNum;
+  }
+
+  const operadoraStr = coletadoMeta.plano_atual?.operadora;
+  if (operadoraStr && typeof operadoraStr === "string" && operadoraStr.trim()) {
+    leadUpdates.operator = operadoraStr.trim().toLowerCase();
+  }
+
+  if (Object.keys(leadUpdates).length > 0) {
+    await supabase.from("leads")
+      .update({ ...leadUpdates, updated_at: new Date().toISOString() })
+      .eq("id", lead_id);
+  }
+
+  // 2. Atualiza lead_memory.structured_json com campos "suaves"
+  const existingJson: Record<string, any> =
+    lead?.lead_memory?.[0]?.structured_json ?? {};
+  const merged: Record<string, any> = { ...existingJson };
+
+  const softFields: Array<[string, unknown]> = [
+    ["regiao", coletadoMeta.regiao],
+    ["o_que_busca", coletadoMeta.o_que_busca],
+    ["horario", coletadoMeta.horario],
+    ["orcamento", coletadoMeta.orcamento],
+    ["urgencia", coletadoMeta.urgencia],
+    ["rede_hospitais", coletadoMeta.rede],
+    ["tipo", coletadoMeta.tipo],
+    ["vidas", coletadoMeta.vidas],
+  ];
+
+  let memChanged = false;
+  for (const [key, val] of softFields) {
+    if (val !== undefined && val !== null && val !== "") {
+      merged[key] = val;
+      memChanged = true;
+    }
+  }
+
+  if (memChanged && lead?.user_id) {
+    await supabase.from("lead_memory").upsert(
+      {
+        lead_id,
+        user_id: lead.user_id,
+        structured_json: merged,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "lead_id,user_id" },
+    );
+  }
 }
 
 Deno.serve(async (req) => {
@@ -729,6 +810,11 @@ Deno.serve(async (req) => {
       { conversation_id, direcao: "incoming", conteudo: user_message, tokens_in: totalIn },
       { conversation_id, direcao: "outgoing", conteudo: propostaFinal, tokens_out: totalOut },
     ]);
+
+    // Persiste o que o SDR aprendeu neste turno → usado por buildState no próximo
+    if (metadata && lead) {
+      await syncLeadDataFromMetadata(supabase, lead, lead_id, metadata);
+    }
 
     const qualificou = !!metadata?.deve_transferir_junior;
 
