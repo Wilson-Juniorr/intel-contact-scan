@@ -4,6 +4,15 @@
 // comprimento/complexidade + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderPersonaInPrompt } from "./persona.ts";
+import { judgeAnchoring } from "./semantic-critic.ts";
+import { detectCampaign, type CampaignTrigger, type CampaignDetection } from "./campaigns.ts";
+import {
+  classifySignal,
+  pruneBrains,
+  pruneTechniques,
+  type BrainRow,
+  type TechniqueRow,
+} from "./brain-pruning.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
