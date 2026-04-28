@@ -957,6 +957,19 @@ Deno.serve(async (req) => {
 
     const qualificou = !!metadata?.deve_transferir_junior;
 
+    // Atualiza atribuição de campanha se qualificou
+    if (qualificou && campaignDetection) {
+      try {
+        await supabase
+          .from("campaign_lead_attributions")
+          .update({ qualificou: true, qualificou_em: new Date().toISOString() })
+          .eq("conversation_id", conversation_id)
+          .eq("campaign_id", campaignDetection.campaign.id);
+      } catch (e) {
+        console.warn("[campaign_attribution] qualified-update failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
