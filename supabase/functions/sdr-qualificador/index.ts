@@ -209,16 +209,20 @@ async function selectFewShot(
   return out;
 }
 
-async function buildBrainsBlock(supabase: any): Promise<string> {
+async function fetchAllBrains(supabase: any): Promise<BrainRow[]> {
   const { data } = await supabase
     .from("agent_vendor_profiles")
-    .select("peso, notas, vendor_profiles(nome, origem, tom, estilo, principios, quando_usar, evitar_quando, exemplos_frases)")
+    .select("id, peso, notas, vendor_profiles(id, nome, origem, tom, estilo, principios, quando_usar, evitar_quando, exemplos_frases)")
     .eq("agent_slug", AGENT_SLUG)
     .order("peso", { ascending: false });
-  if (!data || data.length === 0) return "";
-  let out = "\n## 🧠 CÉREBROS QUE TE FORMAM (combine o melhor de cada um — ordenado por peso)\n";
-  for (const row of data) {
-    const v = (row as any).vendor_profiles;
+  return (data ?? []) as BrainRow[];
+}
+
+function buildBrainsBlockFromRows(rows: BrainRow[]): string {
+  if (!rows.length) return "";
+  let out = "\n## 🧠 CÉREBROS QUE TE FORMAM (use UM como liderança neste turno — escolhidos pelo contexto)\n";
+  for (const row of rows) {
+    const v = row.vendor_profiles;
     if (!v) continue;
     out += `\n### ${v.nome}${v.origem ? ` (${v.origem})` : ""} — peso ${row.peso}/10\n`;
     if (v.tom) out += `- Tom: ${v.tom}\n`;
@@ -235,16 +239,20 @@ async function buildBrainsBlock(supabase: any): Promise<string> {
   return out;
 }
 
-async function buildTechniquesBlock(supabase: any): Promise<string> {
+async function fetchAllTechniques(supabase: any): Promise<TechniqueRow[]> {
   const { data } = await supabase
     .from("agent_techniques")
-    .select("prioridade, notas, sales_techniques(nome, categoria, descricao, como_aplicar, gatilho_uso, exemplos)")
+    .select("prioridade, notas, sales_techniques(id, nome, categoria, descricao, como_aplicar, gatilho_uso, exemplos)")
     .eq("agent_slug", AGENT_SLUG)
     .order("prioridade", { ascending: false });
-  if (!data || data.length === 0) return "";
-  let out = "\n## 🎯 TÉCNICAS QUE VOCÊ DOMINA (use a apropriada ao momento)\n";
-  for (const row of data) {
-    const t = (row as any).sales_techniques;
+  return (data ?? []) as TechniqueRow[];
+}
+
+function buildTechniquesBlockFromRows(rows: TechniqueRow[]): string {
+  if (!rows.length) return "";
+  let out = "\n## 🎯 TÉCNICAS QUE VOCÊ DOMINA (escolha UMA pra ESTE turno — escolhidas pelo contexto)\n";
+  for (const row of rows) {
+    const t = row.sales_techniques;
     if (!t) continue;
     out += `\n### ${t.nome} — prioridade ${row.prioridade}/10 (${t.categoria})\n`;
     if (t.descricao) out += `${t.descricao}\n`;
