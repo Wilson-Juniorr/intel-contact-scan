@@ -849,6 +849,68 @@ Deno.serve(async (req) => {
 
     if (!propostaFinal) propostaFinal = "Pode me dar um segundinho?";
 
+    // ═══ Crítico semântico (LLM-as-judge) — valida ancoragem de cérebro/técnica ═══
+    const cerebroDeclarado: string | null = metadata?.cerebro_principal ?? null;
+    const tecnicaDeclarada: string | null = metadata?.tecnica_aplicada ?? null;
+    const cerebroDesc = cerebroDeclarado
+      ? brainNameToDesc.get(cerebroDeclarado.toLowerCase()) ?? null
+      : null;
+    const tecnicaHowto = tecnicaDeclarada
+      ? techniqueNameToHowto.get(tecnicaDeclarada.toLowerCase()) ?? null
+      : null;
+    const verdict = await judgeAnchoring({
+      resposta: propostaFinal,
+      cerebro_declarado: cerebroDeclarado,
+      cerebro_descricao: cerebroDesc,
+      tecnica_declarada: tecnicaDeclarada,
+      tecnica_como_aplicar: tecnicaHowto,
+      ultima_msg_cliente: state.ultima_msg_cliente,
+    });
+    console.log(`[SDR semantic-critic] approved=${verdict.approved} conf=${verdict.confidence.toFixed(2)} reason="${verdict.reason}"`);
+
+    // ═══ Telemetria: mente_usage_log ═══
+    try {
+      await supabase.from("mente_usage_log").insert({
+        conversation_id,
+        agent_slug: AGENT_SLUG,
+        turn_number: state.turn_number,
+        cerebro_declarado: cerebroDeclarado,
+        tecnica_declarada: tecnicaDeclarada,
+        cerebro_id: cerebroDeclarado
+          ? brainNameToId.get(cerebroDeclarado.toLowerCase()) ?? null
+          : null,
+        tecnica_id: tecnicaDeclarada
+          ? techniqueNameToId.get(tecnicaDeclarada.toLowerCase()) ?? null
+          : null,
+        semantic_approved: verdict.approved,
+        semantic_confidence: verdict.confidence,
+        semantic_reason: verdict.reason,
+        evidencia_trecho: verdict.evidencia_trecho,
+        resposta_final: propostaFinal.slice(0, 2000),
+        ultima_msg_cliente: state.ultima_msg_cliente.slice(0, 1000),
+        tom_cliente: state.tom_cliente,
+        campaign_id: campaignDetection?.campaign.id ?? null,
+      });
+    } catch (logErr) {
+      console.warn("[mente_usage_log] insert failed:", logErr instanceof Error ? logErr.message : logErr);
+    }
+
+    // ═══ Atribuição de campanha (1x por conversa) ═══
+    if (campaignDetection && state.turn_number === 1) {
+      try {
+        await supabase.from("campaign_lead_attributions").insert({
+          campaign_id: campaignDetection.campaign.id,
+          lead_id,
+          conversation_id,
+          detection_method: campaignDetection.method,
+          detection_confidence: campaignDetection.confidence,
+          matched_value: campaignDetection.matched_value.slice(0, 500),
+        });
+      } catch (attrErr) {
+        console.warn("[campaign_attribution] insert failed:", attrErr instanceof Error ? attrErr.message : attrErr);
+      }
+    }
+
     // Logs
     await supabase.from("agent_critic_log").insert({
       conversation_id,
