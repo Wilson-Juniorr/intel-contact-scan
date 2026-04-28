@@ -28,7 +28,7 @@ export default function AgentsPage() {
       </div>
 
       <Tabs defaultValue="config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-13 max-w-7xl">
+        <TabsList className="grid w-full grid-cols-12 lg:grid-cols-[repeat(13,minmax(0,1fr))] max-w-7xl">
           <TabsTrigger value="config">Configuração</TabsTrigger>
           <TabsTrigger value="brains">Cérebros</TabsTrigger>
           <TabsTrigger value="techniques">Técnicas</TabsTrigger>
