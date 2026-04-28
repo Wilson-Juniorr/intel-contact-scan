@@ -639,11 +639,71 @@ Deno.serve(async (req) => {
       );
     }
 
-    const [fewShot, brainsBlock, techniquesBlock] = await Promise.all([
+    // ═══ Detecta campanha de tráfego pago ═══
+    const { data: campaignsRaw } = await supabase
+      .from("campaign_triggers")
+      .select("*")
+      .eq("agent_slug", AGENT_SLUG)
+      .eq("ativo", true);
+    const campaigns = (campaignsRaw ?? []) as CampaignTrigger[];
+    const extra_utm = (body as any).utm ?? null;
+    const campaignDetection: CampaignDetection | null = detectCampaign(user_message, campaigns, extra_utm);
+    if (campaignDetection) {
+      console.log(`[SDR campaign] match="${campaignDetection.campaign.nome}" method=${campaignDetection.method} conf=${campaignDetection.confidence.toFixed(2)}`);
+      // Aplica preset_context: enriquece coletado e retira da falta o que a campanha já presume
+      const preset = campaignDetection.campaign.preset_context || {};
+      for (const [k, v] of Object.entries(preset)) {
+        if (v !== undefined && v !== null && v !== "" && !(k in state.coletado)) {
+          (state.coletado as Record<string, unknown>)[k] = v;
+        }
+      }
+      const skip = new Set(campaignDetection.campaign.skip_questions || []);
+      state.falta = state.falta.filter((k) => !skip.has(k) && !(k in state.coletado));
+    }
+
+    // ═══ Pré-seleção (pruning) de mentes/técnicas ═══
+    const signal = classifySignal(user_message);
+    const [fewShot, allBrains, allTechniques] = await Promise.all([
       selectFewShot(supabase, state),
-      buildBrainsBlock(supabase),
-      buildTechniquesBlock(supabase),
+      fetchAllBrains(supabase),
+      fetchAllTechniques(supabase),
     ]);
+    const prunedBrains = pruneBrains(
+      allBrains,
+      signal,
+      campaignDetection?.campaign.preferred_brain_ids ?? [],
+      5,
+    );
+    const prunedTechniques = pruneTechniques(
+      allTechniques,
+      signal,
+      campaignDetection?.campaign.preferred_technique_ids ?? [],
+      4,
+    );
+    const brainsBlock = buildBrainsBlockFromRows(prunedBrains);
+    const techniquesBlock = buildTechniquesBlockFromRows(prunedTechniques);
+
+    // Mapas nome→id para logging do crítico semântico
+    const brainNameToId = new Map<string, string>();
+    for (const b of prunedBrains) {
+      if (b.vendor_profiles) brainNameToId.set(b.vendor_profiles.nome.toLowerCase(), b.vendor_profiles.id);
+    }
+    const techniqueNameToId = new Map<string, string>();
+    const techniqueNameToHowto = new Map<string, string>();
+    for (const t of prunedTechniques) {
+      if (t.sales_techniques) {
+        techniqueNameToId.set(t.sales_techniques.nome.toLowerCase(), t.sales_techniques.id);
+        techniqueNameToHowto.set(t.sales_techniques.nome.toLowerCase(), t.sales_techniques.como_aplicar);
+      }
+    }
+    const brainNameToDesc = new Map<string, string>();
+    for (const b of prunedBrains) {
+      if (b.vendor_profiles) {
+        const v = b.vendor_profiles;
+        const desc = [v.principios, v.quando_usar].filter(Boolean).join(" | ");
+        brainNameToDesc.set(v.nome.toLowerCase(), desc);
+      }
+    }
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
