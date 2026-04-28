@@ -658,6 +658,105 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_lead_attributions: {
+        Row: {
+          campaign_id: string
+          conversation_id: string | null
+          created_at: string
+          detection_confidence: number | null
+          detection_method: string
+          id: string
+          lead_id: string | null
+          matched_value: string | null
+          qualificou: boolean
+          qualificou_em: string | null
+        }
+        Insert: {
+          campaign_id: string
+          conversation_id?: string | null
+          created_at?: string
+          detection_confidence?: number | null
+          detection_method: string
+          id?: string
+          lead_id?: string | null
+          matched_value?: string | null
+          qualificou?: boolean
+          qualificou_em?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          detection_confidence?: number | null
+          detection_method?: string
+          id?: string
+          lead_id?: string | null
+          matched_value?: string | null
+          qualificou?: boolean
+          qualificou_em?: string | null
+        }
+        Relationships: []
+      }
+      campaign_triggers: {
+        Row: {
+          agent_slug: string
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          detection_count: number
+          fuzzy_threshold: number
+          id: string
+          nome: string
+          opening_message: string | null
+          preferred_brain_ids: string[] | null
+          preferred_technique_ids: string[] | null
+          preset_context: Json
+          qualified_count: number
+          skip_questions: string[] | null
+          trigger_phrases: string[] | null
+          updated_at: string
+          utm_codes: string[] | null
+        }
+        Insert: {
+          agent_slug?: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          detection_count?: number
+          fuzzy_threshold?: number
+          id?: string
+          nome: string
+          opening_message?: string | null
+          preferred_brain_ids?: string[] | null
+          preferred_technique_ids?: string[] | null
+          preset_context?: Json
+          qualified_count?: number
+          skip_questions?: string[] | null
+          trigger_phrases?: string[] | null
+          updated_at?: string
+          utm_codes?: string[] | null
+        }
+        Update: {
+          agent_slug?: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          detection_count?: number
+          fuzzy_threshold?: number
+          id?: string
+          nome?: string
+          opening_message?: string | null
+          preferred_brain_ids?: string[] | null
+          preferred_technique_ids?: string[] | null
+          preset_context?: Json
+          qualified_count?: number
+          skip_questions?: string[] | null
+          trigger_phrases?: string[] | null
+          updated_at?: string
+          utm_codes?: string[] | null
+        }
+        Relationships: []
+      }
       closing_sequences: {
         Row: {
           completed_at: string | null
@@ -1388,6 +1487,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mente_usage_log: {
+        Row: {
+          agent_slug: string
+          campaign_id: string | null
+          cerebro_declarado: string | null
+          cerebro_id: string | null
+          conversation_id: string | null
+          created_at: string
+          evidencia_trecho: string | null
+          id: string
+          resposta_final: string | null
+          semantic_approved: boolean | null
+          semantic_confidence: number | null
+          semantic_reason: string | null
+          tecnica_declarada: string | null
+          tecnica_id: string | null
+          tom_cliente: string | null
+          turn_number: number
+          ultima_msg_cliente: string | null
+        }
+        Insert: {
+          agent_slug: string
+          campaign_id?: string | null
+          cerebro_declarado?: string | null
+          cerebro_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          evidencia_trecho?: string | null
+          id?: string
+          resposta_final?: string | null
+          semantic_approved?: boolean | null
+          semantic_confidence?: number | null
+          semantic_reason?: string | null
+          tecnica_declarada?: string | null
+          tecnica_id?: string | null
+          tom_cliente?: string | null
+          turn_number?: number
+          ultima_msg_cliente?: string | null
+        }
+        Update: {
+          agent_slug?: string
+          campaign_id?: string | null
+          cerebro_declarado?: string | null
+          cerebro_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          evidencia_trecho?: string | null
+          id?: string
+          resposta_final?: string | null
+          semantic_approved?: boolean | null
+          semantic_confidence?: number | null
+          semantic_reason?: string | null
+          tecnica_declarada?: string | null
+          tecnica_id?: string | null
+          tom_cliente?: string | null
+          turn_number?: number
+          ultima_msg_cliente?: string | null
+        }
+        Relationships: []
       }
       notifications: {
         Row: {

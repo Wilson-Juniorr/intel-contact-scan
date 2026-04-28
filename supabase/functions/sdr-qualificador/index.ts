@@ -4,6 +4,15 @@
 // comprimento/complexidade + METADATA paralelo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { renderPersonaInPrompt } from "./persona.ts";
+import { judgeAnchoring } from "./semantic-critic.ts";
+import { detectCampaign, type CampaignTrigger, type CampaignDetection } from "./campaigns.ts";
+import {
+  classifySignal,
+  pruneBrains,
+  pruneTechniques,
+  type BrainRow,
+  type TechniqueRow,
+} from "./brain-pruning.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -200,16 +209,20 @@ async function selectFewShot(
   return out;
 }
 
-async function buildBrainsBlock(supabase: any): Promise<string> {
+async function fetchAllBrains(supabase: any): Promise<BrainRow[]> {
   const { data } = await supabase
     .from("agent_vendor_profiles")
-    .select("peso, notas, vendor_profiles(nome, origem, tom, estilo, principios, quando_usar, evitar_quando, exemplos_frases)")
+    .select("id, peso, notas, vendor_profiles(id, nome, origem, tom, estilo, principios, quando_usar, evitar_quando, exemplos_frases)")
     .eq("agent_slug", AGENT_SLUG)
     .order("peso", { ascending: false });
-  if (!data || data.length === 0) return "";
-  let out = "\n## 🧠 CÉREBROS QUE TE FORMAM (combine o melhor de cada um — ordenado por peso)\n";
-  for (const row of data) {
-    const v = (row as any).vendor_profiles;
+  return (data ?? []) as BrainRow[];
+}
+
+function buildBrainsBlockFromRows(rows: BrainRow[]): string {
+  if (!rows.length) return "";
+  let out = "\n## 🧠 CÉREBROS QUE TE FORMAM (use UM como liderança neste turno — escolhidos pelo contexto)\n";
+  for (const row of rows) {
+    const v = row.vendor_profiles;
     if (!v) continue;
     out += `\n### ${v.nome}${v.origem ? ` (${v.origem})` : ""} — peso ${row.peso}/10\n`;
     if (v.tom) out += `- Tom: ${v.tom}\n`;
@@ -226,16 +239,20 @@ async function buildBrainsBlock(supabase: any): Promise<string> {
   return out;
 }
 
-async function buildTechniquesBlock(supabase: any): Promise<string> {
+async function fetchAllTechniques(supabase: any): Promise<TechniqueRow[]> {
   const { data } = await supabase
     .from("agent_techniques")
-    .select("prioridade, notas, sales_techniques(nome, categoria, descricao, como_aplicar, gatilho_uso, exemplos)")
+    .select("prioridade, notas, sales_techniques(id, nome, categoria, descricao, como_aplicar, gatilho_uso, exemplos)")
     .eq("agent_slug", AGENT_SLUG)
     .order("prioridade", { ascending: false });
-  if (!data || data.length === 0) return "";
-  let out = "\n## 🎯 TÉCNICAS QUE VOCÊ DOMINA (use a apropriada ao momento)\n";
-  for (const row of data) {
-    const t = (row as any).sales_techniques;
+  return (data ?? []) as TechniqueRow[];
+}
+
+function buildTechniquesBlockFromRows(rows: TechniqueRow[]): string {
+  if (!rows.length) return "";
+  let out = "\n## 🎯 TÉCNICAS QUE VOCÊ DOMINA (escolha UMA pra ESTE turno — escolhidas pelo contexto)\n";
+  for (const row of rows) {
+    const t = row.sales_techniques;
     if (!t) continue;
     out += `\n### ${t.nome} — prioridade ${row.prioridade}/10 (${t.categoria})\n`;
     if (t.descricao) out += `${t.descricao}\n`;
@@ -622,11 +639,71 @@ Deno.serve(async (req) => {
       );
     }
 
-    const [fewShot, brainsBlock, techniquesBlock] = await Promise.all([
+    // ═══ Detecta campanha de tráfego pago ═══
+    const { data: campaignsRaw } = await supabase
+      .from("campaign_triggers")
+      .select("*")
+      .eq("agent_slug", AGENT_SLUG)
+      .eq("ativo", true);
+    const campaigns = (campaignsRaw ?? []) as CampaignTrigger[];
+    const extra_utm = (body as any).utm ?? null;
+    const campaignDetection: CampaignDetection | null = detectCampaign(user_message, campaigns, extra_utm);
+    if (campaignDetection) {
+      console.log(`[SDR campaign] match="${campaignDetection.campaign.nome}" method=${campaignDetection.method} conf=${campaignDetection.confidence.toFixed(2)}`);
+      // Aplica preset_context: enriquece coletado e retira da falta o que a campanha já presume
+      const preset = campaignDetection.campaign.preset_context || {};
+      for (const [k, v] of Object.entries(preset)) {
+        if (v !== undefined && v !== null && v !== "" && !(k in state.coletado)) {
+          (state.coletado as Record<string, unknown>)[k] = v;
+        }
+      }
+      const skip = new Set(campaignDetection.campaign.skip_questions || []);
+      state.falta = state.falta.filter((k) => !skip.has(k) && !(k in state.coletado));
+    }
+
+    // ═══ Pré-seleção (pruning) de mentes/técnicas ═══
+    const signal = classifySignal(user_message);
+    const [fewShot, allBrains, allTechniques] = await Promise.all([
       selectFewShot(supabase, state),
-      buildBrainsBlock(supabase),
-      buildTechniquesBlock(supabase),
+      fetchAllBrains(supabase),
+      fetchAllTechniques(supabase),
     ]);
+    const prunedBrains = pruneBrains(
+      allBrains,
+      signal,
+      campaignDetection?.campaign.preferred_brain_ids ?? [],
+      5,
+    );
+    const prunedTechniques = pruneTechniques(
+      allTechniques,
+      signal,
+      campaignDetection?.campaign.preferred_technique_ids ?? [],
+      4,
+    );
+    const brainsBlock = buildBrainsBlockFromRows(prunedBrains);
+    const techniquesBlock = buildTechniquesBlockFromRows(prunedTechniques);
+
+    // Mapas nome→id para logging do crítico semântico
+    const brainNameToId = new Map<string, string>();
+    for (const b of prunedBrains) {
+      if (b.vendor_profiles) brainNameToId.set(b.vendor_profiles.nome.toLowerCase(), b.vendor_profiles.id);
+    }
+    const techniqueNameToId = new Map<string, string>();
+    const techniqueNameToHowto = new Map<string, string>();
+    for (const t of prunedTechniques) {
+      if (t.sales_techniques) {
+        techniqueNameToId.set(t.sales_techniques.nome.toLowerCase(), t.sales_techniques.id);
+        techniqueNameToHowto.set(t.sales_techniques.nome.toLowerCase(), t.sales_techniques.como_aplicar);
+      }
+    }
+    const brainNameToDesc = new Map<string, string>();
+    for (const b of prunedBrains) {
+      if (b.vendor_profiles) {
+        const v = b.vendor_profiles;
+        const desc = [v.principios, v.quando_usar].filter(Boolean).join(" | ");
+        brainNameToDesc.set(v.nome.toLowerCase(), desc);
+      }
+    }
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
@@ -772,6 +849,68 @@ Deno.serve(async (req) => {
 
     if (!propostaFinal) propostaFinal = "Pode me dar um segundinho?";
 
+    // ═══ Crítico semântico (LLM-as-judge) — valida ancoragem de cérebro/técnica ═══
+    const cerebroDeclarado: string | null = metadata?.cerebro_principal ?? null;
+    const tecnicaDeclarada: string | null = metadata?.tecnica_aplicada ?? null;
+    const cerebroDesc = cerebroDeclarado
+      ? brainNameToDesc.get(cerebroDeclarado.toLowerCase()) ?? null
+      : null;
+    const tecnicaHowto = tecnicaDeclarada
+      ? techniqueNameToHowto.get(tecnicaDeclarada.toLowerCase()) ?? null
+      : null;
+    const verdict = await judgeAnchoring({
+      resposta: propostaFinal,
+      cerebro_declarado: cerebroDeclarado,
+      cerebro_descricao: cerebroDesc,
+      tecnica_declarada: tecnicaDeclarada,
+      tecnica_como_aplicar: tecnicaHowto,
+      ultima_msg_cliente: state.ultima_msg_cliente,
+    });
+    console.log(`[SDR semantic-critic] approved=${verdict.approved} conf=${verdict.confidence.toFixed(2)} reason="${verdict.reason}"`);
+
+    // ═══ Telemetria: mente_usage_log ═══
+    try {
+      await supabase.from("mente_usage_log").insert({
+        conversation_id,
+        agent_slug: AGENT_SLUG,
+        turn_number: state.turn_number,
+        cerebro_declarado: cerebroDeclarado,
+        tecnica_declarada: tecnicaDeclarada,
+        cerebro_id: cerebroDeclarado
+          ? brainNameToId.get(cerebroDeclarado.toLowerCase()) ?? null
+          : null,
+        tecnica_id: tecnicaDeclarada
+          ? techniqueNameToId.get(tecnicaDeclarada.toLowerCase()) ?? null
+          : null,
+        semantic_approved: verdict.approved,
+        semantic_confidence: verdict.confidence,
+        semantic_reason: verdict.reason,
+        evidencia_trecho: verdict.evidencia_trecho,
+        resposta_final: propostaFinal.slice(0, 2000),
+        ultima_msg_cliente: state.ultima_msg_cliente.slice(0, 1000),
+        tom_cliente: state.tom_cliente,
+        campaign_id: campaignDetection?.campaign.id ?? null,
+      });
+    } catch (logErr) {
+      console.warn("[mente_usage_log] insert failed:", logErr instanceof Error ? logErr.message : logErr);
+    }
+
+    // ═══ Atribuição de campanha (1x por conversa) ═══
+    if (campaignDetection && state.turn_number === 1) {
+      try {
+        await supabase.from("campaign_lead_attributions").insert({
+          campaign_id: campaignDetection.campaign.id,
+          lead_id,
+          conversation_id,
+          detection_method: campaignDetection.method,
+          detection_confidence: campaignDetection.confidence,
+          matched_value: campaignDetection.matched_value.slice(0, 500),
+        });
+      } catch (attrErr) {
+        console.warn("[campaign_attribution] insert failed:", attrErr instanceof Error ? attrErr.message : attrErr);
+      }
+    }
+
     // Logs
     await supabase.from("agent_critic_log").insert({
       conversation_id,
@@ -817,6 +956,19 @@ Deno.serve(async (req) => {
     }
 
     const qualificou = !!metadata?.deve_transferir_junior;
+
+    // Atualiza atribuição de campanha se qualificou
+    if (qualificou && campaignDetection) {
+      try {
+        await supabase
+          .from("campaign_lead_attributions")
+          .update({ qualificou: true, qualificou_em: new Date().toISOString() })
+          .eq("conversation_id", conversation_id)
+          .eq("campaign_id", campaignDetection.campaign.id);
+      } catch (e) {
+        console.warn("[campaign_attribution] qualified-update failed:", e instanceof Error ? e.message : e);
+      }
+    }
 
     return new Response(
       JSON.stringify({
