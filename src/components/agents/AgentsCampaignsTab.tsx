@@ -80,10 +80,10 @@ export function AgentsCampaignsTab() {
     let parsedPreset: Record<string, unknown> = {};
     try { parsedPreset = JSON.parse(presetText || "{}"); }
     catch { toast.error("Preset Context não é JSON válido"); return; }
-    const payload = { ...draft, preset_context: parsedPreset };
+    const payload = { ...draft, preset_context: parsedPreset as any };
     const { error } = editing
-      ? await supabase.from("campaign_triggers").update(payload).eq("id", editing.id)
-      : await supabase.from("campaign_triggers").insert(payload);
+      ? await supabase.from("campaign_triggers").update(payload as any).eq("id", editing.id)
+      : await supabase.from("campaign_triggers").insert(payload as any);
     if (error) { toast.error(error.message); return; }
     toast.success(editing ? "Campanha atualizada" : "Campanha criada");
     setOpen(false); load();
