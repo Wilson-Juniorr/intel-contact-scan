@@ -67,6 +67,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Load existing structured_json from lead_memory (if any) to preserve continuity
+    const { data: existingMemory } = await supabase
+      .from("lead_memory")
+      .select("structured_json")
+      .eq("lead_id", leadId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    const existingStructured = existingMemory?.structured_json || {};
+
     // Load last 50 messages (text + extracted_text)
     const normalizedPhone = lead.phone.replace(/\D/g, "");
     const phoneVariant = normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
