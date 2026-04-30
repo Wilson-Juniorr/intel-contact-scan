@@ -15,6 +15,53 @@ function normalizePhone(phone: string): string {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
+/**
+ * Sends a pre-recorded voice note via UAZAPI when a trigger is active.
+ * Triggers: apresentacao | entendimento | qualificacao_completa | follow_up_dia2 | follow_up_dia5
+ */
+async function sendAudioIfAvailable(
+  supabase: any,
+  trigger: string,
+  phone: string,
+  agentSlug: string = "sdr-qualificador",
+): Promise<boolean> {
+  const UAZAPI_URL = (Deno.env.get("UAZAPI_URL") ?? "").replace(/\/+$/, "");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN") ?? "";
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
+
+  const { data: audio } = await supabase
+    .from("agent_audios")
+    .select("audio_url, duracao_segundos")
+    .eq("agent_slug", agentSlug)
+    .eq("trigger", trigger)
+    .eq("ativo", true)
+    .maybeSingle();
+
+  if (!audio?.audio_url) return false;
+
+  // humanized "thinking/recording" delay
+  const thinkDelay = 2000 + Math.random() * 2000;
+  await new Promise((r) => setTimeout(r, thinkDelay));
+
+  try {
+    const resp = await fetch(`${UAZAPI_URL}/send/audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({
+        number: phone,
+        audio: audio.audio_url,
+        mimetype: "audio/ogg; codecs=opus",
+        ptt: true,
+      }),
+    });
+    console.log(`[audio] sent trigger=${trigger} to ${phone} status=${resp.status}`);
+    return resp.ok;
+  } catch (e) {
+    console.warn(`[audio] failed trigger=${trigger}:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
