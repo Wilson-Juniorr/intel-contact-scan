@@ -828,6 +828,13 @@ Deno.serve(async (req) => {
             });
           }
 
+          // Persist whatever was collected even on critic failure
+          if (metadata && lead && lead_id) {
+            await syncLeadDataFromMetadata(supabase, lead, lead_id, metadata).catch(
+              (e) => console.warn("syncLeadDataFromMetadata on critic-fail:", e?.message),
+            );
+          }
+
           return new Response(
             JSON.stringify({
               ok: true, silenced: true, reason: "critic_failed_twice",

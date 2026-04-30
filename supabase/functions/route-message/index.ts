@@ -179,6 +179,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Auto-update lead memory after every successful SDR turn (background)
+    if (lead?.user_id) {
+      supabase.functions.invoke("update-lead-memory", {
+        body: { leadId: lead_id, userId: lead.user_id },
+      }).catch((e: any) =>
+        console.warn("[route-message] update-lead-memory background failed:", e?.message),
+      );
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
