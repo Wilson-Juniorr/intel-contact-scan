@@ -15,6 +15,53 @@ function normalizePhone(phone: string): string {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
+/**
+ * Sends a pre-recorded voice note via UAZAPI when a trigger is active.
+ * Triggers: apresentacao | entendimento | qualificacao_completa | follow_up_dia2 | follow_up_dia5
+ */
+async function sendAudioIfAvailable(
+  supabase: any,
+  trigger: string,
+  phone: string,
+  agentSlug: string = "sdr-qualificador",
+): Promise<boolean> {
+  const UAZAPI_URL = (Deno.env.get("UAZAPI_URL") ?? "").replace(/\/+$/, "");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN") ?? "";
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
+
+  const { data: audio } = await supabase
+    .from("agent_audios")
+    .select("audio_url, duracao_segundos")
+    .eq("agent_slug", agentSlug)
+    .eq("trigger", trigger)
+    .eq("ativo", true)
+    .maybeSingle();
+
+  if (!audio?.audio_url) return false;
+
+  // humanized "thinking/recording" delay
+  const thinkDelay = 2000 + Math.random() * 2000;
+  await new Promise((r) => setTimeout(r, thinkDelay));
+
+  try {
+    const resp = await fetch(`${UAZAPI_URL}/send/audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({
+        number: phone,
+        audio: audio.audio_url,
+        mimetype: "audio/ogg; codecs=opus",
+        ptt: true,
+      }),
+    });
+    console.log(`[audio] sent trigger=${trigger} to ${phone} status=${resp.status}`);
+    return resp.ok;
+  } catch (e) {
+    console.warn(`[audio] failed trigger=${trigger}:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -126,6 +173,24 @@ Deno.serve(async (req) => {
     // 5. Send each balloon with a humanized delay via send-whatsapp
     const mensagens: string[] = sdrResp.mensagens ?? [];
     const delays: number[] = sdrResp.delays_ms ?? [];
+    const metaObjAll: any = sdrResp.metadata ?? {};
+    const coletadoAll = metaObjAll?.coletado ?? {};
+    const camposColetados = Object.values(coletadoAll).filter(
+      (v) => v !== null && v !== undefined && v !== "",
+    ).length;
+    const palavrasUltimaMsg = (message_text ?? "").trim().split(/\s+/).filter(Boolean).length;
+    // Estimate turn number from existing conversation balloons
+    const { data: convForTurn } = await supabase
+      .from("agent_conversations")
+      .select("balao_count")
+      .eq("lead_id", lead_id)
+      .eq("agent_slug", "sdr-qualificador")
+      .order("ultima_atividade", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const turnNumber = Math.max(1, Math.floor((convForTurn?.balao_count ?? 0) / 2) + 1);
+    let entendimentoSent = false;
+
     for (let i = 0; i < mensagens.length; i++) {
       const delay = Math.min(delays[i] ?? 3000, 15000);
       await new Promise((r) => setTimeout(r, delay));
@@ -144,6 +209,20 @@ Deno.serve(async (req) => {
           sendErr instanceof Error ? sendErr.message : sendErr,
         );
       }
+
+      // After first balloon: presentation audio if lead is engaged (turn 2+, msg has 5+ words)
+      if (i === 0 && turnNumber === 2 && palavrasUltimaMsg > 5) {
+        await sendAudioIfAvailable(supabase, "apresentacao", normalizedPhone);
+      }
+      // After first balloon: understanding audio when 4+ fields collected (only once)
+      if (i === 0 && !entendimentoSent && camposColetados >= 4 && !sdrResp.qualificou) {
+        entendimentoSent = await sendAudioIfAvailable(supabase, "entendimento", normalizedPhone);
+      }
+    }
+
+    // After all balloons: qualification-complete audio
+    if (sdrResp.qualificou) {
+      await sendAudioIfAvailable(supabase, "qualificacao_completa", normalizedPhone);
     }
 
     // 6. If qualified, advance stage + notify the user

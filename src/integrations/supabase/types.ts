@@ -49,6 +49,45 @@ export type Database = {
           },
         ]
       }
+      agent_audios: {
+        Row: {
+          agent_slug: string
+          ativo: boolean
+          audio_url: string
+          created_at: string
+          descricao: string
+          duracao_segundos: number | null
+          id: string
+          ordem: number
+          trigger: string
+          updated_at: string
+        }
+        Insert: {
+          agent_slug: string
+          ativo?: boolean
+          audio_url?: string
+          created_at?: string
+          descricao: string
+          duracao_segundos?: number | null
+          id?: string
+          ordem?: number
+          trigger: string
+          updated_at?: string
+        }
+        Update: {
+          agent_slug?: string
+          ativo?: boolean
+          audio_url?: string
+          created_at?: string
+          descricao?: string
+          duracao_segundos?: number | null
+          id?: string
+          ordem?: number
+          trigger?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_budget_alerts: {
         Row: {
           acao_tomada: string | null
