@@ -62,26 +62,27 @@ export function classifySignal(msg: string): Signal {
   return "duvida_geral";
 }
 
-// Mapa de keywords que devem aparecer em vendor_profile.nome OU origem OU principios
+// Mapa de keywords para vendor_profile.nome/origem/principios.
+// SDR opera com 2 cérebros: Chris Voss (emoção/rapport/objeção) e Alex Hormozi (qualificação/diagnóstico/eficiência).
 const SIGNAL_BRAIN_KEYWORDS: Record<Signal, string[]> = {
-  preco: ["chris voss", "cialdini", "ancoragem", "ancorar", "negocia", "voss", "preço", "preco", "valor", "objeção"],
-  objecao: ["voss", "cialdini", "ackerman", "objeção", "objecao", "resistência", "resistencia", "tactical empathy", "empatia"],
-  urgencia: ["sandler", "spin", "urgência", "urgencia", "dor", "consequência", "consequencia"],
-  tecnico_ans: ["consultivo", "técnico", "tecnico", "expert", "autoridade", "ans", "regulament"],
-  comparacao: ["challenger", "diferenciação", "diferenciacao", "valor único", "valor unico", "consultivo"],
-  emocional: ["voss", "tactical empathy", "empatia", "label", "labeling", "espelho", "mirror"],
-  abertura_neutra: ["spin", "rapport", "consultivo", "calor", "humano"],
-  duvida_geral: [], // injeta os top-5 por peso
+  preco: ["voss", "tactical empathy", "labeling", "ancoragem", "negocia"],
+  objecao: ["voss", "tactical empathy", "label", "mirror", "empatia"],
+  urgencia: ["hormozi", "diagnóstico", "diagnostico", "voss"],
+  tecnico_ans: ["hormozi", "diagnóstico", "diagnostico", "direto"],
+  comparacao: ["hormozi", "diagnóstico", "diagnostico", "direto", "qualifica"],
+  emocional: ["voss", "tactical empathy", "empatia", "label", "labeling", "mirror", "espelho"],
+  abertura_neutra: ["voss", "rapport", "calibrated", "labeling"],
+  duvida_geral: ["hormozi", "voss"], // ambos, ordenados por peso
 };
 
 const SIGNAL_TECHNIQUE_KEYWORDS: Record<Signal, string[]> = {
-  preco: ["ancoragem", "ancora", "ackerman", "preço", "preco", "valor", "negocia"],
-  objecao: ["mirror", "label", "espelho", "tactical empathy", "objeção", "objecao", "framing"],
-  urgencia: ["spin", "implicação", "implicacao", "consequência", "consequencia", "dor", "urgência", "urgencia"],
-  tecnico_ans: ["autoridade", "consultivo", "expert", "ans"],
-  comparacao: ["diferenciação", "diferenciacao", "challenger", "valor único", "valor unico"],
+  preco: ["ancoragem", "label", "calibrated", "negocia"],
+  objecao: ["mirror", "label", "espelho", "tactical empathy", "framing"],
+  urgencia: ["calibrated", "diagnóstico", "diagnostico", "pergunta", "implicação", "implicacao"],
+  tecnico_ans: ["calibrated", "diagnóstico", "diagnostico", "pergunta aberta"],
+  comparacao: ["diferenciação", "diferenciacao", "calibrated", "diagnóstico", "diagnostico"],
   emocional: ["mirror", "label", "espelho", "tactical empathy", "empatia"],
-  abertura_neutra: ["spin", "rapport", "open question", "pergunta aberta"],
+  abertura_neutra: ["rapport", "calibrated", "open question", "pergunta aberta", "labeling"],
   duvida_geral: [],
 };
 
