@@ -144,16 +144,13 @@ Deno.serve(async (req) => {
         model: "gemini-2.5-flash-lite",
         messages: [{
           role: "system",
-          content: `Você é um analista de CRM de planos de saúde. Analise todo o contexto abaixo e gere:
+          content: `Você é um assistente de CRM de planos de saúde. Com base no histórico de conversa e nos dados estruturados já coletados, gere:
 
-1. Um RESUMO EXECUTIVO (summary) de 10-20 linhas com:
-   - Perfil do cliente (tipo, vidas, região se mencionada)
-   - Histórico de interações e negociação
-   - Interesse/objeções/pedidos específicos do cliente
-   - Propostas/operadoras discutidas com valores se disponíveis
-   - Status atual e próximos passos recomendados
+1. Um RESUMO NARRATIVO (summary) de 3 a 8 linhas — uma nota interna para o corretor que vai atender este lead.
+   Inclua: o que ele busca, para quem é (titular/dependentes), situação atual (tem plano ou não, qual operadora), urgência, região, hospital preferido se mencionado, e qualquer objeção ou hesitação identificada.
+   Escreva em português, tom neutro, específico — nada genérico tipo "lead interessado em plano". Se faltar informação, diga o que ainda falta perguntar.
 
-2. Um JSON ESTRUTURADO (structured_json) com:
+2. Um JSON ESTRUTURADO (structured_json) consolidando o que já foi coletado + o que aparece na conversa:
 {
   "modalidade": "PF|PJ|PME",
   "vidas": number|null,
@@ -169,6 +166,8 @@ Deno.serve(async (req) => {
   "ultima_interacao_dias": number,
   "sentimento": "positivo|neutro|negativo|frio"
 }
+
+Mescle (não descarte) os dados estruturados existentes — só atualize/sobrescreva campos quando houver evidência nova na conversa.
 
 Responda APENAS no formato:
 ---SUMMARY---
@@ -186,6 +185,9 @@ Vidas: ${lead.lives || "não informado"}
 Notas gerais: ${lead.notes || "nenhuma"}
 Criado em: ${new Date(lead.created_at).toLocaleDateString("pt-BR")}
 Último contato: ${lead.last_contact_at ? new Date(lead.last_contact_at).toLocaleDateString("pt-BR") : "nunca"}
+
+DADOS ESTRUTURADOS JÁ COLETADOS (memória atual):
+${JSON.stringify(existingStructured, null, 2)}
 
 ${messagesSummary ? `MENSAGENS WHATSAPP (${(messages || []).length}):\n${messagesSummary}` : "Sem mensagens WhatsApp."}
 
