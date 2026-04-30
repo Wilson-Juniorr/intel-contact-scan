@@ -718,7 +718,10 @@ Deno.serve(async (req) => {
       `TURN: ${state.turn_number}\n` +
       (anuncio.match
         ? `\n🎯 LEAD NOVO DE ANÚNCIO DETECTADO (gatilho: ${anuncio.pattern}). Trate como interesse ATIVO em cotação — não pergunte se ele quer um plano, ele já disse que quer. Foco em qualificar (tipo PF/PJ, vidas, plano atual, urgência) com calor humano, não questionário.\n`
-        : isLeadNovoSemHistorico
+        : (!state.contexto_cliente.memoria_resumo &&
+            !state.contexto_cliente.operadora_atual &&
+            (!state.contexto_cliente.estagio ||
+              ["novo", "lead_novo", "tentativa_contato", "contato_realizado"].includes(state.contexto_cliente.estagio)))
         ? `\n🆕 LEAD NOVO sem histórico ainda — abordagem consultiva, descubra o que ele busca antes de qualificar.\n`
         : "") +
       (state.veio_por_audio
