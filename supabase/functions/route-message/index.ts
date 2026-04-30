@@ -173,6 +173,24 @@ Deno.serve(async (req) => {
     // 5. Send each balloon with a humanized delay via send-whatsapp
     const mensagens: string[] = sdrResp.mensagens ?? [];
     const delays: number[] = sdrResp.delays_ms ?? [];
+    const metaObjAll: any = sdrResp.metadata ?? {};
+    const coletadoAll = metaObjAll?.coletado ?? {};
+    const camposColetados = Object.values(coletadoAll).filter(
+      (v) => v !== null && v !== undefined && v !== "",
+    ).length;
+    const palavrasUltimaMsg = (message_text ?? "").trim().split(/\s+/).filter(Boolean).length;
+    // Estimate turn number from existing conversation balloons
+    const { data: convForTurn } = await supabase
+      .from("agent_conversations")
+      .select("balao_count")
+      .eq("lead_id", lead_id)
+      .eq("agent_slug", "sdr-qualificador")
+      .order("ultima_atividade", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const turnNumber = Math.max(1, Math.floor((convForTurn?.balao_count ?? 0) / 2) + 1);
+    let entendimentoSent = false;
+
     for (let i = 0; i < mensagens.length; i++) {
       const delay = Math.min(delays[i] ?? 3000, 15000);
       await new Promise((r) => setTimeout(r, delay));
@@ -191,6 +209,20 @@ Deno.serve(async (req) => {
           sendErr instanceof Error ? sendErr.message : sendErr,
         );
       }
+
+      // After first balloon: presentation audio if lead is engaged (turn 2+, msg has 5+ words)
+      if (i === 0 && turnNumber === 2 && palavrasUltimaMsg > 5) {
+        await sendAudioIfAvailable(supabase, "apresentacao", normalizedPhone);
+      }
+      // After first balloon: understanding audio when 4+ fields collected (only once)
+      if (i === 0 && !entendimentoSent && camposColetados >= 4 && !sdrResp.qualificou) {
+        entendimentoSent = await sendAudioIfAvailable(supabase, "entendimento", normalizedPhone);
+      }
+    }
+
+    // After all balloons: qualification-complete audio
+    if (sdrResp.qualificou) {
+      await sendAudioIfAvailable(supabase, "qualificacao_completa", normalizedPhone);
     }
 
     // 6. If qualified, advance stage + notify the user
