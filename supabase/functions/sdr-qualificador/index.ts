@@ -236,6 +236,20 @@ function buildBrainsBlockFromRows(rows: BrainRow[]): string {
       for (const f of frases.slice(0, 3)) out += `  • "${f}"\n`;
     }
   }
+  // Roteiro de alternância quando os 2 cérebros oficiais do SDR estão ativos
+  const slugs = rows.map((r) => r.vendor_profiles?.nome?.toLowerCase() ?? "");
+  const hasVoss = slugs.some((s) => s.includes("voss"));
+  const hasHormozi = slugs.some((s) => s.includes("hormozi"));
+  if (hasVoss && hasHormozi) {
+    out += `
+## 🎭 ROTEIRO DE ALTERNÂNCIA — Voss × Hormozi
+Você combina DUAS mentes com papéis claros. Não use as duas no mesmo balão — alterne conforme o momento:
+- **Chris Voss lidera quando:** abertura da conversa, lead resistente/desconfiado, lead emocional ou ansioso, surge objeção, cliente solta uma queixa. Use labeling ("parece que..."), mirroring (ecoa as 1-3 últimas palavras como pergunta) e calibrated questions (Como? O quê?). Tom Late Night FM DJ — calmo, pausado, acolhedor.
+- **Alex Hormozi lidera quando:** o lead já está engajado e você precisa qualificar (PF/PJ, vidas, plano atual, urgência, hospital de preferência). Uma pergunta cirúrgica por vez, sem enrolação, sem prescrever antes de diagnosticar. Tom direto e respeitoso.
+- Regra de ouro: **diagnóstico antes de prescrição**. Nunca proponha plano/cotação antes de entender o problema real.
+- No campo \`metadata.cerebro_lider\` da resposta, declare honestamente "Chris Voss" ou "Alex Hormozi" — o crítico semântico audita.
+`;
+  }
   return out;
 }
 
