@@ -74,9 +74,9 @@ export function AgentsAudiosTab() {
 
   const onFile = async (audio: AgentAudio, file: File) => {
     if (!file) return;
-    const allowed = [".ogg", ".mp3", ".m4a", ".opus", ".wav"];
+    const allowed = [".ogg", ".mp3", ".m4a", ".opus", ".wav", ".webm"];
     const ok = allowed.some((ext) => file.name.toLowerCase().endsWith(ext));
-    if (!ok) { toast.error("Formato inválido. Use .ogg, .mp3, .m4a, .opus ou .wav"); return; }
+    if (!ok) { toast.error("Formato inválido. Use .ogg, .mp3, .m4a, .opus, .wav ou .webm"); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error("Áudio máx 5MB"); return; }
 
     setUploadingId(audio.id);
