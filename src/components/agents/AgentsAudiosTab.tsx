@@ -50,6 +50,12 @@ export function AgentsAudiosTab() {
   const [audios, setAudios] = useState<AgentAudio[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [previewBlob, setPreviewBlob] = useState<Record<string, { url: string; blob: Blob; mime: string }>>({});
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = async () => {
@@ -120,6 +126,63 @@ export function AgentsAudiosTab() {
     if (error) { toast.error(error.message); return; }
     setAudios((prev) => prev.map((a) => a.id === audio.id ? { ...a, ativo } : a));
     toast.success(ativo ? "Áudio ativado" : "Áudio desativado");
+  };
+
+  const startRecording = async (audio: AgentAudio) => {
+    if (recordingId) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+      const mime = mimeCandidates.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || "";
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setPreviewBlob((p) => ({ ...p, [audio.id]: { url, blob, mime: rec.mimeType || "audio/webm" } }));
+      };
+      rec.start();
+      recorderRef.current = rec;
+      setRecordingId(audio.id);
+      setRecordSeconds(0);
+      timerRef.current = setInterval(() => {
+        setRecordSeconds((s) => {
+          if (s + 1 >= 20) {
+            stopRecording();
+            return s + 1;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Não foi possível acessar o microfone");
+    }
+  };
+
+  const stopRecording = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    try { recorderRef.current?.state !== "inactive" && recorderRef.current?.stop(); } catch {}
+    recorderRef.current = null;
+    setRecordingId(null);
+  };
+
+  const discardPreview = (audioId: string) => {
+    setPreviewBlob((p) => {
+      const { [audioId]: _, ...rest } = p;
+      if (_) URL.revokeObjectURL(_.url);
+      return rest;
+    });
+  };
+
+  const savePreview = async (audio: AgentAudio) => {
+    const pv = previewBlob[audio.id];
+    if (!pv) return;
+    const ext = pv.mime.includes("mp4") ? "m4a" : pv.mime.includes("ogg") ? "ogg" : "webm";
+    const file = new File([pv.blob], `gravacao-${audio.trigger}.${ext}`, { type: pv.mime });
+    await onFile(audio, file);
+    discardPreview(audio.id);
   };
 
   if (loading) {
@@ -208,7 +271,46 @@ export function AgentsAudiosTab() {
                       ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Enviando…</>
                       : <><Upload className="h-3.5 w-3.5 mr-1.5" /> {a.audio_url ? "Substituir áudio" : "Enviar áudio"}</>}
                   </Button>
+                  {recordingId === a.id ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={stopRecording}
+                    >
+                      <Mic className="h-3.5 w-3.5 mr-1.5 animate-pulse" />
+                      Parar ({recordSeconds}s)
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => startRecording(a)}
+                      disabled={!!recordingId || uploadingId === a.id}
+                    >
+                      <Mic className="h-3.5 w-3.5 mr-1.5" />
+                      Gravar agora
+                    </Button>
+                  )}
                 </div>
+
+                {previewBlob[a.id] && (
+                  <div className="space-y-2 p-2 rounded border border-primary/30 bg-primary/5">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <audio controls src={previewBlob[a.id].url} className="w-full h-8" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => savePreview(a)} disabled={uploadingId === a.id}>
+                        {uploadingId === a.id
+                          ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Salvando…</>
+                          : <>Usar esta gravação</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => discardPreview(a.id)}>
+                        Regravar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
