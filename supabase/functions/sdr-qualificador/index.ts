@@ -352,7 +352,8 @@ function runDeterministicCritic(
 
   const baloes = texto.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
   const palavrasTotal = texto.replace(/‖/g, " ").split(/\s+/).filter(Boolean).length;
-  if (palavrasTotal > 12 && baloes.length === 1) fails.push("falta_split_baloes");
+  // Soft preference apenas — não falha, vai auto-dividir antes de enviar.
+  // (Manter agente travando por isso bloqueia respostas inteiras.)
 
   // Limites duros de quantidade
   if (baloes.length > 4) fails.push("baloes_acima_do_maximo_4");
