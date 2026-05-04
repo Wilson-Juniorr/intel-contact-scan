@@ -926,7 +926,20 @@ Deno.serve(async (req) => {
     });
 
     // Split em balões
-    const baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
+    let baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
+    // Auto-split: se veio 1 balão longo (>14 palavras), parte em 2 por sentença
+    if (baloes.length === 1) {
+      const palavras = baloes[0].split(/\s+/).filter(Boolean);
+      if (palavras.length > 14) {
+        const sentencas = baloes[0].match(/[^.!?…\n]+[.!?…]+|[^.!?…\n]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
+        if (sentencas.length >= 2) {
+          const meio = Math.ceil(sentencas.length / 2);
+          const a = sentencas.slice(0, meio).join(" ").trim();
+          const b = sentencas.slice(meio).join(" ").trim();
+          if (a && b) baloes = [a, b];
+        }
+      }
+    }
     const palavrasClienteUlt = state.palavras_ultima_msg ?? 5;
     const delays = baloes.map((b, i) => calcularDelay(b, i === 0, palavrasClienteUlt));
 
