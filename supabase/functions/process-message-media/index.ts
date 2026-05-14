@@ -140,8 +140,9 @@ Texto/conteúdo extraído:
 }
 
 async function extractTextWithAI(base64: string, mimetype: string, type: "audio" | "image" | "document"): Promise<{ extractedText: string | null; semanticSummary: string | null; entities: Record<string, any> }> {
+  // Note: returns optionally `transcriptionConfidence` (0..1) for áudio.
   const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) return { extractedText: null, semanticSummary: null, entities: {} };
+  if (!GEMINI_API_KEY) return { extractedText: null, semanticSummary: null, entities: {} } as any;
 
   const dataUri = `data:${mimetype};base64,${base64}`;
 
@@ -152,6 +153,7 @@ async function extractTextWithAI(base64: string, mimetype: string, type: "audio"
 Retorne um JSON com:
 {
   "transcription": "texto transcrito aqui",
+  "transcription_confidence": 0.0-1.0 (sua confiança real na transcrição: 1.0 limpo/claro, 0.5 trechos confusos, <=0.3 inaudível),
   "semantic_summary": "resumo em 1-2 frases do que a pessoa está comunicando",
   "entities": {
     "operadora": null ou "nome",
@@ -168,7 +170,8 @@ Retorne um JSON com:
 }
 
 Se o áudio for saudação social simples (bom dia, etc), coloque is_social=true e entities vazias.
-Se inaudível, retorne transcription="[Áudio não compreendido]".
+Se totalmente inaudível, retorne transcription="[Áudio não compreendido]" e transcription_confidence=0.
+Se você só conseguiu pegar partes, devolva o que entendeu E uma confidence baixa (ex: 0.25).
 Retorne APENAS o JSON.`;
   } else if (type === "image") {
     prompt = `Analise esta imagem com precisão. Retorne um JSON:
@@ -261,24 +264,28 @@ Retorne APENAS o JSON.`;
       const semanticSummary = parsed.semantic_summary || null;
       const entities = parsed.entities || {};
       const isSocial = parsed.is_social === true;
+      const transcriptionConfidence =
+        type === "audio" && typeof parsed.transcription_confidence === "number"
+          ? Math.max(0, Math.min(1, parsed.transcription_confidence))
+          : null;
       
       // If social, prefix with [SOCIAL]
       if (isSocial && type !== "audio") {
         return { 
           extractedText: `[SOCIAL] ${semanticSummary || extractedText}`, 
           semanticSummary, 
-          entities: {} 
-        };
+          entities: {},
+        } as any;
       }
       
-      return { extractedText, semanticSummary, entities };
+      return { extractedText, semanticSummary, entities, transcriptionConfidence } as any;
     } catch {
       // Fallback: use raw content as text
-      return { extractedText: rawContent, semanticSummary: null, entities: {} };
+      return { extractedText: rawContent, semanticSummary: null, entities: {} } as any;
     }
   } catch (e) {
     console.error("AI extraction error:", e);
-    return { extractedText: null, semanticSummary: null, entities: {} };
+    return { extractedText: null, semanticSummary: null, entities: {} } as any;
   }
 }
 
@@ -390,6 +397,7 @@ Deno.serve(async (req) => {
     const extractedText = result.extractedText;
     const semanticSummary = result.semanticSummary;
     const entities = result.entities;
+    const transcriptionConfidence = (result as any).transcriptionConfidence ?? null;
 
     // Classify the message content
     const textForClassification = extractedText || msg.content || "";
@@ -420,6 +428,9 @@ Deno.serve(async (req) => {
       business_relevance_score: classification.business_relevance_score,
       intent: classification.intent,
       classification_confidence: classification.classification_confidence,
+      // Persistência de origem para o SDR (alto volume de campanha)
+      source_type: type === "audio" ? "audio" : type,
+      transcription_confidence: type === "audio" ? transcriptionConfidence : null,
     };
 
     if (storagePath) updateData.media_storage_path = storagePath;
@@ -463,6 +474,8 @@ Deno.serve(async (req) => {
       semanticSummary: semanticSummary ? semanticSummary.slice(0, 300) : null,
       entities: entities || {},
       storagePath,
+      sourceType: type === "audio" ? "audio" : type,
+      transcriptionConfidence: type === "audio" ? transcriptionConfidence : null,
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
