@@ -13,6 +13,12 @@ import {
   type BrainRow,
   type TechniqueRow,
 } from "./brain-pruning.ts";
+import {
+  evaluateQualification,
+  qualProgressBlock,
+  REQUIRED_FIELDS,
+  type QualProgress,
+} from "./qual-score.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -146,13 +152,17 @@ function buildState(
   if (mem.regiao) coletado.regiao = mem.regiao;
   if (mem.o_que_busca) coletado.o_que_busca = mem.o_que_busca;
   if (mem.horario) coletado.horario = mem.horario;
+  if (mem.faixa_etaria) coletado.faixa_etaria = mem.faixa_etaria;
+  if (mem.objetivo) coletado.objetivo = mem.objetivo;
+  // plano_atual estruturado quando memória já trouxe
+  if (mem.plano_atual && !coletado.plano_atual) coletado.plano_atual = mem.plano_atual;
   // Permite que memória sobreescreva defaults de lead.type e lead.lives
   // caso o lead tenha sido criado com tipo "PF" default mas cliente esclareceu que é PJ
   if (mem.tipo && !coletado.tipo) coletado.tipo = mem.tipo;
   if (mem.vidas && !coletado.vidas) coletado.vidas = mem.vidas;
 
-  const camposBase = ["tipo", "vidas", "plano_atual", "o_que_busca", "regiao", "horario"];
-  const falta = camposBase.filter((k) => !(k in coletado));
+  // `falta` é só compat com prompt legado — quem manda agora é qual-score.evaluateQualification.
+  const falta = (REQUIRED_FIELDS as readonly string[]).filter((k) => !(k in coletado));
 
   const palavras = user_message.trim().split(/\s+/).filter(Boolean).length;
   const turn = ((conv?.mensagens ?? []) as any[]).filter((m) => m.role === "assistant").length + 1;
@@ -529,6 +539,9 @@ async function syncLeadDataFromMetadata(
     ["rede_hospitais", coletadoMeta.rede],
     ["tipo", coletadoMeta.tipo],
     ["vidas", coletadoMeta.vidas],
+    ["faixa_etaria", coletadoMeta.faixa_etaria],
+    ["objetivo", coletadoMeta.objetivo],
+    ["plano_atual", coletadoMeta.plano_atual],
   ];
 
   let memChanged = false;
@@ -622,6 +635,10 @@ Deno.serve(async (req) => {
       (source_type as any) ?? (is_audio === true ? "audio" : "text"),
       typeof transcription_confidence === "number" ? transcription_confidence : null,
     );
+
+    // ═══ Qualificação estruturada determinística ═══
+    let qualProgress: QualProgress = evaluateQualification(state.coletado);
+    console.log(`[SDR qual] score=${qualProgress.score} pct=${qualProgress.pct} next=${qualProgress.next_question_field ?? "-"} oos=${qualProgress.out_of_scope}`);
 
     // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
     // Para volume alto de campanha: o áudio NUNCA pode quebrar a conversa
@@ -842,6 +859,7 @@ Deno.serve(async (req) => {
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +
+      qualProgressBlock(qualProgress) +
       "\n\n═══ META-RACIOCÍNIO OBRIGATÓRIO ═══\n" +
       "Antes de responder, escolha CONSCIENTEMENTE:\n" +
       "1. UM cérebro principal (da lista acima) que vai liderar este turno\n" +
@@ -1064,7 +1082,56 @@ Deno.serve(async (req) => {
       await syncLeadDataFromMetadata(supabase, lead, lead_id, metadata);
     }
 
-    const qualificou = !!metadata?.deve_transferir_junior;
+    // Recalcula qualificação combinando coletado anterior + o que metadata trouxe neste turno.
+    const coletadoFinal: Record<string, unknown> = {
+      ...state.coletado,
+      ...(metadata?.coletado ?? {}),
+    };
+    const qualFinal = evaluateQualification(coletadoFinal);
+    console.log(`[SDR qual final] score=${qualFinal.score} pct=${qualFinal.pct} missing=${JSON.stringify(qualFinal.missing)}`);
+
+    // Handoff só com score A — agente pode pedir, mas gate fecha se faltar dado.
+    const aiPediuHandoff = !!metadata?.deve_transferir_junior;
+    const qualificou = qualFinal.score === "A" && aiPediuHandoff;
+    if (aiPediuHandoff && !qualificou) {
+      console.log(`[SDR qual] handoff bloqueado: AI pediu mas score=${qualFinal.score} (faltam ${qualFinal.missing.join(",")})`);
+    }
+
+    // Persiste qual_progress dentro de conversation_state pra próximo turno.
+    try {
+      await supabase.from("agent_conversations").update({
+        conversation_state: {
+          ...(state as any),
+          qual_progress: qualFinal,
+        },
+      }).eq("id", conversation_id);
+    } catch (e) {
+      console.warn("[qual_progress] persist failed:", e instanceof Error ? e.message : e);
+    }
+
+    // Log estruturado da qualificação (action_log, se houver lead/user)
+    if (lead?.user_id) {
+      try {
+        await supabase.from("action_log").insert({
+          user_id: lead.user_id,
+          lead_id,
+          action_type: "qual_score_evaluated",
+          metadata: {
+            score: qualFinal.score,
+            pct: qualFinal.pct,
+            filled: qualFinal.filled,
+            missing: qualFinal.missing,
+            out_of_scope: qualFinal.out_of_scope,
+            reasons: qualFinal.reasons,
+            ai_pediu_handoff: aiPediuHandoff,
+            handoff_concedido: qualificou,
+            turn: state.turn_number,
+          },
+        });
+      } catch (e) {
+        console.warn("[action_log qual] insert failed:", e instanceof Error ? e.message : e);
+      }
+    }
 
     // Atualiza atribuição de campanha se qualificou
     if (qualificou && campaignDetection) {
@@ -1092,6 +1159,7 @@ Deno.serve(async (req) => {
         mensagens: baloes,
         delays_ms: delays,
         qualificou,
+        qual_progress: qualFinal,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
