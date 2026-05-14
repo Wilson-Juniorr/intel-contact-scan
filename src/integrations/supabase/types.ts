@@ -1500,6 +1500,10 @@ export type Database = {
           org_id: string | null
           phone: string
           plan_type: string | null
+          qual_score: string | null
+          qual_score_breakdown: Json | null
+          qual_score_reason: string | null
+          qual_score_updated_at: string | null
           quote_min_value: number | null
           quote_operadora: string | null
           quote_plan_name: string | null
@@ -1527,6 +1531,10 @@ export type Database = {
           org_id?: string | null
           phone: string
           plan_type?: string | null
+          qual_score?: string | null
+          qual_score_breakdown?: Json | null
+          qual_score_reason?: string | null
+          qual_score_updated_at?: string | null
           quote_min_value?: number | null
           quote_operadora?: string | null
           quote_plan_name?: string | null
@@ -1554,6 +1562,10 @@ export type Database = {
           org_id?: string | null
           phone?: string
           plan_type?: string | null
+          qual_score?: string | null
+          qual_score_breakdown?: Json | null
+          qual_score_reason?: string | null
+          qual_score_updated_at?: string | null
           quote_min_value?: number | null
           quote_operadora?: string | null
           quote_plan_name?: string | null
