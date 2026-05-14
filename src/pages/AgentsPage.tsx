@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles } from "lucide-react";
 import { AgentsConfigTab } from "@/components/agents/AgentsConfigTab";
@@ -14,8 +15,10 @@ import { AgentsExamplesTab } from "@/components/agents/AgentsExamplesTab";
 import { AgentsCampaignsTab } from "@/components/agents/AgentsCampaignsTab";
 import { AgentsMentesTab } from "@/components/agents/AgentsMentesTab";
 import { AgentsAudiosTab } from "@/components/agents/AgentsAudiosTab";
+import { AgentsOperationsTab } from "@/components/agents/AgentsOperationsTab";
 
 export default function AgentsPage() {
+  const [tab, setTab] = useState("config");
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
       <div className="flex items-center gap-3">
@@ -28,8 +31,8 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-12 lg:grid-cols-[repeat(14,minmax(0,1fr))] max-w-7xl">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-12 lg:grid-cols-[repeat(15,minmax(0,1fr))] max-w-7xl">
           <TabsTrigger value="config">Configuração</TabsTrigger>
           <TabsTrigger value="brains">Cérebros</TabsTrigger>
           <TabsTrigger value="techniques">Técnicas</TabsTrigger>
@@ -42,6 +45,7 @@ export default function AgentsPage() {
           <TabsTrigger value="playground">Playground</TabsTrigger>
           <TabsTrigger value="conversations">Conversas</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          <TabsTrigger value="operations">Operações</TabsTrigger>
           <TabsTrigger value="hq">Agent HQ</TabsTrigger>
           <TabsTrigger value="costs">Custos</TabsTrigger>
         </TabsList>
@@ -57,6 +61,9 @@ export default function AgentsPage() {
         <TabsContent value="playground" className="animate-fade-in"><AgentsPlaygroundTab /></TabsContent>
         <TabsContent value="conversations" className="animate-fade-in"><AgentsConversationsTab /></TabsContent>
         <TabsContent value="compliance" className="animate-fade-in"><AgentsComplianceTab /></TabsContent>
+        <TabsContent value="operations" className="animate-fade-in">
+          {tab === "operations" && <AgentsOperationsTab />}
+        </TabsContent>
         <TabsContent value="hq" className="animate-fade-in"><AgentHQ /></TabsContent>
         <TabsContent value="costs" className="animate-fade-in"><AgentsCostPanel /></TabsContent>
       </Tabs>
