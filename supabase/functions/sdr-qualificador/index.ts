@@ -1082,7 +1082,56 @@ Deno.serve(async (req) => {
       await syncLeadDataFromMetadata(supabase, lead, lead_id, metadata);
     }
 
-    const qualificou = !!metadata?.deve_transferir_junior;
+    // Recalcula qualificação combinando coletado anterior + o que metadata trouxe neste turno.
+    const coletadoFinal: Record<string, unknown> = {
+      ...state.coletado,
+      ...(metadata?.coletado ?? {}),
+    };
+    const qualFinal = evaluateQualification(coletadoFinal);
+    console.log(`[SDR qual final] score=${qualFinal.score} pct=${qualFinal.pct} missing=${JSON.stringify(qualFinal.missing)}`);
+
+    // Handoff só com score A — agente pode pedir, mas gate fecha se faltar dado.
+    const aiPediuHandoff = !!metadata?.deve_transferir_junior;
+    const qualificou = qualFinal.score === "A" && aiPediuHandoff;
+    if (aiPediuHandoff && !qualificou) {
+      console.log(`[SDR qual] handoff bloqueado: AI pediu mas score=${qualFinal.score} (faltam ${qualFinal.missing.join(",")})`);
+    }
+
+    // Persiste qual_progress dentro de conversation_state pra próximo turno.
+    try {
+      await supabase.from("agent_conversations").update({
+        conversation_state: {
+          ...(state as any),
+          qual_progress: qualFinal,
+        },
+      }).eq("id", conversation_id);
+    } catch (e) {
+      console.warn("[qual_progress] persist failed:", e instanceof Error ? e.message : e);
+    }
+
+    // Log estruturado da qualificação (action_log, se houver lead/user)
+    if (lead?.user_id) {
+      try {
+        await supabase.from("action_log").insert({
+          user_id: lead.user_id,
+          lead_id,
+          action_type: "qual_score_evaluated",
+          metadata: {
+            score: qualFinal.score,
+            pct: qualFinal.pct,
+            filled: qualFinal.filled,
+            missing: qualFinal.missing,
+            out_of_scope: qualFinal.out_of_scope,
+            reasons: qualFinal.reasons,
+            ai_pediu_handoff: aiPediuHandoff,
+            handoff_concedido: qualificou,
+            turn: state.turn_number,
+          },
+        });
+      } catch (e) {
+        console.warn("[action_log qual] insert failed:", e instanceof Error ? e.message : e);
+      }
+    }
 
     // Atualiza atribuição de campanha se qualificou
     if (qualificou && campaignDetection) {
@@ -1110,6 +1159,7 @@ Deno.serve(async (req) => {
         mensagens: baloes,
         delays_ms: delays,
         qualificou,
+        qual_progress: qualFinal,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
