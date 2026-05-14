@@ -99,6 +99,9 @@ interface ConversationState {
   fonte: string | null;
   turn_number: number;
   veio_por_audio: boolean;
+  source_type: "audio" | "text" | "image" | "document" | "unknown";
+  transcription_confidence: number | null;
+  transcription_quality: "good" | "low" | "none";
   contexto_cliente: {
     estagio: string | null;
     ja_e_cliente: boolean;
@@ -126,6 +129,8 @@ function buildState(
   conv: any,
   user_message: string,
   is_audio: boolean,
+  source_type: ConversationState["source_type"] = "text",
+  transcription_confidence: number | null = null,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
   const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
@@ -164,6 +169,23 @@ function buildState(
     ? Math.floor((Date.now() - new Date(ultimaAt).getTime()) / 86400000)
     : null;
 
+  // Qualidade da transcrição (somente para áudio)
+  let transcription_quality: ConversationState["transcription_quality"] = "good";
+  if (is_audio) {
+    const txt = (user_message || "").trim();
+    const inaudible =
+      !txt ||
+      txt === "[Áudio não compreendido]" ||
+      /\[áudio não compreendido\]/i.test(txt);
+    if (inaudible) {
+      transcription_quality = "none";
+    } else if (transcription_confidence !== null && transcription_confidence < 0.4) {
+      transcription_quality = "low";
+    } else if (transcription_confidence === null && txt.split(/\s+/).filter(Boolean).length < 2) {
+      transcription_quality = "low";
+    }
+  }
+
   return {
     coletado,
     falta,
@@ -173,6 +195,9 @@ function buildState(
     fonte: null,
     turn_number: turn,
     veio_por_audio: is_audio,
+    source_type,
+    transcription_confidence,
+    transcription_quality,
     contexto_cliente: {
       estagio: lead?.stage ?? null,
       ja_e_cliente,
@@ -537,7 +562,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { lead_id, whatsapp_number, user_message, is_audio } = body;
+    const {
+      lead_id,
+      whatsapp_number,
+      user_message,
+      is_audio,
+      source_type,
+      transcription_confidence,
+    } = body;
     let conversation_id: string | null = body.conversation_id ?? null;
 
     if (!lead_id || !whatsapp_number || !user_message) {
@@ -582,7 +614,59 @@ Deno.serve(async (req) => {
       supabase.from("leads").select("*, lead_memory(*)").eq("id", lead_id).maybeSingle(),
     ]);
 
-    const state = buildState(lead, conv, user_message, is_audio === true);
+    const state = buildState(
+      lead,
+      conv,
+      user_message,
+      is_audio === true,
+      (source_type as any) ?? (is_audio === true ? "audio" : "text"),
+      typeof transcription_confidence === "number" ? transcription_confidence : null,
+    );
+
+    // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
+    // Para volume alto de campanha: o áudio NUNCA pode quebrar a conversa
+    // nem fazer o agente afirmar coisas que não entendeu.
+    if (is_audio === true && state.transcription_quality !== "good") {
+      const opcoes = [
+        "Deu uma falhada aqui no áudio, não peguei tudo. Me confirma rapidinho por texto: é pra você (PF) ou pra empresa (PJ)?",
+        "Não consegui escutar direito o áudio 😅 me conta em texto: tá buscando plano pra quantas pessoas?",
+        "Deu chiado aqui, não peguei. Me manda em texto: o que exatamente você tá precisando?",
+      ];
+      const escolhido = opcoes[Math.floor(Math.random() * opcoes.length)];
+      const balao = escolhido;
+
+      // Atualiza conversa com a mensagem do cliente + a resposta de clarificação
+      const novasMensagens = [
+        ...((conv?.mensagens ?? []) as any[]),
+        { role: "user", content: user_message },
+        { role: "assistant", content: balao },
+      ];
+      if (conversation_id) {
+        await supabase.from("agent_conversations").update({
+          status: "ativa",
+          mensagens: novasMensagens,
+          balao_count: ((conv?.balao_count ?? 0) as number) + 2,
+          ultima_atividade: new Date().toISOString(),
+          conversation_state: state as any,
+        }).eq("id", conversation_id);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          conversation_id,
+          mensagens: [balao],
+          delays_ms: [1500],
+          qualificou: false,
+          metadata: {
+            short_circuit: "audio_unintelligible",
+            transcription_quality: state.transcription_quality,
+            transcription_confidence: state.transcription_confidence,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Anúncio detectado serve só pra enriquecer o contexto da conversa —
     // NÃO interfere mais na decisão de silenciar. Junior responde a qualquer
@@ -749,7 +833,11 @@ Deno.serve(async (req) => {
           "- NÃO repita a transcrição literal nem cite que é uma transcrição.\n" +
           "- Responda como se estivesse numa conversa fluida — exatamente como você responderia a um texto.\n" +
           "- Se a transcrição estiver confusa/incompleta, peça pra repetir de forma natural ('não peguei tudo, me conta de novo?').\n" +
-          "- Mantenha o split em balões e o tom humano de sempre.\n"
+          "- Mantenha o split em balões e o tom humano de sempre.\n" +
+          "- ⚠️ Áudio NÃO é sinal de interesse por si só. Não trate como lead mais quente nem acelere a qualificação só porque veio áudio. Avalie só pelo conteúdo transcrito.\n" +
+          (state.transcription_confidence !== null
+            ? `- Confiança da transcrição: ${(state.transcription_confidence * 100).toFixed(0)}%. Se baixa, prefira CONFIRMAR antes de afirmar qualquer coisa.\n`
+            : "")
         : "") +
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"

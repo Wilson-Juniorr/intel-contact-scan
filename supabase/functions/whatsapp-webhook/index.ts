@@ -611,6 +611,7 @@ Deno.serve(async (req) => {
     // ═══ PROCESS MEDIA ═══
     const mediaTypes = ["audio", "ptt", "image", "document"];
     let audioTranscription: string | null = null;
+    let audioTranscriptionConfidence: number | null = null;
     if (mediaTypes.includes(messageType) && messageId) {
       await supabase.from("whatsapp_messages").update({ processing_status: "pending" }).eq("id", messageId);
       try {
@@ -625,6 +626,9 @@ Deno.serve(async (req) => {
           // Capture transcription so we can route audio messages to the SDR
           if (messageType === "audio" || messageType === "ptt") {
             audioTranscription = processResult.extractedText;
+            if (typeof processResult.transcriptionConfidence === "number") {
+              audioTranscriptionConfidence = processResult.transcriptionConfidence;
+            }
           }
         }
       } catch (e) { console.error("Media processing error (non-blocking):", e); }
@@ -698,10 +702,14 @@ Deno.serve(async (req) => {
 
     // ═══ ROUTE TO AI AGENT — com gate de classificação (Onda 1) ═══
     const isAudio = messageType === "audio" || messageType === "ptt";
+    // Para áudio, **sempre** roteamos (mesmo se transcrição ruim) para que
+    // o SDR responda pedindo confirmação objetiva — alto volume de campanha
+    // exige que nenhum lead fique mudo. O sdr-qualificador usa
+    // `transcription_confidence` para decidir o tom.
     const routableText = isAudio
-      ? (audioTranscription && audioTranscription.trim().length > 0 && !audioTranscription.includes("[Áudio não compreendido]")
+      ? (audioTranscription && audioTranscription.trim().length > 0
           ? audioTranscription
-          : null)
+          : "[Áudio não compreendido]")
       : (messageType === "text" && content && content.trim().length > 0 ? content : null);
 
     if (!isFromMe && leadId && routableText) {
@@ -716,6 +724,8 @@ Deno.serve(async (req) => {
               whatsapp_number: normalizedPhone,
               message_text: routableText,
               is_audio: isAudio,
+              source_type: isAudio ? "audio" : "text",
+              transcription_confidence: isAudio ? audioTranscriptionConfidence : null,
             },
           }).catch((err: any) =>
             console.error("route-message dispatch failed:", err?.message ?? err)

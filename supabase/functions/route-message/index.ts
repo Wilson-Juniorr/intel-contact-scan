@@ -76,7 +76,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lead_id, whatsapp_number, message_text, is_audio } = await req.json();
+    const {
+      lead_id,
+      whatsapp_number,
+      message_text,
+      is_audio,
+      source_type,
+      transcription_confidence,
+    } = await req.json();
     if (!lead_id || !whatsapp_number || !message_text) {
       return new Response(
         JSON.stringify({
@@ -168,6 +175,9 @@ Deno.serve(async (req) => {
           whatsapp_number: normalizedPhone,
           user_message: message_text,
           is_audio: is_audio === true,
+          source_type: source_type ?? (is_audio === true ? "audio" : "text"),
+          transcription_confidence:
+            typeof transcription_confidence === "number" ? transcription_confidence : null,
         },
       },
     );

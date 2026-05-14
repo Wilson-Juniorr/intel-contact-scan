@@ -2307,7 +2307,9 @@ export type Database = {
           phone: string
           processing_error: string | null
           processing_status: string | null
+          source_type: string | null
           status: string | null
+          transcription_confidence: number | null
           uazapi_message_id: string | null
           user_id: string
         }
@@ -2331,7 +2333,9 @@ export type Database = {
           phone: string
           processing_error?: string | null
           processing_status?: string | null
+          source_type?: string | null
           status?: string | null
+          transcription_confidence?: number | null
           uazapi_message_id?: string | null
           user_id: string
         }
@@ -2355,7 +2359,9 @@ export type Database = {
           phone?: string
           processing_error?: string | null
           processing_status?: string | null
+          source_type?: string | null
           status?: string | null
+          transcription_confidence?: number | null
           uazapi_message_id?: string | null
           user_id?: string
         }
