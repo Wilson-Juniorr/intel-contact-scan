@@ -27,8 +27,9 @@ const corsHeaders = {
 };
 
 // Slug canônico do agente principal de pré-qualificação.
-// O nome do diretório/edge-function permanece `sdr-qualificador` por compatibilidade,
-// mas todas as escritas/leituras em DB usam `junior-sdr`.
+// Edge function canônica do agente principal de pré-qualificação.
+// Slug em DB: `junior-sdr`. A função `sdr-qualificador` permanece como
+// shim de compatibilidade encaminhando para esta.
 const AGENT_SLUG = "junior-sdr";
 const SPLIT_CHAR = "‖";
 const CRITIC_MODEL = "google/gemini-2.5-flash-lite";
@@ -1165,7 +1166,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("sdr-qualificador v3 error:", msg);
+    console.error("junior-sdr v3 error:", msg);
     return new Response(
       JSON.stringify({ ok: false, error: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
