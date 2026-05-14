@@ -18,7 +18,7 @@ export function StepIdentity({ state, set }: { state: BuilderState; set: (p: Par
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Slug (id técnico)</Label>
-          <Input value={state.slug} onChange={(e) => set({ slug: slugify(e.target.value) })} placeholder="camila-sdr" />
+          <Input value={state.slug} onChange={(e) => set({ slug: slugify(e.target.value) })} placeholder="junior-sdr" />
         </div>
         <div>
           <Label>Tipo</Label>

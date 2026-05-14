@@ -26,7 +26,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { agent_slug, conversation_id, user_message, extra_context } = await req.json();
+    let { agent_slug, conversation_id, user_message, extra_context } = await req.json();
+    // Compat: o agente principal de pré-qualificação foi renomeado para `junior-sdr`.
+    // Aceitamos `sdr-qualificador` como alias temporário.
+    if (agent_slug === "sdr-qualificador" || agent_slug === "camila-sdr") {
+      agent_slug = "junior-sdr";
+    }
     if (!agent_slug || !user_message) {
       return new Response(JSON.stringify({ error: "agent_slug e user_message são obrigatórios" }), {
         status: 400,

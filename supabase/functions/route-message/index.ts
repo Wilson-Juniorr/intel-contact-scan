@@ -10,6 +10,10 @@ const corsHeaders = {
 
 const SDR_STAGES = ["novo", "tentativa_contato", "contato_realizado"];
 
+// Slug canônico do agente principal. O nome da edge function (diretório)
+// continua sendo `sdr-qualificador` por compatibilidade de deploy.
+const SDR_AGENT_SLUG = "junior-sdr";
+
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("55") ? digits : `55${digits}`;
@@ -23,7 +27,7 @@ async function sendAudioIfAvailable(
   supabase: any,
   trigger: string,
   phone: string,
-  agentSlug: string = "sdr-qualificador",
+  agentSlug: string = SDR_AGENT_SLUG,
 ): Promise<boolean> {
   const UAZAPI_URL = (Deno.env.get("UAZAPI_URL") ?? "").replace(/\/+$/, "");
   const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN") ?? "";
@@ -135,7 +139,7 @@ Deno.serve(async (req) => {
     const { data: agentRow } = await supabase
       .from("agents_config")
       .select("ativo")
-      .eq("slug", "sdr-qualificador")
+      .eq("slug", SDR_AGENT_SLUG)
       .maybeSingle();
 
     if (!agentRow?.ativo) {
@@ -166,7 +170,7 @@ Deno.serve(async (req) => {
       conversation_id: sdrResp.conversation_id ?? null,
       message_in: message_text.slice(0, 500),
       contexto_avaliado: { stage, lead_id },
-      agent_escolhido: "sdr-qualificador",
+      agent_escolhido: SDR_AGENT_SLUG,
       motivo: `stage=${stage}`,
     });
 
@@ -184,7 +188,7 @@ Deno.serve(async (req) => {
       .from("agent_conversations")
       .select("balao_count")
       .eq("lead_id", lead_id)
-      .eq("agent_slug", "sdr-qualificador")
+      .eq("agent_slug", SDR_AGENT_SLUG)
       .order("ultima_atividade", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -270,7 +274,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
-        agent: "sdr-qualificador",
+        agent: SDR_AGENT_SLUG,
         mensagens_enviadas: mensagens.length,
         qualificou: !!sdrResp.qualificou,
       }),

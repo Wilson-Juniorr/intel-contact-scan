@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function AgentsExamplesTab() {
   const [agents, setAgents] = useState<{ slug: string; nome: string; ativo: boolean }[]>([]);
-  const [agentSlug, setAgentSlug] = useState<string>("sdr-qualificador");
+  const [agentSlug, setAgentSlug] = useState<string>("junior-sdr");
   const { examples, loading, upsert, remove, toggleApproval } = useAgentExamples(agentSlug);
 
   useEffect(() => {
