@@ -14,8 +14,9 @@ const corsHeaders = {
 
 const SDR_STAGES = ["novo", "tentativa_contato", "contato_realizado"];
 
-// Slug canônico do agente principal. O nome da edge function (diretório)
-// continua sendo `sdr-qualificador` por compatibilidade de deploy.
+// Slug canônico do agente principal e nome da edge function correspondente.
+// A função antiga `sdr-qualificador` permanece deployada como shim de
+// compatibilidade para callers legados.
 const SDR_AGENT_SLUG = "junior-sdr";
 
 function normalizePhone(phone: string): string {
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
     // 3. Invoke the SDR
     const normalizedPhone = normalizedPhoneEarly;
     const { data: sdrResp, error: sdrErr } = await supabase.functions.invoke(
-      "sdr-qualificador",
+      "junior-sdr",
       {
         body: {
           lead_id,
