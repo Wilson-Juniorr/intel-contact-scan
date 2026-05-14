@@ -1,6 +1,10 @@
 // Routes inbound WhatsApp messages to the right agent. Today only the SDR
 // pre-qualifier is wired up. Future expansions: follow-up, closer, negotiator.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  evaluateAutomationGate,
+  logAutomationBlock,
+} from "../_shared/automation-gate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,24 +109,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (lead.in_manual_conversation) {
+    // Gate único de automação (categoria, manual, opt-out, janela compliance)
+    const normalizedPhoneEarly = normalizePhone(whatsapp_number);
+    const gate = await evaluateAutomationGate(supabase, {
+      user_id: lead.user_id,
+      phone: normalizedPhoneEarly,
+      lead_id,
+      agent_slug: SDR_AGENT_SLUG,
+    });
+    if (!gate.allowed) {
+      await logAutomationBlock(supabase, gate, {
+        user_id: lead.user_id,
+        lead_id,
+        agent_slug: SDR_AGENT_SLUG,
+        stage: "inbound_routing",
+        phone: normalizedPhoneEarly,
+        message_preview: message_text?.slice(0, 280),
+      });
       return new Response(
-        JSON.stringify({ ok: true, skipped: "manual_conversation" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Second gate: contact category blocks SDR even if upstream missed it.
-    const { data: categoryContact } = await supabase
-      .from("whatsapp_contacts")
-      .select("category")
-      .eq("user_id", lead.user_id)
-      .eq("phone", whatsapp_number)
-      .maybeSingle();
-    const blockingCategories = ["personal", "team", "partner", "vendor", "spam"];
-    if (categoryContact?.category && blockingCategories.includes(categoryContact.category)) {
-      return new Response(
-        JSON.stringify({ ok: true, skipped: "contact_category_blocks", categoria: categoryContact.category }),
+        JSON.stringify({
+          ok: true,
+          skipped: "automation_blocked",
+          block: { reason: gate.reason, metadata: gate.metadata ?? null },
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -150,7 +159,7 @@ Deno.serve(async (req) => {
     }
 
     // 3. Invoke the SDR
-    const normalizedPhone = normalizePhone(whatsapp_number);
+    const normalizedPhone = normalizedPhoneEarly;
     const { data: sdrResp, error: sdrErr } = await supabase.functions.invoke(
       "sdr-qualificador",
       {
@@ -205,6 +214,7 @@ Deno.serve(async (req) => {
             message: mensagens[i],
             lead_id,
             user_id: lead.user_id,
+            agent_slug: SDR_AGENT_SLUG,
           },
         });
       } catch (sendErr) {

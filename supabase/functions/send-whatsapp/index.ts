@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  evaluateAutomationGate,
+  logAutomationBlock,
+} from "../_shared/automation-gate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -84,6 +88,43 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // ═══ GATE ÚNICO DE AUTOMAÇÃO (revalidação fail-closed) ═══
+    // Só é aplicado quando a chamada é assumidamente automática (vem com
+    // agent_slug). Envios manuais do corretor pela interface NÃO passam por aqui.
+    if (agent_slug) {
+      const cleanForGate = String(phone).replace(/\D/g, "");
+      const phoneForGate = cleanForGate.startsWith("55") ? cleanForGate : `55${cleanForGate}`;
+
+      const gate = await evaluateAutomationGate(serviceSupabase, {
+        user_id: userId,
+        phone: phoneForGate,
+        lead_id: lead_id ?? null,
+        agent_slug,
+        skip_window_check: !!skip_window_check,
+      });
+
+      if (!gate.allowed) {
+        await logAutomationBlock(serviceSupabase, gate, {
+          user_id: userId,
+          lead_id: lead_id ?? null,
+          agent_slug,
+          stage: "send_whatsapp",
+          phone: phoneForGate,
+          message_preview: String(message ?? "").slice(0, 280),
+        });
+        return new Response(
+          JSON.stringify({
+            success: false,
+            blocked: true,
+            reason: gate.reason,
+            metadata: gate.metadata ?? null,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+    // ═══ fim gate ═══
 
     // ═══ COMPLIANCE — janela de horário (Onda 1) ═══
     if (!skip_window_check) {
