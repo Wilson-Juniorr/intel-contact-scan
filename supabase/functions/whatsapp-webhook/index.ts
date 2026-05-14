@@ -716,6 +716,29 @@ Deno.serve(async (req) => {
     if (!isFromMe && leadId && routableText) {
       const blockingCategories = ["personal", "team", "partner", "vendor", "spam"];
 
+      // ═══ OPT-OUT — detecta STOP/PARAR/SAIR/NÃO QUERO em inbound, persiste e pausa ═══
+      const optOut = detectOptOut(routableText);
+      if (optOut.match && userId) {
+        try {
+          await applyOptOut(supabase, {
+            user_id: userId,
+            phone: normalizedPhone,
+            lead_id: leadId,
+            message_original: routableText,
+            detected_pattern: optOut.pattern,
+            source: "inbound_webhook",
+          });
+          console.log(`[opt-out] applied for ${normalizedPhone} (lead ${leadId}) pattern=${optOut.pattern}`);
+        } catch (e) {
+          console.error("[opt-out] apply failed:", e instanceof Error ? e.message : e);
+        }
+        // Não roteia para IA — automação está pausada.
+        return new Response(
+          JSON.stringify({ status: "ok", saved: true, direction, lead_id: leadId, opt_out: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const dispatchRoute = () => {
         // @ts-ignore EdgeRuntime is provided by Supabase runtime
         (globalThis as any).EdgeRuntime?.waitUntil?.(
