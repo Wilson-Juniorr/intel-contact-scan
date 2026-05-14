@@ -13,6 +13,12 @@ import {
   type BrainRow,
   type TechniqueRow,
 } from "./brain-pruning.ts";
+import {
+  evaluateQualification,
+  qualProgressBlock,
+  REQUIRED_FIELDS,
+  type QualProgress,
+} from "./qual-score.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -146,13 +152,17 @@ function buildState(
   if (mem.regiao) coletado.regiao = mem.regiao;
   if (mem.o_que_busca) coletado.o_que_busca = mem.o_que_busca;
   if (mem.horario) coletado.horario = mem.horario;
+  if (mem.faixa_etaria) coletado.faixa_etaria = mem.faixa_etaria;
+  if (mem.objetivo) coletado.objetivo = mem.objetivo;
+  // plano_atual estruturado quando memória já trouxe
+  if (mem.plano_atual && !coletado.plano_atual) coletado.plano_atual = mem.plano_atual;
   // Permite que memória sobreescreva defaults de lead.type e lead.lives
   // caso o lead tenha sido criado com tipo "PF" default mas cliente esclareceu que é PJ
   if (mem.tipo && !coletado.tipo) coletado.tipo = mem.tipo;
   if (mem.vidas && !coletado.vidas) coletado.vidas = mem.vidas;
 
-  const camposBase = ["tipo", "vidas", "plano_atual", "o_que_busca", "regiao", "horario"];
-  const falta = camposBase.filter((k) => !(k in coletado));
+  // `falta` é só compat com prompt legado — quem manda agora é qual-score.evaluateQualification.
+  const falta = (REQUIRED_FIELDS as readonly string[]).filter((k) => !(k in coletado));
 
   const palavras = user_message.trim().split(/\s+/).filter(Boolean).length;
   const turn = ((conv?.mensagens ?? []) as any[]).filter((m) => m.role === "assistant").length + 1;
