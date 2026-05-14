@@ -633,6 +633,10 @@ Deno.serve(async (req) => {
       typeof transcription_confidence === "number" ? transcription_confidence : null,
     );
 
+    // ═══ Qualificação estruturada determinística ═══
+    let qualProgress: QualProgress = evaluateQualification(state.coletado);
+    console.log(`[SDR qual] score=${qualProgress.score} pct=${qualProgress.pct} next=${qualProgress.next_question_field ?? "-"} oos=${qualProgress.out_of_scope}`);
+
     // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
     // Para volume alto de campanha: o áudio NUNCA pode quebrar a conversa
     // nem fazer o agente afirmar coisas que não entendeu.
@@ -852,6 +856,7 @@ Deno.serve(async (req) => {
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
         : "") +
+      qualProgressBlock(qualProgress) +
       "\n\n═══ META-RACIOCÍNIO OBRIGATÓRIO ═══\n" +
       "Antes de responder, escolha CONSCIENTEMENTE:\n" +
       "1. UM cérebro principal (da lista acima) que vai liderar este turno\n" +
