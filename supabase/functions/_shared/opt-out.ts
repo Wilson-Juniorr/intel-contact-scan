@@ -21,7 +21,7 @@ export const OPT_OUT_PATTERNS: RegExp[] = [
   /\bpara\s+de\s+(mandar|enviar|me\s+chamar|chamar|me\s+escrever)\b/i,
   /\bn[aã]o\s+tenho\s+interesse\b/i,
   /\bn[aã]o\s+quero\s+(mais\s+)?(receber|conversar|nada)\b/i,
-  /\bme\s+remov(a|er)\s+(da\s+lista|do\s+contato)\b/i,
+  /\bme\s+remov(a|e|er)\s+(da\s+lista|do\s+contato)\b/i,
   /\bn[aã]o\s+me\s+incomod[ae]\b/i,
   /\bperdi\s+(o\s+)?interesse\b/i,
   /\bdesist[ií]\b/i,
