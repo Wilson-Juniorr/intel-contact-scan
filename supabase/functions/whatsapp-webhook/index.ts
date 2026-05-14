@@ -704,7 +704,7 @@ Deno.serve(async (req) => {
     const isAudio = messageType === "audio" || messageType === "ptt";
     // Para áudio, **sempre** roteamos (mesmo se transcrição ruim) para que
     // o SDR responda pedindo confirmação objetiva — alto volume de campanha
-    // exige que nenhum lead fique mudo. O sdr-qualificador usa
+    // exige que nenhum lead fique mudo. O junior-sdr usa
     // `transcription_confidence` para decidir o tom.
     const routableText = isAudio
       ? (audioTranscription && audioTranscription.trim().length > 0
