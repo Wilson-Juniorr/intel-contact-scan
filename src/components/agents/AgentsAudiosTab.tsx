@@ -63,7 +63,7 @@ export function AgentsAudiosTab() {
     const { data, error } = await supabase
       .from("agent_audios")
       .select("*")
-      .eq("agent_slug", "sdr-qualificador")
+      .eq("agent_slug", "junior-sdr")
       .order("ordem", { ascending: true });
     if (error) toast.error(error.message);
     setAudios((data as AgentAudio[]) ?? []);
