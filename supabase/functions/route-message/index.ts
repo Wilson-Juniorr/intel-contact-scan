@@ -103,19 +103,127 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1. Skip if user took manual control of this lead
-    const { data: lead } = await supabase
+    // ═══ AUDIO INTEGRITY GATE ═══
+    // Áudio NÃO é mais shortcut de lead. Só avança se a transcrição entregou
+    // texto inteligível com sinal de intenção real. Caso contrário, devolvemos
+    // uma confirmação curta ao cliente — sem invocar o SDR e sem mover estágio.
+    const normalizedPhoneAudioGate = normalizePhone(whatsapp_number);
+    const audioIn = is_audio === true || source_type === "audio";
+    const trimmedText = String(message_text ?? "").trim();
+    const isUnintelligiblePlaceholder = /^\[?áudio n[aã]o compreendido\]?$/i.test(trimmedText)
+      || /^\[?audio nao compreendido\]?$/i.test(trimmedText);
+    const wordCount = trimmedText ? trimmedText.split(/\s+/).filter(Boolean).length : 0;
+    const lowConfidence =
+      typeof transcription_confidence === "number" && transcription_confidence < 0.5;
+
+    let audioFallbackReason: string | null = null;
+    if (audioIn) {
+      if (!trimmedText || isUnintelligiblePlaceholder) {
+        audioFallbackReason = "audio_unintelligible";
+      } else if (lowConfidence) {
+        audioFallbackReason = "audio_low_confidence";
+      } else if (wordCount < 2) {
+        audioFallbackReason = "audio_too_short";
+      }
+    }
+
+    // Carrega lead cedo para usar user_id no fallback.
+    const { data: leadEarly } = await supabase
       .from("leads")
       .select("stage, in_manual_conversation, user_id, created_at, last_contact_at")
       .eq("id", lead_id)
       .maybeSingle();
 
-    if (!lead) {
+    if (!leadEarly) {
       return new Response(
         JSON.stringify({ ok: true, skipped: "lead_not_found" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    if (audioFallbackReason) {
+      console.log(
+        `[route-message] audio_received reason=${audioFallbackReason}` +
+        ` confidence=${transcription_confidence ?? "null"} words=${wordCount}` +
+        ` text_preview="${trimmedText.slice(0, 80)}"`,
+      );
+
+      // Mensagem curta de confirmação — não avança estágio, não invoca SDR.
+      const fallbackMsg =
+        "Oi! Recebi seu áudio, mas não consegui entender com clareza 🙏 " +
+        "Pode me mandar por texto rapidinho? Assim consigo te ajudar direito.";
+      try {
+        await supabase.functions.invoke("send-whatsapp", {
+          body: {
+            phone: normalizedPhoneAudioGate,
+            message: fallbackMsg,
+            lead_id,
+            user_id: leadEarly.user_id,
+            agent_slug: SDR_AGENT_SLUG,
+          },
+        });
+      } catch (sendErr) {
+        console.error(
+          "[route-message] audio fallback send failed:",
+          sendErr instanceof Error ? sendErr.message : sendErr,
+        );
+      }
+
+      try {
+        await supabase.from("action_log").insert({
+          user_id: leadEarly.user_id,
+          lead_id,
+          action_type: "audio_routing_fallback",
+          metadata: {
+            reason: audioFallbackReason,
+            transcription_confidence: transcription_confidence ?? null,
+            word_count: wordCount,
+            transcription_preview: trimmedText.slice(0, 200),
+            phone: normalizedPhoneAudioGate,
+            decision: "no_sdr_invoke_no_stage_change",
+          },
+        });
+      } catch (logErr) {
+        console.error(
+          "[route-message] action_log insert failed:",
+          logErr instanceof Error ? logErr.message : logErr,
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          skipped: "audio_fallback",
+          reason: audioFallbackReason,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (audioIn) {
+      // Áudio aprovado para roteamento — registra decisão para auditoria.
+      console.log(
+        `[route-message] audio_received reason=ok confidence=${transcription_confidence ?? "null"}` +
+        ` words=${wordCount} text_preview="${trimmedText.slice(0, 80)}"`,
+      );
+      try {
+        await supabase.from("action_log").insert({
+          user_id: leadEarly.user_id,
+          lead_id,
+          action_type: "audio_routed_to_sdr",
+          metadata: {
+            transcription_confidence: transcription_confidence ?? null,
+            word_count: wordCount,
+            transcription_preview: trimmedText.slice(0, 200),
+            phone: normalizedPhoneAudioGate,
+            decision: "sdr_invoked",
+          },
+        });
+      } catch (_) { /* non-blocking */ }
+    }
+
+    // 1. Skip if user took manual control of this lead
+    const lead = leadEarly;
 
     // Gate único de automação (categoria, manual, opt-out, janela compliance)
     const normalizedPhoneEarly = normalizePhone(whatsapp_number);
