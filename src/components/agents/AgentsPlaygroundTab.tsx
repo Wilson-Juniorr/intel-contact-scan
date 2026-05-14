@@ -20,7 +20,7 @@ type ChatMsg = {
 /**
  * Playground interno do SDR Qualificador (Camila).
  * - Você digita como se fosse o cliente; ela responde com humanização real
- *   (split em balões + delay) usando a edge function `sdr-qualificador`.
+ *   (split em balões + delay) usando a edge function `junior-sdr`.
  * - Mantém histórico real da conversa em `agent_conversations`,
  *   então é idêntico ao que aconteceria no WhatsApp.
  * - Botão "Resetar conversa" apaga a conversa atual e começa do zero.
@@ -107,7 +107,7 @@ export function AgentsPlaygroundTab() {
 
     setTyping(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sdr-qualificador", {
+      const { data, error } = await supabase.functions.invoke("junior-sdr", {
         body: {
           lead_id: lid,
           whatsapp_number: normalizePhone(phone) || phone,
