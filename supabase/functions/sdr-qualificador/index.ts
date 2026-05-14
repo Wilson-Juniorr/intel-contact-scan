@@ -20,7 +20,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const AGENT_SLUG = "sdr-qualificador";
+// Slug canônico do agente principal de pré-qualificação.
+// O nome do diretório/edge-function permanece `sdr-qualificador` por compatibilidade,
+// mas todas as escritas/leituras em DB usam `junior-sdr`.
+const AGENT_SLUG = "junior-sdr";
 const SPLIT_CHAR = "‖";
 const CRITIC_MODEL = "google/gemini-2.5-flash-lite";
 
