@@ -374,11 +374,33 @@ Deno.serve(async (req) => {
         })
         .eq("id", lead_id);
 
-      // 2) Monta briefing rico para o corretor.
+      // 2) Monta pacote de handoff padronizado para o corretor.
       const metaObj: any = sdrResp.metadata || {};
       const coletado: any = metaObj.coletado || {};
       const qual: any = sdrResp.qual_progress || {};
+      const handoffPayload: any = sdrResp.handoff_payload || {};
+      const breakdown: any = handoffPayload.breakdown || qual.breakdown || {};
       const lacunas: string[] = Array.isArray(qual.missing) ? qual.missing : [];
+
+      // Resumo da conversa (lead_memory.summary mais recente).
+      let conversaResumo: string | null = null;
+      try {
+        const { data: mem } = await supabase
+          .from("lead_memory")
+          .select("summary")
+          .eq("lead_id", lead_id)
+          .maybeSingle();
+        conversaResumo = mem?.summary ?? null;
+      } catch (_) { /* non-blocking */ }
+
+      // Recomendação de próximo passo (com prioridade de fontes).
+      const recomendacao =
+        metaObj.sugestao_proxima_msg_humana ||
+        (breakdown?.closing_potential?.score >= 60
+          ? "Enviar 2-3 opções de cotação alinhadas ao orçamento já confirmado."
+          : breakdown?.urgency?.score >= 75
+            ? "Ligar agora — janela de decisão curta declarada pelo lead."
+            : "Confirmar dados pendentes antes de cotar e agendar retorno.");
 
       const dadosLinhas = [
         coletado.tipo && `• Tipo: ${coletado.tipo}${coletado.vidas ? ` • ${coletado.vidas} vida(s)` : ""}`,
@@ -391,18 +413,29 @@ Deno.serve(async (req) => {
         coletado.orcamento && `• Orçamento: ${coletado.orcamento}`,
       ].filter(Boolean).join("\n");
 
+      const scoreLine = handoffPayload.score
+        ? `*Score:* ${handoffPayload.score}${typeof breakdown.overall === "number" ? ` (${breakdown.overall}/100)` : ""}`
+        : "*Score:* A";
+      const dimsLine = breakdown && breakdown.fit
+        ? `*Dimensões:* fit ${breakdown.fit?.score ?? "?"} · urgência ${breakdown.urgency?.score ?? "?"} · completude ${breakdown.completeness?.score ?? "?"} · fechamento ${breakdown.closing_potential?.score ?? "?"}`
+        : "";
+      const motivoLine = handoffPayload.reason || qual.reason_summary || null;
+
       const briefing = [
-        "🎯 *Lead pronto para cotação humana (Score A)*",
+        "🎯 *Lead pronto para cotação humana — Handoff*",
+        "",
+        scoreLine,
+        dimsLine,
+        motivoLine ? `*Motivo:* ${motivoLine}` : "",
         "",
         "*Dados coletados:*",
         dadosLinhas || "(nenhum dado estruturado)",
-        lacunas.length ? `\n*Lacunas:* ${lacunas.join(", ")}` : "",
-        metaObj.urgencia ? `\n*Urgência:* ${metaObj.urgencia}` : "",
+        lacunas.length ? `\n*Pendências:* ${lacunas.join(", ")}` : "\n*Pendências:* nenhuma",
+        metaObj.urgencia ? `\n*Urgência declarada:* ${metaObj.urgencia}` : "",
         metaObj.objecao_principal ? `\n*Objeção principal:* ${metaObj.objecao_principal}` : "",
-        metaObj.sugestao_proxima_msg_humana
-          ? `\n*Sugestão de próxima msg:*\n"${metaObj.sugestao_proxima_msg_humana}"`
-          : "",
-        "\n_Junior pausado — você está no comando._",
+        conversaResumo ? `\n*Resumo da conversa:*\n${conversaResumo.slice(0, 600)}` : "",
+        `\n*Próximo passo recomendado:*\n${recomendacao}`,
+        "\n_Junior pausado automaticamente — IA só volta quando você devolver a conversa._",
       ].filter(Boolean).join("\n");
 
       const leadName = (await supabase.from("leads").select("name,phone").eq("id", lead_id).maybeSingle()).data;
@@ -416,25 +449,56 @@ Deno.serve(async (req) => {
         lead_id,
       });
 
-      // 3) Registra handoff estruturado em agent_handoffs.
+      // 3) Registra handoff PADRONIZADO em agent_handoffs.
+      //    Pacote único com tudo que o corretor precisa para retomar sem ler histórico inteiro.
+      const handoffPackage = {
+        version: 1,
+        handoff_at: nowIso,
+        from_agent: SDR_AGENT_SLUG,
+        to_agent: "humano",
+        motivo: "score_A",
+        score: handoffPayload.score ?? "A",
+        score_breakdown: breakdown,
+        score_reason: motivoLine,
+        dados_coletados: coletado,
+        pendencias: lacunas,
+        urgencia: metaObj.urgencia ?? null,
+        objecao_principal: metaObj.objecao_principal ?? null,
+        recomendacao_proximo_passo: recomendacao,
+        resumo_conversa: conversaResumo,
+        manual_mode_activated: true,
+        retomada: {
+          como: "Botão 'Devolver pra Junior' no header da conversa OU desativar in_manual_conversation no lead.",
+          contexto_preservado: true,
+        },
+      };
       try {
         await supabase.from("agent_handoffs").insert({
           conversation_id: sdrResp.conversation_id ?? null,
           from_agent: SDR_AGENT_SLUG,
           to_agent: "humano",
           motivo: "score_A",
-          contexto_transferido: {
-            qual_progress: qual,
-            coletado,
-            urgencia: metaObj.urgencia ?? null,
-            objecao_principal: metaObj.objecao_principal ?? null,
-            sugestao_proxima_msg_humana: metaObj.sugestao_proxima_msg_humana ?? null,
-            lacunas,
-          },
+          contexto_transferido: handoffPackage,
         });
       } catch (e) {
         console.warn("[handoff] insert agent_handoffs failed:", e instanceof Error ? e.message : e);
       }
+
+      // 4) Log auditável da pausa automática.
+      try {
+        await supabase.from("action_log").insert({
+          user_id: lead.user_id,
+          lead_id,
+          action_type: "agent_paused_handoff",
+          metadata: {
+            agent_slug: SDR_AGENT_SLUG,
+            trigger: "score_A_handoff",
+            score: handoffPayload.score ?? "A",
+            overall: breakdown?.overall ?? null,
+            pendencias: lacunas,
+          },
+        });
+      } catch (_) { /* non-blocking */ }
     }
 
     // Auto-update lead memory after every successful SDR turn (background)

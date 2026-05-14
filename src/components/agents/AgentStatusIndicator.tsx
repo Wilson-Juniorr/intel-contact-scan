@@ -90,11 +90,29 @@ export function AgentStatusIndicator({
 
   const toggleManual = useMutation({
     mutationFn: async () => {
+      const willResume = inManualConversation; // estamos saindo do manual → retomada
       const { error } = await supabase
         .from("leads")
         .update({ in_manual_conversation: !inManualConversation })
         .eq("id", leadId);
       if (error) throw error;
+
+      // Log auditável da retomada/pausa manual
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          await supabase.from("action_log").insert({
+            user_id: user.id,
+            lead_id: leadId,
+            action_type: willResume ? "agent_resumed_manual" : "agent_paused_manual",
+            metadata: {
+              triggered_by: "corretor_ui",
+              previous_mode: inManualConversation ? "manual" : "auto",
+              new_mode: willResume ? "auto" : "manual",
+            },
+          });
+        }
+      } catch (_) { /* non-blocking */ }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["lead", leadId] });
