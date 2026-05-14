@@ -57,7 +57,13 @@ Deno.serve(async (req) => {
 
       // Envia via send-whatsapp
       const { error: sendErr } = await sb.functions.invoke("send-whatsapp", {
-        body: { phone: lead.phone, message: mensagem, lead_id: lead.id, user_id: lead.user_id },
+        body: {
+          phone: lead.phone,
+          message: mensagem,
+          lead_id: lead.id,
+          user_id: lead.user_id,
+          agent_slug: "rewarming", // força gate + guardião de compliance
+        },
       });
 
       const novaTentativa = item.tentativas_feitas + 1;
