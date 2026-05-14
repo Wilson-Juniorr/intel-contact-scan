@@ -760,7 +760,7 @@ Deno.serve(async (req) => {
             await supabase.from("action_log").insert({
               user_id: userId,
               lead_id: leadId,
-              action_type: "camila_blocked_by_category",
+              action_type: "junior_blocked_by_category",
               metadata: { categoria: contactCategory, phone: normalizedPhone },
             });
           } else if (!contactCategory || contactCategory === "ambiguo") {
@@ -776,7 +776,7 @@ Deno.serve(async (req) => {
                 await supabase.from("action_log").insert({
                   user_id: userId,
                   lead_id: leadId,
-                  action_type: "camila_blocked_by_classification",
+                  action_type: "junior_blocked_by_classification",
                   metadata: { categoria: cat, confianca: conf },
                 });
               } else if (cat === "ambiguo") {
