@@ -543,6 +543,7 @@ async function syncLeadDataFromMetadata(
     ["faixa_etaria", coletadoMeta.faixa_etaria],
     ["objetivo", coletadoMeta.objetivo],
     ["plano_atual", coletadoMeta.plano_atual],
+    ["cnpj", coletadoMeta.cnpj],
   ];
 
   let memChanged = false;
