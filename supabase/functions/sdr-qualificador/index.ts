@@ -562,7 +562,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { lead_id, whatsapp_number, user_message, is_audio } = body;
+    const {
+      lead_id,
+      whatsapp_number,
+      user_message,
+      is_audio,
+      source_type,
+      transcription_confidence,
+    } = body;
     let conversation_id: string | null = body.conversation_id ?? null;
 
     if (!lead_id || !whatsapp_number || !user_message) {
@@ -607,7 +614,59 @@ Deno.serve(async (req) => {
       supabase.from("leads").select("*, lead_memory(*)").eq("id", lead_id).maybeSingle(),
     ]);
 
-    const state = buildState(lead, conv, user_message, is_audio === true);
+    const state = buildState(
+      lead,
+      conv,
+      user_message,
+      is_audio === true,
+      (source_type as any) ?? (is_audio === true ? "audio" : "text"),
+      typeof transcription_confidence === "number" ? transcription_confidence : null,
+    );
+
+    // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
+    // Para volume alto de campanha: o áudio NUNCA pode quebrar a conversa
+    // nem fazer o agente afirmar coisas que não entendeu.
+    if (is_audio === true && state.transcription_quality !== "good") {
+      const opcoes = [
+        "Deu uma falhada aqui no áudio, não peguei tudo. Me confirma rapidinho por texto: é pra você (PF) ou pra empresa (PJ)?",
+        "Não consegui escutar direito o áudio 😅 me conta em texto: tá buscando plano pra quantas pessoas?",
+        "Deu chiado aqui, não peguei. Me manda em texto: o que exatamente você tá precisando?",
+      ];
+      const escolhido = opcoes[Math.floor(Math.random() * opcoes.length)];
+      const balao = escolhido;
+
+      // Atualiza conversa com a mensagem do cliente + a resposta de clarificação
+      const novasMensagens = [
+        ...((conv?.mensagens ?? []) as any[]),
+        { role: "user", content: user_message },
+        { role: "assistant", content: balao },
+      ];
+      if (conversation_id) {
+        await supabase.from("agent_conversations").update({
+          status: "ativa",
+          mensagens: novasMensagens,
+          balao_count: ((conv?.balao_count ?? 0) as number) + 2,
+          ultima_atividade: new Date().toISOString(),
+          conversation_state: state as any,
+        }).eq("id", conversation_id);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          conversation_id,
+          mensagens: [balao],
+          delays_ms: [1500],
+          qualificou: false,
+          metadata: {
+            short_circuit: "audio_unintelligible",
+            transcription_quality: state.transcription_quality,
+            transcription_confidence: state.transcription_confidence,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Anúncio detectado serve só pra enriquecer o contexto da conversa —
     // NÃO interfere mais na decisão de silenciar. Junior responde a qualquer
