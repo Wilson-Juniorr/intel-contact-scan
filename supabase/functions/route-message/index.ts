@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
             message: mensagens[i],
             lead_id,
             user_id: lead.user_id,
+            agent_slug: SDR_AGENT_SLUG,
           },
         });
       } catch (sendErr) {
