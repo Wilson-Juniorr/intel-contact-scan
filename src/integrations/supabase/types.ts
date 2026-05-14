@@ -1064,6 +1064,51 @@ export type Database = {
           },
         ]
       }
+      junior_followup_attempts: {
+        Row: {
+          approach_tag: string | null
+          cadence_offset_hours: number
+          created_at: string
+          id: string
+          lead_id: string
+          message_content: string | null
+          scheduled_at: string
+          sent_at: string | null
+          skip_reason: string | null
+          status: string
+          step_index: number
+          user_id: string
+        }
+        Insert: {
+          approach_tag?: string | null
+          cadence_offset_hours: number
+          created_at?: string
+          id?: string
+          lead_id: string
+          message_content?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: string
+          step_index: number
+          user_id: string
+        }
+        Update: {
+          approach_tag?: string | null
+          cadence_offset_hours?: number
+          created_at?: string
+          id?: string
+          lead_id?: string
+          message_content?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: string
+          step_index?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       lead_checklist: {
         Row: {
           completed: boolean
