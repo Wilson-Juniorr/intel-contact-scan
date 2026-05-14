@@ -251,23 +251,49 @@ Deno.serve(async (req) => {
 
     // 6. If qualified, advance stage + notify the user
     if (sdrResp.qualificou && lead.user_id) {
+      // ═══ HANDOFF SCORE A ═══
+      // 1) Avança estágio + ativa modo manual (gate fail-closed bloqueia IA daqui em diante).
+      const nowIso = new Date().toISOString();
       await supabase
         .from("leads")
         .update({
           stage: "contato_realizado",
-          updated_at: new Date().toISOString(),
+          in_manual_conversation: true,
+          assumed_at: nowIso,
+          assumed_by: lead.user_id,
+          updated_at: nowIso,
         })
         .eq("id", lead_id);
 
-      // Monta resumo estruturado (Onda 3)
-      const metaObj = sdrResp.metadata || {};
-      const coletado = metaObj.coletado || {};
-      const resumoLinhas = [
-        coletado.tipo && `• ${coletado.tipo}${coletado.vidas ? ` • ${coletado.vidas} vidas` : ""}`,
-        coletado.plano_atual?.operadora && `• Hoje: ${coletado.plano_atual.operadora}`,
-        coletado.orcamento && `• Orçamento: ${coletado.orcamento}`,
-        coletado.urgencia && `• Urgência: ${coletado.urgencia}`,
+      // 2) Monta briefing rico para o corretor.
+      const metaObj: any = sdrResp.metadata || {};
+      const coletado: any = metaObj.coletado || {};
+      const qual: any = sdrResp.qual_progress || {};
+      const lacunas: string[] = Array.isArray(qual.missing) ? qual.missing : [];
+
+      const dadosLinhas = [
+        coletado.tipo && `• Tipo: ${coletado.tipo}${coletado.vidas ? ` • ${coletado.vidas} vida(s)` : ""}`,
+        coletado.faixa_etaria && `• Faixa etária: ${coletado.faixa_etaria}`,
+        coletado.plano_atual?.operadora
+          ? `• Plano atual: ${coletado.plano_atual.operadora}`
+          : (coletado.plano_atual?.tem === false ? `• Plano atual: não tem` : null),
         coletado.regiao && `• Região: ${coletado.regiao}`,
+        coletado.objetivo && `• Objetivo: ${coletado.objetivo}`,
+        coletado.orcamento && `• Orçamento: ${coletado.orcamento}`,
+      ].filter(Boolean).join("\n");
+
+      const briefing = [
+        "🎯 *Lead pronto para cotação humana (Score A)*",
+        "",
+        "*Dados coletados:*",
+        dadosLinhas || "(nenhum dado estruturado)",
+        lacunas.length ? `\n*Lacunas:* ${lacunas.join(", ")}` : "",
+        metaObj.urgencia ? `\n*Urgência:* ${metaObj.urgencia}` : "",
+        metaObj.objecao_principal ? `\n*Objeção principal:* ${metaObj.objecao_principal}` : "",
+        metaObj.sugestao_proxima_msg_humana
+          ? `\n*Sugestão de próxima msg:*\n"${metaObj.sugestao_proxima_msg_humana}"`
+          : "",
+        "\n_Junior pausado — você está no comando._",
       ].filter(Boolean).join("\n");
 
       const leadName = (await supabase.from("leads").select("name,phone").eq("id", lead_id).maybeSingle()).data;
@@ -276,10 +302,30 @@ Deno.serve(async (req) => {
       await supabase.from("notifications").insert({
         user_id: lead.user_id,
         type: "lead_qualificado",
-        title: `🎯 SDR qualificou ${displayName}`,
-        body: resumoLinhas || `O lead avançou para "contato_realizado". Assuma a conversa no WhatsApp.`,
+        title: `🎯 Junior qualificou ${displayName}`,
+        body: briefing,
         lead_id,
       });
+
+      // 3) Registra handoff estruturado em agent_handoffs.
+      try {
+        await supabase.from("agent_handoffs").insert({
+          conversation_id: sdrResp.conversation_id ?? null,
+          from_agent: SDR_AGENT_SLUG,
+          to_agent: "humano",
+          motivo: "score_A",
+          contexto_transferido: {
+            qual_progress: qual,
+            coletado,
+            urgencia: metaObj.urgencia ?? null,
+            objecao_principal: metaObj.objecao_principal ?? null,
+            sugestao_proxima_msg_humana: metaObj.sugestao_proxima_msg_humana ?? null,
+            lacunas,
+          },
+        });
+      } catch (e) {
+        console.warn("[handoff] insert agent_handoffs failed:", e instanceof Error ? e.message : e);
+      }
     }
 
     // Auto-update lead memory after every successful SDR turn (background)
