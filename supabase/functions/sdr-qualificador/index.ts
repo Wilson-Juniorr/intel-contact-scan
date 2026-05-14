@@ -539,6 +539,9 @@ async function syncLeadDataFromMetadata(
     ["rede_hospitais", coletadoMeta.rede],
     ["tipo", coletadoMeta.tipo],
     ["vidas", coletadoMeta.vidas],
+    ["faixa_etaria", coletadoMeta.faixa_etaria],
+    ["objetivo", coletadoMeta.objetivo],
+    ["plano_atual", coletadoMeta.plano_atual],
   ];
 
   let memChanged = false;
