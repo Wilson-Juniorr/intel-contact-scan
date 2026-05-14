@@ -15,6 +15,7 @@ import {
   Building2,
   Users,
   Target,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -43,6 +44,35 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
     },
     enabled: !!user && !!leadId,
   });
+
+  const { data: leadScore } = useQuery({
+    queryKey: ["lead_qual_score", leadId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("qual_score, qual_score_reason, qual_score_breakdown, qual_score_updated_at")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!leadId,
+    refetchInterval: 30000,
+  });
+
+  const scoreColors: Record<string, string> = {
+    A: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    B: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+    C: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    D: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+  };
+  const bd = (leadScore?.qual_score_breakdown || {}) as any;
+  const dims: Array<{ key: string; label: string }> = [
+    { key: "fit", label: "Fit" },
+    { key: "urgency", label: "Urgência" },
+    { key: "completeness", label: "Completude" },
+    { key: "closing_potential", label: "Fechamento" },
+  ];
 
   const updateMemory = async () => {
     setUpdating(true);
@@ -105,6 +135,69 @@ export function LeadMemoryCard({ leadId, leadName }: Props) {
   return (
     <Card className="border-primary/20">
       <CardContent className="p-4 space-y-3">
+        {leadScore?.qual_score && (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Qualificação IA</span>
+              </div>
+              <Badge
+                variant="outline"
+                className={`text-xs font-bold ${scoreColors[leadScore.qual_score] ?? "bg-muted"}`}
+              >
+                Score {leadScore.qual_score}
+                {typeof bd.overall === "number" ? ` · ${bd.overall}/100` : ""}
+              </Badge>
+            </div>
+            {leadScore.qual_score_reason && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {leadScore.qual_score_reason}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-1.5">
+              {dims.map((d) => {
+                const v = bd?.[d.key];
+                if (!v || typeof v.score !== "number") return null;
+                const pct = Math.max(0, Math.min(100, v.score));
+                return (
+                  <div key={d.key} className="space-y-0.5">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{d.label}</span>
+                      <span className="font-mono">{pct}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {Array.isArray(v.reasons) && v.reasons.length > 0 && (
+                      <p className="text-[9px] text-muted-foreground/70 truncate">
+                        {v.reasons.slice(0, 2).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {Array.isArray(bd.missing) && bd.missing.length > 0 && (
+              <p className="text-[10px] text-amber-400">
+                Falta: {bd.missing.join(", ")}
+              </p>
+            )}
+            {leadScore.qual_score_updated_at && (
+              <p className="text-[9px] text-muted-foreground/70 text-right">
+                Avaliado{" "}
+                {formatDistanceToNow(new Date(leadScore.qual_score_updated_at), {
+                  addSuffix: true,
+                  locale: ptBR,
+                })}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Brain className="h-4 w-4 text-primary" />

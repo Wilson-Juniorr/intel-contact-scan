@@ -1111,6 +1111,32 @@ Deno.serve(async (req) => {
       console.warn("[qual_progress] persist failed:", e instanceof Error ? e.message : e);
     }
 
+    // Persiste score auditável diretamente no lead (visível no histórico/UI).
+    // Score só desce de A se houver evidência forte (mantemos histórico em action_log).
+    const prevScore = (lead as any)?.qual_score ?? null;
+    try {
+      await supabase.from("leads").update({
+        qual_score: qualFinal.score,
+        qual_score_reason: qualFinal.reason_summary,
+        qual_score_breakdown: {
+          overall: qualFinal.breakdown.overall,
+          weights: qualFinal.breakdown.weights,
+          fit: qualFinal.breakdown.fit,
+          urgency: qualFinal.breakdown.urgency,
+          completeness: qualFinal.breakdown.completeness,
+          closing_potential: qualFinal.breakdown.closing_potential,
+          out_of_scope: qualFinal.out_of_scope,
+          oos_reasons: qualFinal.reasons,
+          missing: qualFinal.missing,
+          turn: state.turn_number,
+          evaluated_at: new Date().toISOString(),
+        },
+        qual_score_updated_at: new Date().toISOString(),
+      }).eq("id", lead_id);
+    } catch (e) {
+      console.warn("[lead.qual_score] persist failed:", e instanceof Error ? e.message : e);
+    }
+
     // Log estruturado da qualificação (action_log, se houver lead/user)
     if (lead?.user_id) {
       try {
@@ -1120,6 +1146,11 @@ Deno.serve(async (req) => {
           action_type: "qual_score_evaluated",
           metadata: {
             score: qualFinal.score,
+            previous_score: prevScore,
+            score_changed: prevScore !== qualFinal.score,
+            overall: qualFinal.breakdown.overall,
+            breakdown: qualFinal.breakdown,
+            reason_summary: qualFinal.reason_summary,
             pct: qualFinal.pct,
             filled: qualFinal.filled,
             missing: qualFinal.missing,
@@ -1130,6 +1161,21 @@ Deno.serve(async (req) => {
             turn: state.turn_number,
           },
         });
+        // Log dedicado de mudança de score (mais fácil de filtrar/auditar)
+        if (prevScore !== qualFinal.score) {
+          await supabase.from("action_log").insert({
+            user_id: lead.user_id,
+            lead_id,
+            action_type: "qual_score_changed",
+            metadata: {
+              from: prevScore,
+              to: qualFinal.score,
+              overall: qualFinal.breakdown.overall,
+              reason: qualFinal.reason_summary,
+              turn: state.turn_number,
+            },
+          });
+        }
       } catch (e) {
         console.warn("[action_log qual] insert failed:", e instanceof Error ? e.message : e);
       }
@@ -1162,6 +1208,13 @@ Deno.serve(async (req) => {
         delays_ms: delays,
         qualificou,
         qual_progress: qualFinal,
+        // Handoff payload explícito — não caixa-preta
+        handoff_payload: qualificou ? {
+          score: qualFinal.score,
+          reason: qualFinal.reason_summary,
+          breakdown: qualFinal.breakdown,
+          missing: qualFinal.missing,
+        } : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
