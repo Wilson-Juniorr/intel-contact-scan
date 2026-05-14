@@ -833,7 +833,11 @@ Deno.serve(async (req) => {
           "- NÃO repita a transcrição literal nem cite que é uma transcrição.\n" +
           "- Responda como se estivesse numa conversa fluida — exatamente como você responderia a um texto.\n" +
           "- Se a transcrição estiver confusa/incompleta, peça pra repetir de forma natural ('não peguei tudo, me conta de novo?').\n" +
-          "- Mantenha o split em balões e o tom humano de sempre.\n"
+          "- Mantenha o split em balões e o tom humano de sempre.\n" +
+          "- ⚠️ Áudio NÃO é sinal de interesse por si só. Não trate como lead mais quente nem acelere a qualificação só porque veio áudio. Avalie só pelo conteúdo transcrito.\n" +
+          (state.transcription_confidence !== null
+            ? `- Confiança da transcrição: ${(state.transcription_confidence * 100).toFixed(0)}%. Se baixa, prefira CONFIRMAR antes de afirmar qualquer coisa.\n`
+            : "")
         : "") +
       (state.palavras_ultima_msg <= 5
         ? "\n⚠️ CLIENTE RESPONDEU CURTO — SUA PRÓXIMA MENSAGEM DEVE USAR MIRRORING OU LABELING.\n"
