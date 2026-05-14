@@ -144,6 +144,159 @@ export interface QualProgress {
   score: QualScore;
   out_of_scope: boolean;
   reasons: string[];
+  // ─── Score detalhado, auditável (não caixa-preta) ───
+  breakdown: QualBreakdown;
+  reason_summary: string;
+}
+
+export interface QualDimension {
+  /** 0-100 */
+  score: number;
+  /** Sinais positivos que somaram pontos. */
+  reasons: string[];
+  /** Trechos/valores brutos que justificam a pontuação. */
+  evidence: string[];
+}
+
+export interface QualBreakdown {
+  /** Aderência ao ICP: tipo válido, vidas plausíveis, região informada. */
+  fit: QualDimension;
+  /** Janela de decisão: urgência + prazo. */
+  urgency: QualDimension;
+  /** Quantos campos obrigatórios já temos. */
+  completeness: QualDimension;
+  /** Probabilidade de fechar: orçamento, objetivo claro, sem flags negativas. */
+  closing_potential: QualDimension;
+  /** Score final agregado (0-100). */
+  overall: number;
+  /** Pesos usados (auditoria). */
+  weights: { fit: number; urgency: number; completeness: number; closing_potential: number };
+}
+
+/* ─────────────── Cálculo por dimensão ─────────────── */
+
+function computeFit(c: Record<string, unknown>): QualDimension {
+  const reasons: string[] = [];
+  const evidence: string[] = [];
+  let score = 0;
+  const tipo = String(c.tipo ?? "").toUpperCase();
+  if (tipo && TIPOS_VALIDOS.has(tipo)) {
+    score += 40;
+    reasons.push(`tipo_valido:${tipo}`);
+    evidence.push(`tipo=${tipo}`);
+  }
+  if (isFilled("vidas", c)) {
+    score += 30;
+    reasons.push("vidas_informadas");
+    evidence.push(`vidas=${c.vidas}`);
+  }
+  if (isFilled("regiao", c)) {
+    score += 20;
+    reasons.push("regiao_informada");
+    evidence.push(`regiao=${String(c.regiao).slice(0, 40)}`);
+  }
+  if (isFilled("faixa_etaria", c)) {
+    score += 10;
+    reasons.push("faixa_etaria_informada");
+    evidence.push(`faixa_etaria=${String(c.faixa_etaria).slice(0, 40)}`);
+  }
+  return { score: Math.min(100, score), reasons, evidence };
+}
+
+function computeUrgency(c: Record<string, unknown>): QualDimension {
+  const reasons: string[] = [];
+  const evidence: string[] = [];
+  let score = 0;
+  const u = String(c.urgencia ?? "").toLowerCase();
+  if (u) {
+    evidence.push(`urgencia="${u.slice(0, 60)}"`);
+    if (/(urgent|hoje|amanh|essa semana|esta semana|imediat|agora|ja precis)/.test(u)) {
+      score = 100; reasons.push("urgencia_alta");
+    } else if (/(este m[eê]s|esse m[eê]s|pr[oó]ximos? \d* ?dias|15 dias|30 dias|r[aá]pido)/.test(u)) {
+      score = 75; reasons.push("urgencia_media");
+    } else if (/(planeja|sem pressa|pesquisa|ver|olhar|estudar|futuro|daqui a)/.test(u)) {
+      score = 35; reasons.push("urgencia_baixa");
+    } else {
+      score = 60; reasons.push("urgencia_declarada_indefinida");
+    }
+  } else {
+    reasons.push("urgencia_nao_informada");
+  }
+  return { score, reasons, evidence };
+}
+
+function computeCompleteness(
+  applicable: readonly StageDef[],
+  completedNonSynthetic: StageId[],
+  c: Record<string, unknown>,
+): QualDimension {
+  const reasons: string[] = [];
+  const evidence: string[] = [];
+  const stagesNeeding = applicable.filter((s) => !s.synthetic);
+  const total = stagesNeeding.length;
+  const done = completedNonSynthetic.length;
+  const score = total === 0 ? 100 : Math.round((done / total) * 100);
+  reasons.push(`${done}/${total}_etapas_completas`);
+  for (const f of REQUIRED_FIELDS) {
+    if (isFilled(f, c)) evidence.push(`${f}=ok`);
+  }
+  return { score, reasons, evidence };
+}
+
+function computeClosingPotential(
+  c: Record<string, unknown>,
+  out_of_scope: boolean,
+): QualDimension {
+  const reasons: string[] = [];
+  const evidence: string[] = [];
+  if (out_of_scope) {
+    reasons.push("fora_de_escopo_zera_potencial");
+    return { score: 0, reasons, evidence };
+  }
+  let score = 0;
+  if (isFilled("orcamento", c)) {
+    score += 40;
+    reasons.push("orcamento_declarado");
+    evidence.push(`orcamento=${String(c.orcamento).slice(0, 60)}`);
+  }
+  const obj = String(c.objetivo ?? "").toLowerCase();
+  if (obj && isFilled("objetivo", c)) {
+    if (/(ades[aã]o|contrat|fech|primeiro plano|nunca tive)/.test(obj)) {
+      score += 35; reasons.push("objetivo_alta_intencao");
+    } else if (/(troca|migra|portab|reduz|economi|melhor)/.test(obj)) {
+      score += 30; reasons.push("objetivo_media_intencao");
+    } else {
+      score += 15; reasons.push("objetivo_baixa_intencao");
+    }
+    evidence.push(`objetivo="${obj.slice(0, 80)}"`);
+  }
+  // CNPJ presente em PJ-like = mais perto de fechar
+  const tipo = String(c.tipo ?? "").toUpperCase();
+  if (PJ_LIKE.has(tipo) && isFilled("cnpj", c)) {
+    score += 25;
+    reasons.push("cnpj_validado_pj");
+    evidence.push("cnpj=ok");
+  } else if (!PJ_LIKE.has(tipo) && tipo === "PF") {
+    score += 10;
+    reasons.push("pf_sem_dependencia_cnpj");
+  }
+  return { score: Math.min(100, score), reasons, evidence };
+}
+
+function buildReasonSummary(score: QualScore, b: QualBreakdown, oos: boolean, oosReasons: string[]): string {
+  if (oos) return `Score D — fora de escopo (${oosReasons.join("; ") || "sinal explícito"})`;
+  const parts = [
+    `fit ${b.fit.score}`,
+    `urgência ${b.urgency.score}`,
+    `completude ${b.completeness.score}`,
+    `fechamento ${b.closing_potential.score}`,
+  ].join(" · ");
+  const top = [b.fit, b.urgency, b.completeness, b.closing_potential]
+    .flatMap((d) => d.reasons.slice(0, 1))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(", ");
+  return `Score ${score} (overall ${b.overall}) — ${parts}${top ? ` | ${top}` : ""}`;
 }
 
 export function evaluateQualification(
@@ -215,12 +368,28 @@ export function evaluateQualification(
     ? 100
     : Math.round((completedNonSynthetic.length / stagesNeedingFields.length) * 100);
 
+  // 6.1) Score multidimensional, auditável
+  const fit = computeFit(coletado);
+  const urgency = computeUrgency(coletado);
+  const completeness = computeCompleteness(applicable, completedNonSynthetic, coletado);
+  const closing_potential = computeClosingPotential(coletado, out_of_scope);
+  const weights = { fit: 0.25, urgency: 0.20, completeness: 0.30, closing_potential: 0.25 };
+  const overall = Math.round(
+    fit.score * weights.fit +
+    urgency.score * weights.urgency +
+    completeness.score * weights.completeness +
+    closing_potential.score * weights.closing_potential,
+  );
+  const breakdown: QualBreakdown = { fit, urgency, completeness, closing_potential, overall, weights };
+
   let score: QualScore;
   if (out_of_scope) score = "D";
-  else if (completedNonSynthetic.length === stagesNeedingFields.length) score = "A";
-  else if (pct >= 70) score = "B";
-  else if (filled.length >= 1) score = "C";
-  else score = "C";
+  else if (completedNonSynthetic.length === stagesNeedingFields.length && overall >= 80) score = "A";
+  else if (overall >= 65) score = "B";
+  else if (overall >= 30 || filled.length >= 1) score = "C";
+  else score = "D";
+
+  const reason_summary = buildReasonSummary(score, breakdown, out_of_scope, reasons);
 
   return {
     stages_total: STAGES.length,
@@ -237,6 +406,8 @@ export function evaluateQualification(
     score,
     out_of_scope,
     reasons,
+    breakdown,
+    reason_summary,
   };
 }
 
