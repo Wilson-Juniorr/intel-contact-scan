@@ -3,6 +3,10 @@ import {
   evaluateAutomationGate,
   logAutomationBlock,
 } from "../_shared/automation-gate.ts";
+import {
+  evaluateComplianceGuardian,
+  logComplianceViolation,
+} from "../_shared/compliance-guardian.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,6 +127,33 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+
+      // ═══ GUARDIÃO DE COMPLIANCE (conteúdo) ═══
+      // Aplica em TODO envio automático (qualquer agent_slug). Envio manual não passa.
+      const guardian = evaluateComplianceGuardian(String(message ?? ""));
+      if (!guardian.allowed) {
+        await logComplianceViolation(serviceSupabase, {
+          user_id: userId,
+          lead_id: lead_id ?? null,
+          agent_slug,
+          stage: "send_whatsapp",
+          message_original: String(message ?? ""),
+          violations: guardian.violations,
+          suggested_fix: guardian.suggested_fix ?? null,
+          blocked: true,
+        });
+        return new Response(
+          JSON.stringify({
+            success: false,
+            blocked: true,
+            reason: "compliance_guardian",
+            violations: guardian.violations,
+            suggested_fix: guardian.suggested_fix ?? null,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // ═══ fim guardião ═══
     }
     // ═══ fim gate ═══
 

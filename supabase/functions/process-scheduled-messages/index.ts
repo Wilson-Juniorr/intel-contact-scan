@@ -39,6 +39,7 @@ Deno.serve(async (_req) => {
             lead_id: msg.lead_id,
             user_id: msg.user_id,
             skip_window_check: true,
+            agent_slug: msg.agent_slug ?? "scheduled", // força gate + guardião
           },
         });
         if (error || !resp?.success) {
