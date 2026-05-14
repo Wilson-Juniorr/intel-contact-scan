@@ -143,6 +143,10 @@ export function qualProgressBlock(progress: QualProgress): string {
     "2. NUNCA invente dados que o cliente ainda não disse. Se não tem certeza, pergunte.\n" +
     "3. NÃO confirme handoff/cotação humana enquanto SCORE não for A.\n" +
     "4. Se SCORE = D (fora de escopo), encerre com cordialidade — não force qualificação.\n" +
-    "5. Reporte no METADATA o JSON `coletado` apenas com o que o cliente DECLAROU explicitamente neste turno.\n"
+    "5. Reporte no METADATA o JSON `coletado` apenas com o que o cliente DECLAROU explicitamente neste turno.\n" +
+    "6. Quando SCORE for A e você for transferir (`deve_transferir_junior: true`), inclua TAMBÉM no METADATA:\n" +
+    "   - `urgencia`: 'alta' | 'media' | 'baixa' (com base no que o cliente disse, sem inventar).\n" +
+    "   - `objecao_principal`: a maior preocupação dita pelo cliente até agora (ou null).\n" +
+    "   - `sugestao_proxima_msg_humana`: rascunho curto (até 2 frases) que o corretor pode usar como abertura.\n"
   );
 }

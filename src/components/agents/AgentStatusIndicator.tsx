@@ -102,8 +102,8 @@ export function AgentStatusIndicator({
       qc.invalidateQueries({ queryKey: ["whatsapp-leads"] });
       toast.success(
         inManualConversation
-          ? "Devolvido para a Camila"
-          : "Você assumiu a conversa",
+          ? "Devolvido para o Junior — IA volta a responder"
+          : "Você assumiu a conversa — IA pausada",
       );
     },
     onError: (err) => toast.error((err as Error).message),
@@ -186,7 +186,7 @@ export function AgentStatusIndicator({
         onClick={() => toggleManual.mutate()}
       >
         <UserCog className="h-3.5 w-3.5 mr-1" />
-        {inManualConversation ? "Devolver pra Camila" : "Assumir manualmente"}
+        {inManualConversation ? "Devolver pra Junior" : "Assumir manualmente"}
       </Button>
     </div>
     {inManualConversation && assumedAt && (
