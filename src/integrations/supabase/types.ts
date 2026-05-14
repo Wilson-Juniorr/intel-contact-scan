@@ -2238,6 +2238,8 @@ export type Database = {
           id: string
           is_personal: boolean
           lead_id: string | null
+          opted_out: boolean
+          opted_out_at: string | null
           phone: string
           updated_at: string
           user_id: string
@@ -2252,6 +2254,8 @@ export type Database = {
           id?: string
           is_personal?: boolean
           lead_id?: string | null
+          opted_out?: boolean
+          opted_out_at?: string | null
           phone: string
           updated_at?: string
           user_id: string
@@ -2266,6 +2270,8 @@ export type Database = {
           id?: string
           is_personal?: boolean
           lead_id?: string | null
+          opted_out?: boolean
+          opted_out_at?: string | null
           phone?: string
           updated_at?: string
           user_id?: string
