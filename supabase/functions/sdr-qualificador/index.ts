@@ -99,6 +99,9 @@ interface ConversationState {
   fonte: string | null;
   turn_number: number;
   veio_por_audio: boolean;
+  source_type: "audio" | "text" | "image" | "document" | "unknown";
+  transcription_confidence: number | null;
+  transcription_quality: "good" | "low" | "none";
   contexto_cliente: {
     estagio: string | null;
     ja_e_cliente: boolean;
@@ -126,6 +129,8 @@ function buildState(
   conv: any,
   user_message: string,
   is_audio: boolean,
+  source_type: ConversationState["source_type"] = "text",
+  transcription_confidence: number | null = null,
 ): ConversationState {
   const mem = lead?.lead_memory?.[0]?.structured_json ?? {};
   const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
@@ -164,6 +169,23 @@ function buildState(
     ? Math.floor((Date.now() - new Date(ultimaAt).getTime()) / 86400000)
     : null;
 
+  // Qualidade da transcrição (somente para áudio)
+  let transcription_quality: ConversationState["transcription_quality"] = "good";
+  if (is_audio) {
+    const txt = (user_message || "").trim();
+    const inaudible =
+      !txt ||
+      txt === "[Áudio não compreendido]" ||
+      /\[áudio não compreendido\]/i.test(txt);
+    if (inaudible) {
+      transcription_quality = "none";
+    } else if (transcription_confidence !== null && transcription_confidence < 0.4) {
+      transcription_quality = "low";
+    } else if (transcription_confidence === null && txt.split(/\s+/).filter(Boolean).length < 2) {
+      transcription_quality = "low";
+    }
+  }
+
   return {
     coletado,
     falta,
@@ -173,6 +195,9 @@ function buildState(
     fonte: null,
     turn_number: turn,
     veio_por_audio: is_audio,
+    source_type,
+    transcription_confidence,
+    transcription_quality,
     contexto_cliente: {
       estagio: lead?.stage ?? null,
       ja_e_cliente,
