@@ -13,8 +13,10 @@ export type GateBlock = {
   allowed: false;
   reason:
     | "contact_category_blocks"
+    | "personal_contact"
     | "manual_conversation"
     | "opted_out"
+    | "rate_limited"
     | "outside_compliance_window"
     | "lead_not_found"
     | "user_unresolved"
@@ -27,6 +29,14 @@ export type GateAllow = { allowed: true };
 export type GateResult = GateAllow | GateBlock;
 
 const BLOCKING_CATEGORIES = ["personal", "team", "partner", "vendor", "spam"];
+
+// Anti-spam: limites de envio AUTOMÁTICO por janela de tempo (por telefone+user).
+// Manual (corretor) NÃO passa por este gate.
+const RATE_LIMIT_RULES: { window_minutes: number; max_messages: number }[] = [
+  { window_minutes: 30, max_messages: 1 },     // no máx 1 mensagem automática a cada 30 min
+  { window_minutes: 60 * 24, max_messages: 4 },// no máx 4 mensagens automáticas em 24h
+  { window_minutes: 60 * 24 * 7, max_messages: 8 }, // no máx 8 por semana
+];
 
 export interface GateInput {
   user_id: string | null;
@@ -62,10 +72,10 @@ export async function evaluateAutomationGate(
       }
     }
 
-    // 2/3. Contato — categoria bloqueante e/ou opt-out
+    // 2/3. Contato — categoria bloqueante, opt-out e/ou pessoal
     const { data: contact } = await supabase
       .from("whatsapp_contacts")
-      .select("category, opted_out")
+      .select("category, opted_out, is_personal")
       .eq("user_id", input.user_id)
       .eq("phone", input.phone)
       .maybeSingle();
@@ -73,12 +83,39 @@ export async function evaluateAutomationGate(
     if (contact?.opted_out === true) {
       return { allowed: false, reason: "opted_out" };
     }
+    if (contact?.is_personal === true) {
+      return { allowed: false, reason: "personal_contact" };
+    }
     if (contact?.category && BLOCKING_CATEGORIES.includes(contact.category)) {
       return {
         allowed: false,
         reason: "contact_category_blocks",
         metadata: { category: contact.category },
       };
+    }
+
+    // 3.5. Anti-spam: limites de frequência por janela
+    const now = Date.now();
+    for (const rule of RATE_LIMIT_RULES) {
+      const since = new Date(now - rule.window_minutes * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from("whatsapp_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", input.user_id)
+        .eq("phone", input.phone)
+        .eq("direction", "outbound")
+        .gte("created_at", since);
+      if ((count ?? 0) >= rule.max_messages) {
+        return {
+          allowed: false,
+          reason: "rate_limited",
+          metadata: {
+            window_minutes: rule.window_minutes,
+            max_messages: rule.max_messages,
+            actual_count: count ?? 0,
+          },
+        };
+      }
     }
 
     // 4. Janela de compliance (quando aplicável)
