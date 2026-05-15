@@ -459,7 +459,14 @@ function runDeterministicCritic(
     for (const e of emojis) if (proibidos.includes(e[0])) fails.push(`emoji_proibido:${e[0]}`);
   }
 
-  if (state.palavras_ultima_msg <= 5 && meta && meta.usou_mirror_ou_label === false) {
+  // Mirror/label só é exigido a partir do 2º turno e em respostas MUITO curtas (<=3 palavras).
+  // Saudações de abertura como "Olá gostaria de mais informações" não devem bloquear a resposta.
+  if (
+    state.turn_number >= 2 &&
+    state.palavras_ultima_msg <= 3 &&
+    meta &&
+    meta.usou_mirror_ou_label === false
+  ) {
     fails.push("nao_aplicou_mirror_em_resposta_curta");
   }
 
