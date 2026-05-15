@@ -767,54 +767,72 @@ Deno.serve(async (req) => {
         if (leadFlag?.in_manual_conversation) {
           console.log(`SDR bloqueada: lead ${leadId} em conversa manual`);
         } else {
-          // Categoria cacheada do contato (busca por todas variantes do telefone)
-          let contactCategory: string | null = null;
-          for (const v of phoneVariants(phone)) {
-            const { data: c } = await supabase
-              .from("whatsapp_contacts")
-              .select("category, category_source")
-              .eq("user_id", userId)
-              .eq("phone", v)
-              .maybeSingle();
-            if (c?.category) { contactCategory = c.category; break; }
-          }
+          // Se já existe conversa ativa do SDR com esse lead, roteia direto
+          // (não re-classifica — o lead já está em qualificação)
+          const { data: existingConv } = await supabase
+            .from("agent_conversations")
+            .select("id")
+            .eq("lead_id", leadId)
+            .eq("agent_slug", "junior-sdr")
+            .in("status", ["ativa", "digitando"])
+            .limit(1)
+            .maybeSingle();
 
-          if (contactCategory && blockingCategories.includes(contactCategory)) {
-            console.log(`SDR bloqueada: categoria=${contactCategory}`);
-            await supabase.from("action_log").insert({
-              user_id: userId,
-              lead_id: leadId,
-              action_type: "junior_blocked_by_category",
-              metadata: { categoria: contactCategory, phone: normalizedPhone },
-            });
-          } else if (!contactCategory || contactCategory === "ambiguo") {
-            // Classifica antes de rotear
-            try {
-              const { data: classResp } = await supabase.functions.invoke("classify-conversation", {
-                body: { phone: normalizedPhone, user_id: userId },
+          if (existingConv) {
+            // Conversa ativa — roteia direto sem re-classificar
+            dispatchRoute();
+          } else {
+            // Categoria cacheada do contato (busca por todas variantes do telefone)
+            let contactCategory: string | null = null;
+            for (const v of phoneVariants(phone)) {
+              const { data: c } = await supabase
+                .from("whatsapp_contacts")
+                .select("category, category_source")
+                .eq("user_id", userId)
+                .eq("phone", v)
+                .maybeSingle();
+              if (c?.category) { contactCategory = c.category; break; }
+            }
+
+            if (contactCategory && blockingCategories.includes(contactCategory)) {
+              console.log(`SDR bloqueada: categoria=${contactCategory}`);
+              await supabase.from("action_log").insert({
+                user_id: userId,
+                lead_id: leadId,
+                action_type: "junior_blocked_by_category",
+                metadata: { categoria: contactCategory, phone: normalizedPhone },
               });
-              const cat = classResp?.categoria;
-              const conf = Number(classResp?.confianca ?? 0);
-              if (cat && blockingCategories.includes(cat) && conf >= 0.85) {
-                console.log(`SDR bloqueada após classificação: ${cat} (${conf})`);
-                await supabase.from("action_log").insert({
-                  user_id: userId,
-                  lead_id: leadId,
-                  action_type: "junior_blocked_by_classification",
-                  metadata: { categoria: cat, confianca: conf },
+            } else if (!contactCategory || contactCategory === "ambiguo") {
+              // Classifica antes de rotear
+              try {
+                const { data: classResp } = await supabase.functions.invoke("classify-conversation", {
+                  body: { phone: normalizedPhone, user_id: userId },
                 });
-              } else if (cat === "ambiguo") {
-                console.log(`Categoria ambígua — corretor notificado, SDR aguarda`);
-              } else {
+                const cat = classResp?.categoria;
+                const conf = Number(classResp?.confianca ?? 0);
+                if (cat && blockingCategories.includes(cat) && conf >= 0.85) {
+                  console.log(`SDR bloqueada após classificação: ${cat} (${conf})`);
+                  await supabase.from("action_log").insert({
+                    user_id: userId,
+                    lead_id: leadId,
+                    action_type: "junior_blocked_by_classification",
+                    metadata: { categoria: cat, confianca: conf },
+                  });
+                } else if (cat === "ambiguo") {
+                  // Ambíguo mas é a primeira msg — dá o benefício da dúvida, roteia
+                  console.log(`Categoria ambígua — roteando pro SDR (benefício da dúvida)`);
+                  dispatchRoute();
+                } else {
+                  dispatchRoute();
+                }
+              } catch (classErr) {
+                console.error("classify falhou, fallback pro route-message:", classErr);
                 dispatchRoute();
               }
-            } catch (classErr) {
-              console.error("classify falhou, fallback pro route-message:", classErr);
+            } else {
+              // lead_novo / lead_retorno → segue
               dispatchRoute();
             }
-          } else {
-            // lead_novo / lead_retorno → segue
-            dispatchRoute();
           }
         }
       } catch (routeErr) {
