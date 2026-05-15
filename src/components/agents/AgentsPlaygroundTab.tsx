@@ -48,7 +48,6 @@ export function AgentsPlaygroundTab() {
       const { data } = await supabase
         .from("agents_config")
         .select("id, slug, nome, tipo, ativo")
-        .eq("ativo", true)
         .order("nome");
       const list = (data as Agent[]) || [];
       setAgents(list);
