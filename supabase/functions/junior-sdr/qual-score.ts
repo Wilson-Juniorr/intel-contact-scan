@@ -112,16 +112,16 @@ interface StageDef {
 }
 
 export const STAGES: readonly StageDef[] = [
-  { id: "apresentacao", label: "apresentação humanizada", ask_hint: "se apresentar e perguntar como pode ajudar", fields: [], synthetic: true },
-  { id: "nome",         label: "nome do contato",          ask_hint: "perguntar o nome do cliente",                fields: ["nome"] },
-  { id: "tipo",         label: "tipo de cliente (PF/MEI/PME)", ask_hint: "é pra você (PF), MEI ou empresa (PME)?", fields: ["tipo"] },
-  { id: "regiao",       label: "cidade/UF",                 ask_hint: "qual cidade/estado?",                       fields: ["regiao"] },
-  { id: "vidas_idades", label: "quantidade de vidas + idades", ask_hint: "quantas pessoas vão entrar e qual a faixa de idade?", fields: ["vidas", "faixa_etaria"] },
+  { id: "apresentacao", label: "apresentação humanizada", ask_hint: "se apresentar de forma calorosa e perguntar o que ele tá buscando", fields: [], synthetic: true },
+  { id: "tipo",         label: "tipo de cliente (PF/MEI/PME)", ask_hint: "é pra você (pessoa física), MEI ou empresa?", fields: ["tipo"] },
+  { id: "vidas_idades", label: "quantidade de vidas + idades", ask_hint: "quantas pessoas vão entrar no plano e qual a faixa de idade?", fields: ["vidas", "faixa_etaria"] },
+  { id: "regiao",       label: "cidade/UF",                 ask_hint: "qual cidade ou região?",                       fields: ["regiao"] },
+  { id: "nome",         label: "nome do contato",          ask_hint: "como posso te chamar? / qual seu nome?",        fields: ["nome"] },
   { id: "cnpj",         label: "CNPJ (quando PJ/MEI/PME)",  ask_hint: "qual o CNPJ da empresa? (ou se está em abertura)", fields: ["cnpj"],
     applies: (c) => PJ_LIKE.has(String(c.tipo ?? "").toUpperCase()) },
-  { id: "objetivo",     label: "objetivo (adesão/troca/redução)", ask_hint: "qual o objetivo? primeiro plano, troca ou reduzir custo?", fields: ["objetivo"] },
-  { id: "urgencia",     label: "urgência/prazo",            ask_hint: "pra quando precisa? urgente ou pode planejar?", fields: ["urgencia"] },
-  { id: "orcamento",    label: "faixa de orçamento",        ask_hint: "tem uma faixa de orçamento por vida em mente?", fields: ["orcamento"] },
+  { id: "objetivo",     label: "objetivo (adesão/troca/redução)", ask_hint: "é primeiro plano, troca de operadora ou quer reduzir custo?", fields: ["objetivo"] },
+  { id: "urgencia",     label: "urgência/prazo",            ask_hint: "pra quando precisa? é urgente ou pode planejar com calma?", fields: ["urgencia"] },
+  { id: "orcamento",    label: "faixa de orçamento",        ask_hint: "tem uma faixa de valor em mente por pessoa?", fields: ["orcamento"] },
 ] as const;
 
 /* ─────────────── Resultado ─────────────── */

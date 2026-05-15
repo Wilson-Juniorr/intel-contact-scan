@@ -47,7 +47,7 @@ export const AUDIO_TRIGGERS = [
   {
     trigger: "qualificacao_completa",
     descricao: "Qualificação completa — transferência pro humano",
-    quando: "Quando deve_transferir = true (qualificou)",
+    quando: "Quando Score = A (qualificou todos os dados)",
     scripts: [
       "Pronto, já tenho tudo que precisava. Vou montar as melhores opções pro seu perfil agora e te mando ainda hoje. Qualquer dúvida é só chamar aqui.",
       "Perfeito, com essas informações eu já consigo montar uma cotação personalizada. Vou preparar e te envio em breve com tudo detalhado.",
@@ -57,28 +57,40 @@ export const AUDIO_TRIGGERS = [
     duracao_ideal: "8-10s",
   },
   {
-    trigger: "follow_up_dia2",
-    descricao: "Follow-up dia 2 — lead sem resposta há 24-48h",
-    quando: "Lead sem resposta há 24-48h",
+    trigger: "follow_up_2h",
+    descricao: "Follow-up 2h — lead parou de responder durante qualificação",
+    quando: "Lead sem resposta há 2h (primeiro toque do follow-up fase 1)",
     scripts: [
       "Oi, aqui é o Junior. Vi que a gente tava conversando sobre o plano. Fica tranquilo, sem pressa. Quando puder continuar é só me chamar aqui.",
-      "E aí, tudo certo? Junior aqui. Só passando pra ver se surgiu alguma dúvida sobre o que a gente conversou. Tô por aqui quando precisar.",
-      "Oi, Junior aqui. Sei que o dia a dia é corrido. Quando tiver um minutinho pra gente continuar sobre o plano, me dá um toque.",
+      "E aí, tudo certo? Junior aqui. Só passando pra ver se surgiu alguma dúvida. Tô por aqui quando precisar.",
+      "Oi, Junior aqui. Sei que o dia a dia é corrido. Quando tiver um minutinho pra gente continuar, me dá um toque.",
     ],
     script_sugerido: `Oi, aqui é o Junior. Vi que a gente tava conversando sobre o plano. Fica tranquilo, sem pressa. Quando puder continuar é só me chamar aqui.`,
     duracao_ideal: "6-8s",
   },
   {
-    trigger: "follow_up_dia5",
-    descricao: "Follow-up dia 5 — lead sem resposta há 4-5 dias",
-    quando: "Lead sem resposta há 4-5 dias",
+    trigger: "follow_up_24h",
+    descricao: "Follow-up 24h — dia seguinte, tom fresco",
+    quando: "Lead sem resposta há 24h (terceiro toque do follow-up fase 1)",
     scripts: [
-      "Oi, Junior aqui. Tô com algumas novidades de tabela que podem ser interessantes pro seu perfil. Se quiser dar uma olhada, me chama que te mostro.",
-      "E aí, tudo bem? Saiu uma condição especial essa semana em algumas operadoras. Se ainda tiver interesse, posso te mostrar o que mudou.",
-      "Oi, aqui é o Junior. Última vez que conversamos você tava vendo sobre plano de saúde. Se mudou de ideia tá tudo certo, mas se quiser retomar, tô aqui.",
+      "Bom dia! Junior aqui. Ontem a gente tava vendo sobre o plano de saúde. Quando puder me responder eu finalizo a cotação pra você.",
+      "Oi, bom dia! Passando aqui rapidinho — ainda faz sentido a gente ver as opções de plano? Tô com tudo pronto pra montar sua cotação.",
+      "E aí, tudo bem? Junior aqui. Tô com umas opções boas separadas, só preciso confirmar uns dados contigo. Me chama quando puder.",
     ],
-    script_sugerido: `Oi, Junior aqui. Tô com algumas novidades de tabela que podem ser interessantes pro seu perfil. Se quiser dar uma olhada, me chama que te mostro.`,
-    duracao_ideal: "8-10s",
+    script_sugerido: `Bom dia! Junior aqui. Ontem a gente tava vendo sobre o plano de saúde. Quando puder me responder eu finalizo a cotação pra você.`,
+    duracao_ideal: "7-10s",
+  },
+  {
+    trigger: "follow_up_72h",
+    descricao: "Follow-up 72h — última tentativa pessoal do Junior",
+    quando: "Lead sem resposta há 72h (último toque pessoal antes do follow-up institucional)",
+    scripts: [
+      "Oi, Junior aqui. Última mensagem minha pra não te incomodar. Se em algum momento quiser retomar, é só me chamar que eu retomo de onde paramos.",
+      "Oi, entendo que talvez não seja o momento. Vou ficar por aqui caso mude de ideia. Qualquer dúvida futura, pode me chamar sem cerimônia.",
+      "Junior aqui. Vou dar uma pausa. Seus dados ficam salvos comigo — quando quiser voltar a conversar sobre o plano, é só mandar um oi.",
+    ],
+    script_sugerido: `Oi, Junior aqui. Última mensagem minha pra não te incomodar. Se em algum momento quiser retomar, é só me chamar que eu retomo de onde paramos.`,
+    duracao_ideal: "7-9s",
   },
 ] as const;
 

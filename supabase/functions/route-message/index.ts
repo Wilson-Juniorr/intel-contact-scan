@@ -28,7 +28,8 @@ function normalizePhone(phone: string): string {
 
 /**
  * Sends a pre-recorded voice note via UAZAPI when a trigger is active.
- * Triggers: apresentacao | entendimento | qualificacao_completa | follow_up_dia2 | follow_up_dia5
+ * Triggers: apresentacao | entendimento | qualificacao_completa
+ * (follow-up audios are handled by junior-followup function)
  */
 async function sendAudioIfAvailable(
   supabase: any,

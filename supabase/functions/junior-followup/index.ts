@@ -58,6 +58,54 @@ function detectOptOut(text: string): boolean {
   return OPT_OUT_PATTERNS.some((re) => re.test(text) || re.test(norm));
 }
 
+// Mapa de step_index → trigger de áudio (só fase 1)
+const AUDIO_TRIGGER_MAP: Record<number, string> = {
+  0: "follow_up_2h",   // 2h
+  2: "follow_up_24h",  // 24h
+  4: "follow_up_72h",  // 72h
+};
+
+async function sendAudioIfAvailable(
+  supabase: any,
+  trigger: string,
+  phone: string,
+): Promise<boolean> {
+  const UAZAPI_URL = (Deno.env.get("UAZAPI_URL") ?? "").replace(/\/+$/, "");
+  const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN") ?? "";
+  if (!UAZAPI_URL || !UAZAPI_TOKEN) return false;
+
+  const { data: audio } = await supabase
+    .from("agent_audios")
+    .select("audio_url, duracao_segundos")
+    .eq("agent_slug", "junior-sdr")
+    .eq("trigger", trigger)
+    .eq("ativo", true)
+    .maybeSingle();
+
+  if (!audio?.audio_url) return false;
+
+  const thinkDelay = 1500 + Math.random() * 2000;
+  await new Promise((r) => setTimeout(r, thinkDelay));
+
+  try {
+    const resp = await fetch(`${UAZAPI_URL}/send/audio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
+      body: JSON.stringify({
+        number: phone,
+        audio: audio.audio_url,
+        mimetype: "audio/ogg; codecs=opus",
+        ptt: true,
+      }),
+    });
+    console.log(`[followup-audio] sent trigger=${trigger} to ${phone} status=${resp.status}`);
+    return resp.ok;
+  } catch (e) {
+    console.warn(`[followup-audio] failed trigger=${trigger}:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
 /**
  * FASE 1: Mensagens do Junior (pessoal, como se fosse ele retomando)
  * Tom: natural, curto, sem pressão mas com direção
@@ -364,6 +412,12 @@ Deno.serve(async (req) => {
           cadence_offset_hours: offsetH, scheduled_at: nowIso, sent_at: nowIso,
           status: "sent", message_content: message, approach_tag: approach,
         });
+
+        // Dispara áudio pré-gravado nos toques-chave (se disponível e ativo)
+        const audioTrigger = AUDIO_TRIGGER_MAP[nextIdx];
+        if (audioTrigger) {
+          await sendAudioIfAvailable(supabase, audioTrigger, phone);
+        }
 
         await supabase.from("leads").update({
           last_contact_at: nowIso, updated_at: nowIso,
