@@ -1,14 +1,15 @@
-// Junior — Follow-up pós-cotação
-// Cadência enxuta e parametrizável após `last_quote_sent_at`.
-// Padrão: 2h, 24h, 72h, 7d (4 toques no máximo).
+// Junior — Follow-up inteligente em 2 fases
+// FASE 1 (0-72h): Junior faz follow-up pessoal, mais intenso (5 toques em 3 dias)
+// FASE 2 (após 72h): Cadência espaçada, tom mais institucional
+//
 // Gates aplicados em cada execução (fail-closed):
-//   - cotação enviada (last_quote_sent_at não nulo)
+//   - last_quote_sent_at não nulo OU conversa SDR pausada por timeout
 //   - estágio compatível (cotacao_enviada / contato_realizado)
 //   - sem in_manual_conversation
 //   - sem opted_out (whatsapp_contacts.opted_out)
-//   - sem inbound recente (últimas 6h)
+//   - sem inbound recente (4h na fase 1, 6h na fase 2)
 //   - opt-out por palavra-chave nas últimas mensagens recebidas
-//   - dentro da janela compliance (08-21 BRT, dias úteis) — gate de send-whatsapp confirma
+//   - dentro da janela compliance — gate de send-whatsapp confirma
 // Cron sugerido: a cada 15 minutos.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,8 +20,19 @@ const corsHeaders = {
 };
 
 const AGENT_SLUG = "junior-followup";
-const DEFAULT_CADENCE_HOURS = [2, 24, 72, 168]; // 2h, 24h, 72h, 7d
-const RECENT_INBOUND_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+// FASE 1: Junior pessoal (primeiros 3 dias) — cadência mais intensa
+const PHASE1_CADENCE_HOURS = [2, 6, 24, 48, 72];
+const PHASE1_INBOUND_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+// FASE 2: Follow-up institucional (após 3 dias) — espaçado
+const PHASE2_CADENCE_HOURS = [120, 168, 336]; // 5d, 7d, 14d
+const PHASE2_INBOUND_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+// Cadência combinada (fase 1 + fase 2)
+const FULL_CADENCE_HOURS = [...PHASE1_CADENCE_HOURS, ...PHASE2_CADENCE_HOURS];
+const PHASE1_COUNT = PHASE1_CADENCE_HOURS.length;
+
 const ELIGIBLE_STAGES = new Set(["cotacao_enviada", "contato_realizado"]);
 
 const OPT_OUT_PATTERNS: RegExp[] = [
@@ -42,49 +54,108 @@ function normalizePhone(phone: string): string {
 
 function detectOptOut(text: string): boolean {
   if (!text) return false;
-  const norm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const norm = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return OPT_OUT_PATTERNS.some((re) => re.test(text) || re.test(norm));
 }
 
-/** Variações de abordagem por toque — curtas, contextualizadas, sem cobrança. */
-function buildMessage(opts: {
+/**
+ * FASE 1: Mensagens do Junior (pessoal, como se fosse ele retomando)
+ * Tom: natural, curto, sem pressão mas com direção
+ */
+function buildPhase1Message(opts: {
+  step_index: number;
+  lead_name: string;
+  objetivo?: string | null;
+  tem_dados: boolean;
+}): { message: string; approach: string } {
+  const nome = (opts.lead_name || "").split(/\s+/)[0] || "tudo bem";
+  const objetivo = (opts.objetivo || "").toLowerCase();
+
+  const pools: Array<{ approach: string; messages: string[] }> = [
+    {
+      approach: "retomada_rapida",
+      messages: [
+        `${nome}, vi que a gente tava conversando aqui. Fica tranquilo, sem pressa — quando puder me responder a gente continua 🙂`,
+        `Oi ${nome}! Sei que o dia é corrido. Quando tiver um minutinho pra gente fechar os dados do plano, me chama aqui.`,
+        `${nome}, tô por aqui quando puder continuar. Falta pouco pra eu montar as opções certas pra você.`,
+      ],
+    },
+    {
+      approach: "valor_rapido",
+      messages: [
+        `${nome}, só pra você saber: assim que a gente fechar os dados eu já consigo te mandar as melhores opções em menos de 1h. Me chama quando puder 👍`,
+        `Oi ${nome}! Tô separando umas opções boas aqui. Só preciso confirmar uns dados contigo pra não te mandar coisa que não faz sentido.`,
+        opts.tem_dados
+          ? `${nome}, com o que você já me passou eu já tenho uma boa base. Falta só mais um ou dois dados pra eu fechar a cotação certinha.`
+          : `${nome}, me conta quando puder: é plano pra você ou pra empresa? Com isso eu já começo a filtrar as melhores opções.`,
+      ],
+    },
+    {
+      approach: "dia_seguinte",
+      messages: [
+        `Bom dia ${nome}! Passando aqui rapidinho — ainda faz sentido a gente ver as opções de plano? Tô com tudo pronto pra montar sua cotação.`,
+        `${nome}, bom dia! Ontem a gente tava vendo sobre plano de saúde. Quando puder me responder eu finalizo a cotação pra você.`,
+        `Oi ${nome}! Novo dia, novas energias 😄 Me avisa quando quiser continuar sobre o plano que eu tô por aqui.`,
+      ],
+    },
+    {
+      approach: "urgencia_suave",
+      messages: [
+        `${nome}, só um toque: as tabelas que eu tenho aqui são válidas até o fim do mês. Se quiser garantir esse valor, me chama que a gente fecha rápido.`,
+        `Oi ${nome}! Tô com umas condições boas aqui que valem por pouco tempo. Quer que eu te mande um resumo rápido das opções?`,
+        objetivo.includes("troca") || objetivo.includes("reduz")
+          ? `${nome}, vi que você tá querendo melhorar o plano. Tenho opções que podem te economizar bastante — me chama que te mostro em 2 min.`
+          : `${nome}, posso te mandar um comparativo rápido das 2-3 melhores opções pro seu perfil? Sem compromisso, só pra você ter uma base.`,
+      ],
+    },
+    {
+      approach: "ultima_pessoal",
+      messages: [
+        `${nome}, última mensagem minha por aqui pra não te incomodar. Se em algum momento quiser retomar, é só me chamar que eu retomo de onde paramos 🙏`,
+        `${nome}, vou dar uma pausa aqui. Seus dados ficam salvos comigo — quando quiser voltar a conversar sobre o plano, é só mandar um oi.`,
+        `Oi ${nome}, entendo que talvez não seja o momento. Vou ficar por aqui caso mude de ideia. Qualquer dúvida futura, pode me chamar sem cerimônia.`,
+      ],
+    },
+  ];
+
+  const idx = Math.min(opts.step_index, pools.length - 1);
+  const pool = pools[idx];
+  const message = pool.messages[Math.floor(Math.random() * pool.messages.length)];
+  return { message, approach: pool.approach };
+}
+
+/**
+ * FASE 2: Follow-up institucional (após 3 dias)
+ * Tom: profissional, oferece valor concreto, sem pressão
+ */
+function buildPhase2Message(opts: {
   step_index: number;
   lead_name: string;
   operadora?: string | null;
-  plano_nome?: string | null;
 }): { message: string; approach: string } {
-  const primeiroNome = (opts.lead_name || "tudo bem").split(/\s+/)[0];
+  const nome = (opts.lead_name || "").split(/\s+/)[0] || "tudo bem";
   const op = opts.operadora ? ` da ${opts.operadora}` : "";
-  const plano = opts.plano_nome ? ` (${opts.plano_nome})` : "";
 
-  // Pequena rotação interna por step pra não soar mecânico
   const pools: Array<{ approach: string; messages: string[] }> = [
     {
-      approach: "checagem_leve",
+      approach: "novidade",
       messages: [
-        `${primeiroNome}, deu pra dar uma olhada na cotação${op}${plano}? Qualquer dúvida me chama 🙂`,
-        `Oi ${primeiroNome}! Conseguiu ver a proposta${op}? Posso esclarecer qualquer ponto.`,
+        `${nome}, saiu uma condição nova essa semana em algumas operadoras${op}. Se ainda tiver interesse, posso te mostrar o que mudou.`,
+        `Oi ${nome}! Tô com umas tabelas atualizadas aqui. Quer que eu dê uma olhada se tem algo melhor pro seu perfil?`,
       ],
     },
     {
-      approach: "ajuda_concreta",
+      approach: "checagem_final",
       messages: [
-        `${primeiroNome}, posso te ajudar comparando algum ponto da cotação${op}? Rede, valor ou cobertura?`,
-        `Se quiser, te explico em 2 minutos as diferenças do plano${op} pra ficar mais claro.`,
+        `${nome}, faz uma semana que a gente conversou. Ainda posso te ajudar com o plano de saúde? Se não for mais o momento, sem problema nenhum.`,
+        `Oi ${nome}! Passando aqui uma última vez sobre o plano. Se precisar no futuro, pode me chamar direto por aqui.`,
       ],
     },
     {
-      approach: "valor_concreto",
+      approach: "encerramento_definitivo",
       messages: [
-        `${primeiroNome}, ainda faz sentido seguirmos com essa cotação${op}? Posso ajustar pra outro perfil se preferir.`,
-        `Se algo mudou, me avisa que adapto a proposta${op} sem compromisso.`,
-      ],
-    },
-    {
-      approach: "encerrar_respeitoso",
-      messages: [
-        `${primeiroNome}, vou parar por aqui pra não te incomodar. Se precisar no futuro, é só me chamar 🙏`,
-        `${primeiroNome}, deixo essa em standby. Quando quiser retomar é só responder por aqui.`,
+        `${nome}, vou encerrar nosso contato por aqui pra não te incomodar. Seus dados ficam salvos — quando precisar, é só mandar um oi que eu retomo. Valeu! 🙏`,
+        `${nome}, última mensagem minha. Se um dia precisar de plano de saúde, pode me chamar aqui que eu te atendo na hora. Abraço!`,
       ],
     },
   ];
@@ -103,28 +174,14 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Permite override da cadência via body (parametrizável)
-  let cadence = DEFAULT_CADENCE_HOURS;
-  if (req.method === "POST") {
-    try {
-      const body = await req.json().catch(() => ({}));
-      if (Array.isArray(body?.cadence_hours) && body.cadence_hours.length > 0) {
-        const arr = body.cadence_hours.filter((n: any) => Number.isFinite(n) && n > 0);
-        if (arr.length) cadence = arr;
-      }
-    } catch { /* ignore */ }
-  }
-
-  const stats = { evaluated: 0, sent: 0, skipped: 0, failed: 0, scheduled: 0, sdr_timed_out: 0 };
+  const stats = { evaluated: 0, sent: 0, skipped: 0, failed: 0, sdr_timed_out: 0 };
 
   try {
     const nowMs = Date.now();
     const nowIso = new Date().toISOString();
 
     // ═══ FASE 0: Pausar conversas SDR inativas (timeout 2h) ═══
-    // Detecta conversas do pré-qualificador que ficaram penduradas (lead parou de responder)
-    // e as pausa para que o follow-up possa assumir.
-    const SDR_INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
+    const SDR_INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000;
     const timeoutThreshold = new Date(nowMs - SDR_INACTIVITY_TIMEOUT_MS).toISOString();
 
     const { data: staleConvs } = await supabase
@@ -140,7 +197,6 @@ Deno.serve(async (req) => {
         .update({ status: "pausada", ultima_atividade: nowIso })
         .eq("id", conv.id);
 
-      // Busca dados do lead pra notificar
       const { data: staleLead } = await supabase
         .from("leads")
         .select("user_id, name, phone, stage")
@@ -153,7 +209,7 @@ Deno.serve(async (req) => {
           user_id: staleLead.user_id,
           type: "sdr_timeout",
           title: `Junior pausou — ${displayName} não respondeu`,
-          body: `Lead não respondeu há 2h+ durante qualificação. Follow-up vai assumir a cadência.\n\nSe quiser retomar manualmente, é só responder direto.`,
+          body: `Lead não respondeu há 2h+ durante qualificação. Follow-up vai assumir.\n\nSe quiser retomar, é só responder direto.`,
           lead_id: conv.lead_id,
         });
 
@@ -161,43 +217,23 @@ Deno.serve(async (req) => {
           user_id: staleLead.user_id,
           lead_id: conv.lead_id,
           action_type: "sdr_timeout_inactivity",
-          metadata: {
-            conversation_id: conv.id,
-            ultima_atividade: conv.ultima_atividade,
-            decision: "paused_for_followup",
-          },
+          metadata: { conversation_id: conv.id, ultima_atividade: conv.ultima_atividade },
         });
 
-        // Marca last_quote_sent_at pra que o follow-up possa pegar esse lead
-        // O follow-up precisa de stage compatível + last_quote_sent_at preenchido
-        const needsUpdate = !staleLead.stage ||
+        // Garante que o lead está elegível pro follow-up
+        const needsStageUpdate = !staleLead.stage ||
           !["cotacao_enviada", "contato_realizado"].includes(staleLead.stage);
-        if (needsUpdate) {
-          await supabase.from("leads").update({
-            stage: "contato_realizado",
-            last_quote_sent_at: nowIso,
-            updated_at: nowIso,
-          }).eq("id", conv.lead_id);
-        } else {
-          // Já está em estágio compatível, só garante last_quote_sent_at
-          const { data: checkLead } = await supabase
-            .from("leads")
-            .select("last_quote_sent_at")
-            .eq("id", conv.lead_id)
-            .maybeSingle();
-          if (!checkLead?.last_quote_sent_at) {
-            await supabase.from("leads").update({
-              last_quote_sent_at: nowIso,
-              updated_at: nowIso,
-            }).eq("id", conv.lead_id);
-          }
-        }
+        await supabase.from("leads").update({
+          ...(needsStageUpdate ? { stage: "contato_realizado" } : {}),
+          last_quote_sent_at: nowIso,
+          updated_at: nowIso,
+        }).eq("id", conv.lead_id);
       }
 
       stats.sdr_timed_out++;
     }
 
-    // 1) Encontra leads candidatos: cotação enviada, sem manual, sem soft-delete
+    // ═══ FOLLOW-UP: Fase 1 (Junior pessoal) + Fase 2 (institucional) ═══
     const { data: leads, error: lErr } = await supabase
       .from("leads")
       .select("id, user_id, name, phone, stage, last_quote_sent_at, in_manual_conversation, quote_operadora, quote_plan_name, deleted_at")
@@ -213,65 +249,56 @@ Deno.serve(async (req) => {
       const quoteAt = new Date(lead.last_quote_sent_at as string).getTime();
       const elapsedH = (nowMs - quoteAt) / 3_600_000;
 
-      // 2) Acha próximo step não usado
+      // Acha próximo step não usado
       const { data: existing } = await supabase
         .from("junior_followup_attempts")
         .select("step_index, status")
         .eq("lead_id", lead.id)
         .order("step_index", { ascending: true });
-      const usedSteps = new Set((existing ?? []).map((r) => r.step_index));
-      const nextIdx = cadence.findIndex((_, i) => !usedSteps.has(i));
-      if (nextIdx === -1) continue; // todos os toques já usados
+      const usedSteps = new Set((existing ?? []).map((r: any) => r.step_index));
+      const nextIdx = FULL_CADENCE_HOURS.findIndex((_, i) => !usedSteps.has(i));
+      if (nextIdx === -1) continue;
 
-      const offsetH = cadence[nextIdx];
-      if (elapsedH < offsetH) continue; // janela mínima ainda não atingida
+      const offsetH = FULL_CADENCE_HOURS[nextIdx];
+      if (elapsedH < offsetH) continue;
 
       const phone = normalizePhone(lead.phone);
+      const isPhase1 = nextIdx < PHASE1_COUNT;
+      const inboundWindow = isPhase1 ? PHASE1_INBOUND_WINDOW_MS : PHASE2_INBOUND_WINDOW_MS;
 
-      // 3) Gates secundários (registramos como skipped quando aplicável)
+      // Gates
       const logSkip = async (reason: string) => {
         await supabase.from("junior_followup_attempts").insert({
-          lead_id: lead.id,
-          user_id: lead.user_id,
-          step_index: nextIdx,
-          cadence_offset_hours: offsetH,
-          scheduled_at: nowIso,
-          status: "skipped",
-          skip_reason: reason,
+          lead_id: lead.id, user_id: lead.user_id, step_index: nextIdx,
+          cadence_offset_hours: offsetH, scheduled_at: nowIso,
+          status: "skipped", skip_reason: reason,
         });
         stats.skipped++;
       };
 
-      // 3a) opted_out
       const { data: contact } = await supabase
         .from("whatsapp_contacts")
         .select("opted_out, is_personal")
-        .eq("phone", phone)
-        .eq("user_id", lead.user_id)
+        .eq("phone", phone).eq("user_id", lead.user_id)
         .maybeSingle();
       if (contact?.opted_out) { await logSkip("opted_out"); continue; }
       if (contact?.is_personal) { await logSkip("is_personal"); continue; }
 
-      // 3b) inbound recente
-      const since = new Date(nowMs - RECENT_INBOUND_WINDOW_MS).toISOString();
+      const since = new Date(nowMs - inboundWindow).toISOString();
       const { data: recentInbound } = await supabase
         .from("whatsapp_messages")
         .select("id, content")
-        .eq("phone", phone)
-        .eq("direction", "inbound")
+        .eq("phone", phone).eq("direction", "inbound")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(5);
 
       if ((recentInbound?.length ?? 0) > 0) {
-        // 3c) opt-out por palavra-chave em qualquer inbound recente
         const optOutHit = recentInbound!.some((m: any) => detectOptOut(m.content || ""));
         if (optOutHit) {
-          // Marca contato como opted_out pra parar todas as automações
           await supabase.from("whatsapp_contacts")
             .update({ opted_out: true, opted_out_at: nowIso })
-            .eq("phone", phone)
-            .eq("user_id", lead.user_id);
+            .eq("phone", phone).eq("user_id", lead.user_id);
           await logSkip("opt_out_keyword_detected");
           continue;
         }
@@ -279,87 +306,89 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 4) Monta mensagem variada e envia via send-whatsapp (gate fail-closed)
-      const { message, approach } = buildMessage({
-        step_index: nextIdx,
-        lead_name: lead.name || "",
-        operadora: lead.quote_operadora,
-        plano_nome: lead.quote_plan_name,
-      });
+      // Monta mensagem baseada na fase
+      let message: string;
+      let approach: string;
 
+      if (isPhase1) {
+        // Busca dados coletados da conversa SDR pra contextualizar
+        const { data: convData } = await supabase
+          .from("agent_conversations")
+          .select("conversation_state")
+          .eq("lead_id", lead.id).eq("agent_slug", "junior-sdr")
+          .order("ultima_atividade", { ascending: false })
+          .limit(1).maybeSingle();
+        const coletado = (convData?.conversation_state as any)?.coletado ?? {};
+        const objetivo = coletado.objetivo || coletado.o_que_busca || null;
+        const temDados = Object.keys(coletado).length > 2;
+
+        const result = buildPhase1Message({
+          step_index: nextIdx,
+          lead_name: lead.name || "",
+          objetivo,
+          tem_dados: temDados,
+        });
+        message = result.message;
+        approach = `fase1_${result.approach}`;
+      } else {
+        const result = buildPhase2Message({
+          step_index: nextIdx - PHASE1_COUNT,
+          lead_name: lead.name || "",
+          operadora: lead.quote_operadora,
+        });
+        message = result.message;
+        approach = `fase2_${result.approach}`;
+      }
+
+      // Envia
       try {
         const { data: sendRes, error: sendErr } = await supabase.functions.invoke("send-whatsapp", {
-          body: {
-            phone,
-            message,
-            user_id: lead.user_id,
-            lead_id: lead.id,
-            agent_slug: AGENT_SLUG, // força revalidação no gate
-          },
+          body: { phone, message, user_id: lead.user_id, lead_id: lead.id, agent_slug: AGENT_SLUG },
         });
 
         if (sendErr || (sendRes && sendRes.ok === false)) {
           const reason = sendRes?.gate_block?.reason || sendRes?.error || sendErr?.message || "send_failed";
           await supabase.from("junior_followup_attempts").insert({
-            lead_id: lead.id,
-            user_id: lead.user_id,
-            step_index: nextIdx,
-            cadence_offset_hours: offsetH,
-            scheduled_at: nowIso,
+            lead_id: lead.id, user_id: lead.user_id, step_index: nextIdx,
+            cadence_offset_hours: offsetH, scheduled_at: nowIso,
             status: sendRes?.gate_block ? "skipped" : "failed",
             skip_reason: String(reason).slice(0, 200),
-            message_content: message,
-            approach_tag: approach,
+            message_content: message, approach_tag: approach,
           });
           if (sendRes?.gate_block) stats.skipped++; else stats.failed++;
           continue;
         }
 
         await supabase.from("junior_followup_attempts").insert({
-          lead_id: lead.id,
-          user_id: lead.user_id,
-          step_index: nextIdx,
-          cadence_offset_hours: offsetH,
-          scheduled_at: nowIso,
-          sent_at: nowIso,
-          status: "sent",
-          message_content: message,
-          approach_tag: approach,
+          lead_id: lead.id, user_id: lead.user_id, step_index: nextIdx,
+          cadence_offset_hours: offsetH, scheduled_at: nowIso, sent_at: nowIso,
+          status: "sent", message_content: message, approach_tag: approach,
         });
 
-        // Atualiza last_contact_at e registra interaction
         await supabase.from("leads").update({
-          last_contact_at: nowIso,
-          updated_at: nowIso,
+          last_contact_at: nowIso, updated_at: nowIso,
         }).eq("id", lead.id);
 
         await supabase.from("interactions").insert({
-          lead_id: lead.id,
-          user_id: lead.user_id,
-          type: "whatsapp",
+          lead_id: lead.id, user_id: lead.user_id, type: "whatsapp",
           description: `[Junior follow-up #${nextIdx + 1} • ${approach}] ${message.slice(0, 140)}`,
         });
 
         stats.sent++;
-        await new Promise((r) => setTimeout(r, 800)); // rate-limit suave
+        await new Promise((r) => setTimeout(r, 800));
       } catch (sendCatch) {
         const msg = sendCatch instanceof Error ? sendCatch.message : String(sendCatch);
         await supabase.from("junior_followup_attempts").insert({
-          lead_id: lead.id,
-          user_id: lead.user_id,
-          step_index: nextIdx,
-          cadence_offset_hours: offsetH,
-          scheduled_at: nowIso,
-          status: "failed",
-          skip_reason: msg.slice(0, 200),
-          message_content: message,
-          approach_tag: approach,
+          lead_id: lead.id, user_id: lead.user_id, step_index: nextIdx,
+          cadence_offset_hours: offsetH, scheduled_at: nowIso,
+          status: "failed", skip_reason: msg.slice(0, 200),
+          message_content: message, approach_tag: approach,
         });
         stats.failed++;
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, stats, cadence_hours: cadence }), {
+    return new Response(JSON.stringify({ ok: true, stats, cadence_hours: FULL_CADENCE_HOURS }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
