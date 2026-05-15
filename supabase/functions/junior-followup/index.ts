@@ -115,11 +115,87 @@ Deno.serve(async (req) => {
     } catch { /* ignore */ }
   }
 
-  const stats = { evaluated: 0, sent: 0, skipped: 0, failed: 0, scheduled: 0 };
+  const stats = { evaluated: 0, sent: 0, skipped: 0, failed: 0, scheduled: 0, sdr_timed_out: 0 };
 
   try {
     const nowMs = Date.now();
     const nowIso = new Date().toISOString();
+
+    // ═══ FASE 0: Pausar conversas SDR inativas (timeout 2h) ═══
+    // Detecta conversas do pré-qualificador que ficaram penduradas (lead parou de responder)
+    // e as pausa para que o follow-up possa assumir.
+    const SDR_INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 horas
+    const timeoutThreshold = new Date(nowMs - SDR_INACTIVITY_TIMEOUT_MS).toISOString();
+
+    const { data: staleConvs } = await supabase
+      .from("agent_conversations")
+      .select("id, lead_id, ultima_atividade")
+      .eq("agent_slug", "junior-sdr")
+      .in("status", ["ativa", "digitando"])
+      .lt("ultima_atividade", timeoutThreshold)
+      .limit(50);
+
+    for (const conv of staleConvs ?? []) {
+      await supabase.from("agent_conversations")
+        .update({ status: "pausada", ultima_atividade: nowIso })
+        .eq("id", conv.id);
+
+      // Busca dados do lead pra notificar
+      const { data: staleLead } = await supabase
+        .from("leads")
+        .select("user_id, name, phone, stage")
+        .eq("id", conv.lead_id)
+        .maybeSingle();
+
+      if (staleLead?.user_id) {
+        const displayName = staleLead.name || staleLead.phone || "lead";
+        await supabase.from("notifications").insert({
+          user_id: staleLead.user_id,
+          type: "sdr_timeout",
+          title: `Junior pausou — ${displayName} não respondeu`,
+          body: `Lead não respondeu há 2h+ durante qualificação. Follow-up vai assumir a cadência.\n\nSe quiser retomar manualmente, é só responder direto.`,
+          lead_id: conv.lead_id,
+        });
+
+        await supabase.from("action_log").insert({
+          user_id: staleLead.user_id,
+          lead_id: conv.lead_id,
+          action_type: "sdr_timeout_inactivity",
+          metadata: {
+            conversation_id: conv.id,
+            ultima_atividade: conv.ultima_atividade,
+            decision: "paused_for_followup",
+          },
+        });
+
+        // Marca last_quote_sent_at pra que o follow-up possa pegar esse lead
+        // O follow-up precisa de stage compatível + last_quote_sent_at preenchido
+        const needsUpdate = !staleLead.stage ||
+          !["cotacao_enviada", "contato_realizado"].includes(staleLead.stage);
+        if (needsUpdate) {
+          await supabase.from("leads").update({
+            stage: "contato_realizado",
+            last_quote_sent_at: nowIso,
+            updated_at: nowIso,
+          }).eq("id", conv.lead_id);
+        } else {
+          // Já está em estágio compatível, só garante last_quote_sent_at
+          const { data: checkLead } = await supabase
+            .from("leads")
+            .select("last_quote_sent_at")
+            .eq("id", conv.lead_id)
+            .maybeSingle();
+          if (!checkLead?.last_quote_sent_at) {
+            await supabase.from("leads").update({
+              last_quote_sent_at: nowIso,
+              updated_at: nowIso,
+            }).eq("id", conv.lead_id);
+          }
+        }
+      }
+
+      stats.sdr_timed_out++;
+    }
 
     // 1) Encontra leads candidatos: cotação enviada, sem manual, sem soft-delete
     const { data: leads, error: lErr } = await supabase
