@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Send, RotateCcw, Bot, User as UserIcon, Sparkles, Phone, RefreshCcw, CheckCircle2, Circle } from "lucide-react";
+import { Loader2, Send, RotateCcw, Bot, User as UserIcon, Sparkles, Phone, RefreshCcw, CheckCircle2, Circle, Eraser } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { normalizePhone } from "@/lib/phone";
 import { QUALIFICATION_FIELDS } from "@/lib/agents/juniorPrequalificador";
@@ -250,6 +250,30 @@ export function AgentsPlaygroundTab() {
               </Button>
               <Button variant="outline" size="sm" onClick={resetLead} disabled={!leadId} className="btn-press w-full">
                 <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Resetar lead
+              </Button>
+              {/* TEMPORÁRIO — remover quando a SDR estiver validada */}
+              <Button
+                variant="destructive"
+                size="sm"
+                className="btn-press w-full"
+                onClick={async () => {
+                  const target = "11958047450";
+                  const ok = window.confirm(`Apagar TODOS os rastros do número ${target}?`);
+                  if (!ok) return;
+                  const { data, error } = await supabase.functions.invoke("reset-test-lead", {
+                    body: { phone: target },
+                  });
+                  if (error) {
+                    toast.error("Erro ao zerar: " + error.message);
+                    return;
+                  }
+                  toast.success(`Número ${target} zerado`, {
+                    description: data?.summary ? JSON.stringify(data.summary) : undefined,
+                  });
+                  reset();
+                }}
+              >
+                <Eraser className="h-3.5 w-3.5 mr-1.5" /> Zerar 11958047450 (teste)
               </Button>
             </div>
           </CardContent>
