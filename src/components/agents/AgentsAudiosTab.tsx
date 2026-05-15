@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,37 +42,53 @@ export function AgentsAudiosTab() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Carrega lista de agentes
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("agents_config")
         .select("slug, nome")
         .order("nome");
+      if (error) {
+        toast.error("Erro ao carregar agentes: " + error.message);
+        setLoading(false);
+        return;
+      }
       const list = (data as AgentOption[]) || [];
       setAgents(list);
-      if (list.length && !selectedAgent) {
+      if (list.length) {
         const junior = list.find(a => a.slug.includes("prequalificador") || a.slug.includes("junior"));
         setSelectedAgent(junior?.slug || list[0].slug);
-      } else if (!list.length) {
+      } else {
         setLoading(false);
       }
     })();
   }, []);
 
-  const load = async () => {
-    if (!selectedAgent) return;
+  // Carrega áudios do agente selecionado
+  const loadAudios = useCallback(async (agentSlug: string) => {
+    if (!agentSlug) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from("agent_audios")
       .select("*")
-      .eq("agent_slug", selectedAgent)
+      .eq("agent_slug", agentSlug)
       .order("ordem", { ascending: true });
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error("Erro ao carregar áudios: " + error.message);
+    }
     setAudios((data as AgentAudio[]) ?? []);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { if (selectedAgent) load(); }, [selectedAgent]);
+  useEffect(() => {
+    if (selectedAgent) {
+      loadAudios(selectedAgent);
+    }
+  }, [selectedAgent, loadAudios]);
 
   const onFile = async (audio: AgentAudio, file: File) => {
     if (!file) return;
@@ -110,7 +126,7 @@ export function AgentsAudiosTab() {
       if (updErr) throw updErr;
 
       toast.success("Áudio enviado!");
-      await load();
+      await loadAudios(selectedAgent);
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao enviar áudio");
     } finally {
@@ -188,6 +204,10 @@ export function AgentsAudiosTab() {
       toast.error("Preencha trigger e descrição");
       return;
     }
+    if (!selectedAgent) {
+      toast.error("Selecione um agente primeiro");
+      return;
+    }
     const { error } = await supabase.from("agent_audios").insert({
       agent_slug: selectedAgent,
       trigger: newTrigger.trigger.trim().toLowerCase().replace(/\s+/g, "_"),
@@ -196,17 +216,32 @@ export function AgentsAudiosTab() {
       ativo: false,
       audio_url: "",
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error("Erro ao criar trigger: " + error.message); return; }
     toast.success("Trigger criado!");
     setNewTriggerOpen(false);
     setNewTrigger({ trigger: "", descricao: "" });
-    load();
+    loadAudios(selectedAgent);
   };
 
   const triggerHint = (trigger: string) => AUDIO_TRIGGERS.find(t => t.trigger === trigger);
 
-  if (loading && !audios.length) {
-    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  // Estado: carregando
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-2">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-xs text-muted-foreground">Carregando áudios...</p>
+      </div>
+    );
+  }
+
+  // Estado: nenhum agente ativo
+  if (agents.length === 0) {
+    return (
+      <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
+        Nenhum agente ativo encontrado. Crie um agente na tab Configuração primeiro.
+      </CardContent></Card>
+    );
   }
 
   return (
@@ -289,7 +324,7 @@ export function AgentsAudiosTab() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <input
                     ref={(el) => { fileInputs.current[a.id] = el; }}
                     type="file"
@@ -335,7 +370,7 @@ export function AgentsAudiosTab() {
             </Card>
           );
         })}
-        {audios.length === 0 && !loading && (
+        {audios.length === 0 && (
           <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
             Nenhum áudio configurado para este agente. Clique em "Novo trigger" para começar.
           </CardContent></Card>
