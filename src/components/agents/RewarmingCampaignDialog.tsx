@@ -25,7 +25,7 @@ export function RewarmingCampaignDialog({ open, onOpenChange, campaign, onSave }
     if (open) {
       supabase.from("agents_config").select("slug,nome").eq("ativo", true).then(({ data }) => setAgents((data as any) || []));
       setForm(campaign || {
-        nome: "", descricao: "", ativo: true, agente_slug: "junior-sdr",
+        nome: "", descricao: "", ativo: true, agente_slug: "",
         dias_inativo_min: 14, estagios_alvo: ["cotacao_enviada", "qualificacao"],
         excluir_perdidos: true, filtro_tipo: [],
         max_tentativas: 3, intervalo_dias: 7, horario_envio: "10:00",

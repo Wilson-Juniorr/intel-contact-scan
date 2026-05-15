@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function AgentsExamplesTab() {
   const [agents, setAgents] = useState<{ slug: string; nome: string; ativo: boolean }[]>([]);
-  const [agentSlug, setAgentSlug] = useState<string>("junior-sdr");
+  const [agentSlug, setAgentSlug] = useState<string>("");
   const { examples, loading, upsert, remove, toggleApproval } = useAgentExamples(agentSlug);
 
   useEffect(() => {
@@ -24,7 +24,8 @@ export function AgentsExamplesTab() {
       .then(({ data }) => {
         if (data && data.length) {
           setAgents(data);
-          if (!data.find((a) => a.slug === agentSlug)) setAgentSlug(data[0].slug);
+          const junior = data.find((a) => a.slug.includes("prequalificador") || a.slug.includes("junior"));
+          setAgentSlug(junior?.slug || data[0].slug);
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

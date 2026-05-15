@@ -325,4 +325,13 @@
   .btn-press:active {
     transform: scale(0.97);
   }
+
+  /* ─── Hide scrollbar but keep scroll ─── */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
