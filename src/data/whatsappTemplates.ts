@@ -17,13 +17,13 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "geral_ola",
     label: "Olá, tudo bem?",
     stage: "geral",
-    text: "Olá {nome}, tudo bem? Aqui é da consultoria de planos de saúde. Como posso te ajudar hoje?",
+    text: "Oi {nome}, tudo bem? Aqui é o Junior, consultor de planos de saúde. Me conta no que posso te ajudar",
   },
   {
     id: "geral_retorno",
     label: "Retorno de contato",
     stage: "geral",
-    text: "Oi {nome}, estou retornando o contato sobre planos de saúde. Ainda tem interesse? Fico à disposição!",
+    text: "Oi {nome}, aqui é o Junior. A gente tava conversando sobre plano de saúde. Ainda faz sentido pra você?",
   },
 
   // Novo
@@ -31,13 +31,13 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "novo_primeiro",
     label: "Primeiro contato",
     stage: "novo",
-    text: "Olá {nome}! Vi que você tem interesse em planos de saúde. Posso te apresentar as melhores opções para o seu perfil? 😊",
+    text: "Oi {nome}! Vi que você tem interesse em plano de saúde. Me conta: é pra você ou pra mais pessoas?",
   },
   {
     id: "novo_apresentacao",
     label: "Apresentação rápida",
     stage: "novo",
-    text: "Oi {nome}, tudo bem? Sou consultor(a) de planos de saúde e gostaria de entender melhor a sua necessidade para encontrar o plano ideal. Podemos conversar?",
+    text: "Oi {nome}, tudo bem? Sou o Junior, consultor de planos de saúde. Trabalho com as principais operadoras. Me conta o que você tá buscando",
   },
 
   // Tentativa de contato
@@ -45,13 +45,45 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "tentativa_followup",
     label: "Follow-up de contato",
     stage: "tentativa_contato",
-    text: "Oi {nome}, tentei falar com você mas não consegui. Podemos agendar um horário para conversarmos sobre as opções de planos de saúde?",
+    text: "Oi {nome}, tentei te chamar mas sei que o dia a dia é corrido. Quando puder me responder a gente continua sobre o plano",
   },
   {
     id: "tentativa_ultimo",
     label: "Última tentativa",
     stage: "tentativa_contato",
-    text: "Olá {nome}, fiz algumas tentativas de contato. Caso ainda tenha interesse em planos de saúde, estou à disposição! É só me chamar aqui. 😊",
+    text: "{nome}, vou encerrar seu atendimento por aqui pra não ficar te incomodando. Se no futuro precisar de plano de saúde, pode me chamar que te atendo na hora. Fica bem!",
+  },
+
+  // Follow-up cadência
+  {
+    id: "followup_4h",
+    label: "Follow-up 4h (curiosidade)",
+    stage: "tentativa_contato",
+    text: "Oi {nome}! Só pra não perder o fio da conversa — me falta só uma info pra montar suas opções. Quando puder me responder a gente continua rapidinho",
+  },
+  {
+    id: "followup_dia2",
+    label: "Follow-up dia 2 (valor)",
+    stage: "tentativa_contato",
+    text: "Oi {nome}, tudo bem? Separei umas opções que acho que vão te surpreender no custo-benefício. Quer que eu te mande ou prefere a gente conversar mais antes?",
+  },
+  {
+    id: "followup_dia4",
+    label: "Follow-up dia 4 (escassez)",
+    stage: "tentativa_contato",
+    text: "{nome}, uma operadora soltou condição especial essa semana com desconto na adesão. Se tiver interesse me avisa que vejo se seu perfil se encaixa antes de vencer o prazo",
+  },
+  {
+    id: "followup_dia7",
+    label: "Follow-up dia 7 (social proof)",
+    stage: "tentativa_contato",
+    text: "Oi {nome}! Essa semana fechei plano pra 3 famílias com perfil parecido com o seu. Se ainda fizer sentido pra você, me chama que monto as opções rapidinho",
+  },
+  {
+    id: "followup_dia14",
+    label: "Follow-up dia 14 (despedida)",
+    stage: "tentativa_contato",
+    text: "{nome}, vou encerrar seu atendimento por aqui pra não ficar te incomodando. Se no futuro precisar de plano de saúde, pode me chamar que te atendo na hora. Fica bem!",
   },
 
   // Cotação enviada
@@ -59,19 +91,19 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "cotacao_lembrete",
     label: "Lembrete de cotação",
     stage: "cotacao_enviada",
-    text: "Oi {nome}! Enviei a cotação do plano {operadora}. Conseguiu dar uma olhada? Se quiser, posso ajustar valores ou comparar com outras operadoras.",
+    text: "Oi {nome}! Te mandei a cotação da {operadora}. Conseguiu dar uma olhada? Se quiser ajustar valor ou comparar com outra operadora, me fala",
   },
   {
     id: "cotacao_duvidas",
     label: "Tirar dúvidas",
     stage: "cotacao_enviada",
-    text: "{nome}, ficou com alguma dúvida sobre a cotação que enviei? Posso explicar as coberturas, carências e condições. Estou por aqui!",
+    text: "{nome}, ficou com alguma dúvida sobre a cotação? Posso explicar cobertura, carência, rede... é só perguntar",
   },
   {
     id: "cotacao_prazo",
     label: "Prazo especial",
     stage: "cotacao_enviada",
-    text: "Oi {nome}, a condição especial da {operadora} tem prazo até {prazo}. Quer que eu reserve essa condição para você?",
+    text: "Oi {nome}, a condição especial da {operadora} vale até {prazo}. Quer que eu trave essa condição pra você?",
   },
 
   // Cotação aprovada
@@ -79,7 +111,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "aprovada_docs",
     label: "Solicitar documentos",
     stage: "cotacao_aprovada",
-    text: "Ótimo {nome}! Para prosseguir com o plano {operadora} ({vidas} vidas), preciso de alguns documentos. Posso enviar a lista?",
+    text: "Boa {nome}! Pra seguir com o plano {operadora} ({vidas} vidas), preciso de uns documentos. Te mando a lista?",
   },
 
   // Documentação completa
@@ -87,13 +119,13 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "docs_confirmacao",
     label: "Confirmação de docs",
     stage: "documentacao_completa",
-    text: "Oi {nome}, recebi toda a documentação. Vou encaminhar para a {operadora} para análise. Te atualizo assim que tiver retorno!",
+    text: "Oi {nome}, recebi tudo certinho. Vou encaminhar pra {operadora} analisar. Te aviso assim que tiver retorno",
   },
   {
     id: "docs_pendente",
     label: "Documento pendente",
     stage: "documentacao_completa",
-    text: "{nome}, para finalizar o processo com a {operadora} ainda falta um documento. Consegue me enviar? Assim consigo dar entrada rapidinho!",
+    text: "{nome}, pra fechar com a {operadora} ainda falta um documento. Consegue me mandar? Assim dou entrada rapidinho",
   },
 
   // Em emissão
@@ -101,7 +133,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "emissao_status",
     label: "Status da emissão",
     stage: "em_emissao",
-    text: "Oi {nome}, seu plano {operadora} está em processo de emissão. Assim que tiver o número da proposta te aviso! 🎉",
+    text: "Oi {nome}, seu plano {operadora} tá em emissão. Assim que sair o número da proposta te aviso aqui",
   },
 
   // Aguardando implantação
@@ -109,7 +141,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "implantacao_prazo",
     label: "Prazo de implantação",
     stage: "aguardando_implantacao",
-    text: "{nome}, seu plano {operadora} foi aprovado! A previsão de ativação é até {prazo}. Qualquer novidade te aviso aqui.",
+    text: "{nome}, seu plano {operadora} foi aprovado! Previsão de ativação até {prazo}. Qualquer novidade te chamo aqui",
   },
 
   // Retrabalho
@@ -117,7 +149,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "retrabalho_retomada",
     label: "Retomada de contato",
     stage: "retrabalho",
-    text: "Olá {nome}, faz um tempo que conversamos sobre planos de saúde. Surgiu alguma novidade? Tenho novas condições que podem te interessar!",
+    text: "Oi {nome}, faz um tempo que a gente conversou sobre plano de saúde. Surgiu alguma novidade? Tenho condições novas que podem fazer sentido pra você",
   },
 ];
 
