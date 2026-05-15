@@ -106,7 +106,7 @@ export default function ContactCategoriesPage() {
         <div>
           <h1 className="text-2xl font-bold">Categorias de contato</h1>
           <p className="text-sm text-muted-foreground">
-            A Camila só responde contatos marcados como <strong>lead</strong>. Os demais ficam silenciados.
+            O agente só responde contatos marcados como <strong>lead</strong>. Os demais ficam silenciados.
           </p>
         </div>
         <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>

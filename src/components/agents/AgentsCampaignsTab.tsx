@@ -31,7 +31,7 @@ const EMPTY: Omit<Campaign, "id" | "detection_count" | "qualified_count"> = {
   nome: "",
   descricao: "",
   ativo: true,
-  agent_slug: "junior-sdr",
+  agent_slug: "",
   utm_codes: [],
   trigger_phrases: [],
   fuzzy_threshold: 0.7,

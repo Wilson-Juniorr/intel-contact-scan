@@ -4,8 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, Mic, Volume2, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Upload, Mic, Volume2, AlertCircle, Plus, Bot } from "lucide-react";
 import { toast } from "sonner";
+import { AUDIO_TRIGGERS } from "@/lib/agents/juniorPrequalificador";
 
 type AgentAudio = {
   id: string;
@@ -18,59 +24,54 @@ type AgentAudio = {
   ordem: number;
 };
 
-const TRIGGER_HINTS: Record<string, { quando: string; script: string; duracao: string }> = {
-  apresentacao: {
-    quando: "Turn 2, quando o lead respondeu com 5+ palavras (engajado)",
-    script: "\"Oi… Aqui é o Junior mesmo. Sou consultor de planos de saúde há anos aqui em SP. Trabalho com as principais operadoras e vou te ajudar a achar a melhor opção. Me conta mais um pouco…\"",
-    duracao: "8-12s",
-  },
-  entendimento: {
-    quando: "Quando 4+ campos do coletado estão preenchidos",
-    script: "\"Perfeito… Já entendi sua situação. Com esses dados eu já consigo montar as opções certas pra você, sem desperdiçar seu tempo. Já estou verificando…\"",
-    duracao: "8-12s",
-  },
-  qualificacao_completa: {
-    quando: "Quando deve_transferir_junior = true (qualificou)",
-    script: "\"Oi! Já tenho tudo que precisava. Vou montar as melhores opções pro seu perfil agora e te mando ainda hoje. Qualquer dúvida pode falar!\"",
-    duracao: "8-10s",
-  },
-  follow_up_dia2: {
-    quando: "Lead sem resposta há 24-48h",
-    script: "\"Oi! Aqui é o Junior. Vi que a gente estava conversando sobre o plano. Fica à vontade pra continuar quando puder, tô aqui.\"",
-    duracao: "6-8s",
-  },
-  follow_up_dia5: {
-    quando: "Lead sem resposta há 4-5 dias",
-    script: "\"Oi! Junior aqui. Tô com algumas novidades de tabela que podem ser interessantes pro seu perfil. Quando quiser continuar é só falar.\"",
-    duracao: "8-10s",
-  },
-};
+type AgentOption = { slug: string; nome: string };
 
 export function AgentsAudiosTab() {
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [audios, setAudios] = useState<AgentAudio[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [previewBlob, setPreviewBlob] = useState<Record<string, { url: string; blob: Blob; mime: string }>>({});
+  const [newTriggerOpen, setNewTriggerOpen] = useState(false);
+  const [newTrigger, setNewTrigger] = useState({ trigger: "", descricao: "" });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("agents_config")
+        .select("slug, nome")
+        .eq("ativo", true)
+        .order("nome");
+      const list = (data as AgentOption[]) || [];
+      setAgents(list);
+      if (list.length && !selectedAgent) {
+        const junior = list.find(a => a.slug.includes("prequalificador") || a.slug.includes("junior"));
+        setSelectedAgent(junior?.slug || list[0].slug);
+      }
+    })();
+  }, []);
+
   const load = async () => {
+    if (!selectedAgent) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("agent_audios")
       .select("*")
-      .eq("agent_slug", "junior-sdr")
+      .eq("agent_slug", selectedAgent)
       .order("ordem", { ascending: true });
     if (error) toast.error(error.message);
     setAudios((data as AgentAudio[]) ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (selectedAgent) load(); }, [selectedAgent]);
 
   const onFile = async (audio: AgentAudio, file: File) => {
     if (!file) return;
@@ -90,7 +91,6 @@ export function AgentsAudiosTab() {
 
       const { data: pub } = supabase.storage.from("agent-audios").getPublicUrl(path);
 
-      // try to read duration
       let duracao: number | null = null;
       try {
         duracao = Math.round(await new Promise<number>((resolve, reject) => {
@@ -149,10 +149,7 @@ export function AgentsAudiosTab() {
       setRecordSeconds(0);
       timerRef.current = setInterval(() => {
         setRecordSeconds((s) => {
-          if (s + 1 >= 20) {
-            stopRecording();
-            return s + 1;
-          }
+          if (s + 1 >= 20) { stopRecording(); return s + 1; }
           return s + 1;
         });
       }, 1000);
@@ -170,8 +167,8 @@ export function AgentsAudiosTab() {
 
   const discardPreview = (audioId: string) => {
     setPreviewBlob((p) => {
-      const { [audioId]: _, ...rest } = p;
-      if (_) URL.revokeObjectURL(_.url);
+      const { [audioId]: removed, ...rest } = p;
+      if (removed) URL.revokeObjectURL(removed.url);
       return rest;
     });
   };
@@ -185,21 +182,62 @@ export function AgentsAudiosTab() {
     discardPreview(audio.id);
   };
 
-  if (loading) {
+  const createTrigger = async () => {
+    if (!newTrigger.trigger.trim() || !newTrigger.descricao.trim()) {
+      toast.error("Preencha trigger e descrição");
+      return;
+    }
+    const { error } = await supabase.from("agent_audios").insert({
+      agent_slug: selectedAgent,
+      trigger: newTrigger.trigger.trim().toLowerCase().replace(/\s+/g, "_"),
+      descricao: newTrigger.descricao.trim(),
+      ordem: audios.length + 1,
+      ativo: false,
+      audio_url: "",
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Trigger criado!");
+    setNewTriggerOpen(false);
+    setNewTrigger({ trigger: "", descricao: "" });
+    load();
+  };
+
+  const triggerHint = (trigger: string) => AUDIO_TRIGGERS.find(t => t.trigger === trigger);
+
+  if (loading && !audios.length) {
     return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/80 to-blue-500 flex items-center justify-center">
-          <Mic className="h-5 w-5 text-primary-foreground" />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/80 to-blue-500 flex items-center justify-center">
+            <Mic className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Áudios do Agente</h2>
+            <p className="text-xs text-muted-foreground">
+              Áudios pré-gravados disparados nos momentos certos da conversa via WhatsApp (PTT).
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-bold">Áudios do Junior</h2>
-          <p className="text-xs text-muted-foreground">
-            Áudios pré-gravados disparados nos momentos certos da conversa via WhatsApp (PTT).
-          </p>
+        <div className="flex items-center gap-2">
+          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+            <SelectTrigger className="w-[200px] h-9 text-sm">
+              <SelectValue placeholder="Selecione agente" />
+            </SelectTrigger>
+            <SelectContent>
+              {agents.map((a) => (
+                <SelectItem key={a.slug} value={a.slug}>
+                  <span className="flex items-center gap-2"><Bot className="h-3 w-3" />{a.nome}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={() => setNewTriggerOpen(true)} className="btn-press">
+            <Plus className="h-3.5 w-3.5 mr-1" /> Novo trigger
+          </Button>
         </div>
       </div>
 
@@ -215,7 +253,7 @@ export function AgentsAudiosTab() {
 
       <div className="grid gap-3">
         {audios.map((a) => {
-          const hint = TRIGGER_HINTS[a.trigger];
+          const hint = triggerHint(a.trigger);
           return (
             <Card key={a.id} className="hover-card-lift border-border/50">
               <CardContent className="p-4 space-y-3">
@@ -226,13 +264,14 @@ export function AgentsAudiosTab() {
                       {a.duracao_segundos != null && (
                         <Badge variant="secondary" className="text-[10px]">{a.duracao_segundos}s</Badge>
                       )}
-                      {hint && <span className="text-[10px] text-muted-foreground">ideal: {hint.duracao}</span>}
+                      {!a.audio_url && <Badge variant="destructive" className="text-[10px]">Sem áudio</Badge>}
+                      {hint && <span className="text-[10px] text-muted-foreground">ideal: {hint.duracao_ideal}</span>}
                     </div>
                     <p className="text-sm font-semibold">{a.descricao}</p>
                     {hint && (
                       <>
-                        <p className="text-[11px] text-muted-foreground mt-1">📅 {hint.quando}</p>
-                        <p className="text-[11px] text-muted-foreground italic mt-1">📝 {hint.script}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Quando: {hint.quando}</p>
+                        <p className="text-[11px] text-muted-foreground italic mt-1">Script: "{hint.script_sugerido}"</p>
                       </>
                     )}
                   </div>
@@ -261,34 +300,18 @@ export function AgentsAudiosTab() {
                       e.target.value = "";
                     }}
                   />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => fileInputs.current[a.id]?.click()}
-                    disabled={uploadingId === a.id}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => fileInputs.current[a.id]?.click()} disabled={uploadingId === a.id}>
                     {uploadingId === a.id
                       ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Enviando…</>
-                      : <><Upload className="h-3.5 w-3.5 mr-1.5" /> {a.audio_url ? "Substituir áudio" : "Enviar áudio"}</>}
+                      : <><Upload className="h-3.5 w-3.5 mr-1.5" /> {a.audio_url ? "Substituir" : "Enviar áudio"}</>}
                   </Button>
                   {recordingId === a.id ? (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={stopRecording}
-                    >
-                      <Mic className="h-3.5 w-3.5 mr-1.5 animate-pulse" />
-                      Parar ({recordSeconds}s)
+                    <Button size="sm" variant="destructive" onClick={stopRecording}>
+                      <Mic className="h-3.5 w-3.5 mr-1.5 animate-pulse" /> Parar ({recordSeconds}s)
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startRecording(a)}
-                      disabled={!!recordingId || uploadingId === a.id}
-                    >
-                      <Mic className="h-3.5 w-3.5 mr-1.5" />
-                      Gravar agora
+                    <Button size="sm" variant="outline" onClick={() => startRecording(a)} disabled={!!recordingId || uploadingId === a.id}>
+                      <Mic className="h-3.5 w-3.5 mr-1.5" /> Gravar
                     </Button>
                   )}
                 </div>
@@ -301,13 +324,9 @@ export function AgentsAudiosTab() {
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => savePreview(a)} disabled={uploadingId === a.id}>
-                        {uploadingId === a.id
-                          ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Salvando…</>
-                          : <>Usar esta gravação</>}
+                        {uploadingId === a.id ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Salvando…</> : <>Usar esta gravação</>}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => discardPreview(a.id)}>
-                        Regravar
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => discardPreview(a.id)}>Regravar</Button>
                     </div>
                   </div>
                 )}
@@ -315,7 +334,45 @@ export function AgentsAudiosTab() {
             </Card>
           );
         })}
+        {audios.length === 0 && !loading && (
+          <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
+            Nenhum áudio configurado para este agente. Clique em "Novo trigger" para começar.
+          </CardContent></Card>
+        )}
       </div>
+
+      {/* Dialog novo trigger */}
+      <Dialog open={newTriggerOpen} onOpenChange={setNewTriggerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Trigger de Áudio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Trigger (identificador)</Label>
+              <Input
+                value={newTrigger.trigger}
+                onChange={(e) => setNewTrigger(t => ({ ...t, trigger: e.target.value }))}
+                placeholder="ex: apresentacao, follow_up_dia3"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Sem espaços, use underline</p>
+            </div>
+            <div>
+              <Label className="text-xs">Descrição</Label>
+              <Textarea
+                value={newTrigger.descricao}
+                onChange={(e) => setNewTrigger(t => ({ ...t, descricao: e.target.value }))}
+                placeholder="Quando e por que esse áudio é enviado"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTriggerOpen(false)}>Cancelar</Button>
+            <Button onClick={createTrigger}>Criar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
