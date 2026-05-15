@@ -47,13 +47,14 @@ export function AgentsAudiosTab() {
       const { data } = await supabase
         .from("agents_config")
         .select("slug, nome")
-        .eq("ativo", true)
         .order("nome");
       const list = (data as AgentOption[]) || [];
       setAgents(list);
       if (list.length && !selectedAgent) {
         const junior = list.find(a => a.slug.includes("prequalificador") || a.slug.includes("junior"));
         setSelectedAgent(junior?.slug || list[0].slug);
+      } else if (!list.length) {
+        setLoading(false);
       }
     })();
   }, []);
