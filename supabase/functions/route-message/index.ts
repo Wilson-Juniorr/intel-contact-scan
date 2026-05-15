@@ -168,40 +168,25 @@ Deno.serve(async (req) => {
       const lastActivity = new Date(activeConv.ultima_atividade).getTime();
       const elapsed = Date.now() - lastActivity;
       if (elapsed > INACTIVITY_TIMEOUT_MS) {
-        // Timeout: Junior sai, marca conversa como pausada para follow-up assumir
+        // Lead voltou após timeout — reativa a conversa e processa normalmente.
+        // O lead re-engajou, então Junior deve responder (não descartar a mensagem).
         await supabase.from("agent_conversations")
-          .update({ status: "pausada", ultima_atividade: new Date().toISOString() })
+          .update({ status: "ativa", ultima_atividade: new Date().toISOString() })
           .eq("id", activeConv.id);
 
-        // Registra decisão
         if (leadEarly.user_id) {
           await supabase.from("action_log").insert({
             user_id: leadEarly.user_id,
             lead_id,
-            action_type: "sdr_timeout_inactivity",
+            action_type: "sdr_reactivated_after_timeout",
             metadata: {
               elapsed_hours: Math.round(elapsed / 3_600_000 * 10) / 10,
-              threshold_hours: INACTIVITY_TIMEOUT_MS / 3_600_000,
               conversation_id: activeConv.id,
-              decision: "paused_for_followup",
             },
           });
-
-          await supabase.from("notifications").insert({
-            user_id: leadEarly.user_id,
-            type: "sdr_timeout",
-            title: "Junior pausou — lead não respondeu",
-            body: `Lead não respondeu há ${Math.round(elapsed / 3_600_000)}h durante qualificação. Follow-up vai assumir.\n\nÚltima msg do lead: "${message_text.slice(0, 100)}"`,
-            lead_id,
-          });
         }
-
-        return new Response(
-          JSON.stringify({ ok: true, skipped: "inactivity_timeout", elapsed_ms: elapsed }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
       }
-      // Conversa ativa e dentro do prazo — continua normalmente (pula guard de "lead novo")
+      // Conversa ativa (ou reativada) — continua normalmente (pula guard de "lead novo")
     } else {
       // Sem conversa ativa — verifica se é realmente um lead novo (primeira interação)
       // Conta mensagens INBOUND anteriores desse número (excluindo a mensagem atual)
@@ -224,15 +209,15 @@ Deno.serve(async (req) => {
       // É lead novo — verifica se a mensagem demonstra interesse em plano de saúde
       const interestPatterns: RegExp[] = [
         /\binteresse\b/i,
-        /\binforma(ç|c)(ão|oes|õe)/i,
-        /\bcota(ç|c)(ão|ar)\b/i,
+        /\binforma(ç|c)([aã]o|oes|[oõ]e)/i,
+        /\bcota(ç|c)([aã]o|ar)\b/i,
         /\bcotar\b/i,
-        /\bsimula(ç|c)(ão|ar)\b/i,
+        /\bsimula(ç|c)([aã]o|ar)\b/i,
         /\bsimular\b/i,
         /\bor(ç|c)amento\b/i,
         /\bvalor(es)?\b/i,
         /\bpre(ç|c)o\b/i,
-        /\bquanto (custa|fica|sai|é)\b/i,
+        /\bquanto (custa|fica|sai|[eé])\b/i,
         /\bquero (um |uma )?(plano|conv[eê]nio|seguro|sa[uú]de)/i,
         /\bprecis(o|amos|ando) (de )?(um |uma )?(plano|conv[eê]nio|seguro)/i,
         /\bplano (de )?sa[uú]de\b/i,
@@ -248,10 +233,10 @@ Deno.serve(async (req) => {
         /\bgostaria de (saber|contratar|conhecer)/i,
         /\btenho interesse\b/i,
         /\bpode me ajudar\b.*\b(plano|sa[uú]de|conv[eê]nio)\b/i,
-        /\bolá.*\b(plano|cotação|interesse|informação|valor)/i,
-        /\boi.*\b(plano|cotação|interesse|informação|valor)/i,
-        /\bbom dia.*\b(plano|cotação|interesse|informação|valor)/i,
-        /\bboa tarde.*\b(plano|cotação|interesse|informação|valor)/i,
+        /\bol[aá].*\b(plano|cota(ç|c)[aã]o|interesse|informa(ç|c)[aã]o|valor)/i,
+        /\boi\b.*\b(plano|cota(ç|c)[aã]o|interesse|informa(ç|c)[aã]o|valor)/i,
+        /\bbom dia.*\b(plano|cota(ç|c)[aã]o|interesse|informa(ç|c)[aã]o|valor)/i,
+        /\bboa tarde.*\b(plano|cota(ç|c)[aã]o|interesse|informa(ç|c)[aã]o|valor)/i,
       ];
 
       const textNorm = trimmedText.normalize("NFD").replace(/[̀-ͯ]/g, "");
