@@ -674,6 +674,11 @@ Deno.serve(async (req) => {
       .select("*").eq("slug", AGENT_SLUG).eq("ativo", true).maybeSingle();
     if (!agent) throw new Error(`Agent ${AGENT_SLUG} inativo ou não encontrado`);
 
+    // Defaults robustos — funciona mesmo com tabela mal configurada
+    const agentModelo = agent.modelo || "google/gemini-2.5-flash";
+    const agentTemperature = Number(agent.temperature) || 0.75;
+    const agentMaxTokens = Number(agent.max_tokens) || 800;
+
     // Acha/cria conversation
     if (!conversation_id) {
       const { data: existing } = await supabase
@@ -883,11 +888,17 @@ Deno.serve(async (req) => {
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
-    // System prompt: usa o da tabela se existir e for substancial,
-    // senão usa o prompt completo hardcoded (garante funcionamento sem config manual)
-    let rawPrompt = (agent.system_prompt as string) || "";
-    if (rawPrompt.trim().length < 200) {
-      rawPrompt = generateFallbackSystemPrompt();
+    // System prompt: fallback completo é SEMPRE a base.
+    // Se a tabela tiver um prompt customizado substancial, adiciona como complemento.
+    const fallbackPrompt = generateFallbackSystemPrompt();
+    const tablePrompt = ((agent.system_prompt as string) || "").trim();
+    let rawPrompt: string;
+    if (tablePrompt.length > 200 && !tablePrompt.includes("{{")) {
+      // Prompt customizado existe e é substancial — usa ele como principal
+      rawPrompt = tablePrompt;
+    } else {
+      // Tabela vazia/genérica — usa fallback completo
+      rawPrompt = fallbackPrompt;
     }
     const personaPrompt = await renderPersonaInPrompt(supabase, rawPrompt, AGENT_SLUG);
 
@@ -971,9 +982,9 @@ Deno.serve(async (req) => {
 
     while (attempt < 2 && !propostaFinal) {
       attempt++;
-      const resp = await callGemini(agent.modelo, systemWithContext, messages, {
-        max_tokens: agent.max_tokens,
-        temperature: Number(agent.temperature),
+      const resp = await callGemini(agentModelo, systemWithContext, messages, {
+        max_tokens: agentMaxTokens,
+        temperature: agentTemperature,
       });
       totalIn += resp.tokens_in;
       totalOut += resp.tokens_out;

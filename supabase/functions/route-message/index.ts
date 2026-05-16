@@ -152,24 +152,20 @@ Deno.serve(async (req) => {
     const normalizedPhoneGuard = normalizePhone(whatsapp_number);
     const phoneVars = [normalizedPhoneGuard, normalizedPhoneGuard.startsWith("55") ? normalizedPhoneGuard.slice(2) : normalizedPhoneGuard];
 
-    // Checa se já existe conversa ativa do SDR com esse lead (continuidade)
+    // Checa se já existe conversa ativa OU pausada do SDR com esse lead (continuidade)
     const { data: activeConv } = await supabase
       .from("agent_conversations")
-      .select("id, ultima_atividade")
+      .select("id, ultima_atividade, status")
       .eq("lead_id", lead_id)
       .eq("agent_slug", SDR_AGENT_SLUG)
-      .in("status", ["ativa", "digitando"])
+      .in("status", ["ativa", "digitando", "pausada"])
       .order("ultima_atividade", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (activeConv) {
-      // Conversa ativa existe — checa timeout de inatividade
-      const lastActivity = new Date(activeConv.ultima_atividade).getTime();
-      const elapsed = Date.now() - lastActivity;
-      if (elapsed > INACTIVITY_TIMEOUT_MS) {
-        // Lead voltou após timeout — reativa a conversa e processa normalmente.
-        // O lead re-engajou, então Junior deve responder (não descartar a mensagem).
+      // Conversa existe — se estava pausada ou com timeout, reativa
+      if (activeConv.status === "pausada") {
         await supabase.from("agent_conversations")
           .update({ status: "ativa", ultima_atividade: new Date().toISOString() })
           .eq("id", activeConv.id);
@@ -178,12 +174,30 @@ Deno.serve(async (req) => {
           await supabase.from("action_log").insert({
             user_id: leadEarly.user_id,
             lead_id,
-            action_type: "sdr_reactivated_after_timeout",
-            metadata: {
-              elapsed_hours: Math.round(elapsed / 3_600_000 * 10) / 10,
-              conversation_id: activeConv.id,
-            },
+            action_type: "sdr_reactivated_by_lead",
+            metadata: { conversation_id: activeConv.id },
           });
+        }
+      } else {
+        const lastActivity = new Date(activeConv.ultima_atividade).getTime();
+        const elapsed = Date.now() - lastActivity;
+        if (elapsed > INACTIVITY_TIMEOUT_MS) {
+          // Reativa conversa que estava ativa mas com timeout
+          await supabase.from("agent_conversations")
+            .update({ status: "ativa", ultima_atividade: new Date().toISOString() })
+            .eq("id", activeConv.id);
+
+          if (leadEarly.user_id) {
+            await supabase.from("action_log").insert({
+              user_id: leadEarly.user_id,
+              lead_id,
+              action_type: "sdr_reactivated_after_timeout",
+              metadata: {
+                elapsed_hours: Math.round(elapsed / 3_600_000 * 10) / 10,
+                conversation_id: activeConv.id,
+              },
+            });
+          }
         }
       }
       // Conversa ativa (ou reativada) — continua normalmente (pula guard de "lead novo")

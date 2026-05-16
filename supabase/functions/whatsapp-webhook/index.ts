@@ -767,14 +767,15 @@ Deno.serve(async (req) => {
         if (leadFlag?.in_manual_conversation) {
           console.log(`SDR bloqueada: lead ${leadId} em conversa manual`);
         } else {
-          // Se já existe conversa ativa do SDR com esse lead, roteia direto
-          // (não re-classifica — o lead já está em qualificação)
+          // Se já existe conversa ativa OU pausada do SDR com esse lead, roteia direto
+          // (não re-classifica — o lead já está/esteve em qualificação)
           const { data: existingConv } = await supabase
             .from("agent_conversations")
-            .select("id")
+            .select("id, status")
             .eq("lead_id", leadId)
             .eq("agent_slug", "junior-sdr")
-            .in("status", ["ativa", "digitando"])
+            .in("status", ["ativa", "digitando", "pausada"])
+            .order("ultima_atividade", { ascending: false })
             .limit(1)
             .maybeSingle();
 
