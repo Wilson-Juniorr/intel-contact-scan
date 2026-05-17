@@ -356,6 +356,7 @@ Deno.serve(async (req) => {
       phone: normalizedPhoneEarly,
       lead_id,
       agent_slug: SDR_AGENT_SLUG,
+      skip_window_check: true, // Janela de horário é tratada no send-whatsapp (agenda pra manhã seguinte)
     });
     if (!gate.allowed) {
       await logAutomationBlock(supabase, gate, {
