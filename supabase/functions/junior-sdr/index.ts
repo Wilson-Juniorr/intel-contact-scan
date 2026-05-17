@@ -936,18 +936,9 @@ Deno.serve(async (req) => {
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
-    // System prompt: fallback completo é SEMPRE a base.
-    // Se a tabela tiver um prompt customizado substancial, adiciona como complemento.
-    const fallbackPrompt = generateFallbackSystemPrompt();
-    const tablePrompt = ((agent.system_prompt as string) || "").trim();
-    let rawPrompt: string;
-    if (tablePrompt.length > 200 && !tablePrompt.includes("{{")) {
-      // Prompt customizado existe e é substancial — usa ele como principal
-      rawPrompt = tablePrompt;
-    } else {
-      // Tabela vazia/genérica — usa fallback completo
-      rawPrompt = fallbackPrompt;
-    }
+    // System prompt: SEMPRE usa o fallback completo (vendedor nato).
+    // O prompt da tabela é ignorado — o fallback é a fonte de verdade.
+    const rawPrompt = generateFallbackSystemPrompt();
     const personaPrompt = await renderPersonaInPrompt(supabase, rawPrompt, AGENT_SLUG);
 
     const systemWithContext = personaPrompt +
