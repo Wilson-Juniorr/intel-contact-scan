@@ -747,14 +747,27 @@ NUNCA comece com:
 - "Obrigado pelo contato" (corporativo)
 - Qualquer frase que não avance a conversa
 
-## FORMATO DE MENSAGEM
-- Máximo 3 linhas por balão
-- Varie quantidade de balões: às vezes 1, às vezes 2, às vezes 3 (NUNCA sempre igual)
-- Sempre termine com pergunta ou direção clara
-- No máximo 1 emoji por mensagem (e nem sempre)
-- Use \`‖\` para separar balões
-- Nunca use markdown, asteriscos ou formatação — é WhatsApp puro
-- Varie aberturas — nunca comece 2 turnos seguidos da mesma forma
+## FORMATO DE MENSAGEM (REGRA MAIS IMPORTANTE — NUNCA VIOLAR)
+
+VOCÊ ESTÁ NO WHATSAPP. Mensagens longas = lead ignora.
+
+REGRAS ABSOLUTAS:
+- MÁXIMO 2 frases por balão (NUNCA mais que isso)
+- Use ‖ para separar balões (cada ‖ vira uma mensagem separada no WhatsApp)
+- MÁXIMO 3 balões por resposta
+- Cada balão tem NO MÁXIMO 30 palavras
+- Sempre termine com pergunta
+- No máximo 1 emoji por resposta (e nem sempre)
+- Nunca use markdown, asteriscos, negrito ou formatação
+- Varie: às vezes 1 balão, às vezes 2, às vezes 3
+
+EXEMPLO CORRETO:
+"Oi! Junior aqui, consultor de planos de saúde. Trabalho com as principais operadoras.‖Me conta: é plano pra você ou pra empresa?"
+
+EXEMPLO ERRADO (PROIBIDO):
+"Oi! Aqui é o Junior, consultor de planos de saúde. Trabalho com as principais operadoras do mercado — Unimed, Amil, Bradesco, SulAmérica, Porto Seguro. Tenho anos de experiência no mercado e posso te ajudar a encontrar o plano ideal para o seu perfil. Me conta o que você está buscando, se é para pessoa física ou jurídica, quantas pessoas seriam beneficiadas e qual a sua região."
+
+SE VOCÊ MANDAR UMA MENSAGEM COM MAIS DE 40 PALAVRAS NUM ÚNICO BALÃO, VOCÊ FALHOU.
 
 ## FLUXO DE QUALIFICAÇÃO
 Colete na ordem (flexível — se lead deu fora de ordem, capture):
@@ -1279,10 +1292,36 @@ Deno.serve(async (req) => {
 
     // Split em balões
     let baloes = propostaFinal.split(SPLIT_CHAR).map((b) => b.trim()).filter(Boolean);
-    // Auto-split: se veio 1 balão longo (>14 palavras), parte em 2 por sentença
+
+    // Auto-split agressivo: se veio 1 balão longo, força separação
     if (baloes.length === 1) {
       const palavras = baloes[0].split(/\s+/).filter(Boolean);
-      if (palavras.length > 14) {
+      if (palavras.length > 30) {
+        // Muito longo — corta em sentenças e agrupa em max 3 balões de ~25 palavras
+        const sentencas = baloes[0].match(/[^.!?…\n]+[.!?…]+|[^.!?…\n]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
+        if (sentencas.length >= 2) {
+          const resultado: string[] = [];
+          let atual = "";
+          for (const s of sentencas) {
+            if ((atual + " " + s).split(/\s+/).length > 25 && atual) {
+              resultado.push(atual.trim());
+              atual = s;
+            } else {
+              atual = atual ? atual + " " + s : s;
+            }
+          }
+          if (atual) resultado.push(atual.trim());
+          baloes = resultado.slice(0, 3); // Max 3 balões
+        } else {
+          // Sem pontuação — corta bruto por palavras
+          const metade = Math.ceil(palavras.length / 2);
+          baloes = [
+            palavras.slice(0, metade).join(" "),
+            palavras.slice(metade).join(" "),
+          ];
+        }
+      } else if (palavras.length > 14) {
+        // Médio — tenta partir em 2 por sentença
         const sentencas = baloes[0].match(/[^.!?…\n]+[.!?…]+|[^.!?…\n]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
         if (sentencas.length >= 2) {
           const meio = Math.ceil(sentencas.length / 2);
@@ -1292,6 +1331,19 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    // Trunca balões individuais que ficaram muito longos (max 40 palavras cada)
+    baloes = baloes.map(b => {
+      const words = b.split(/\s+/);
+      if (words.length > 40) {
+        // Corta na última sentença completa antes de 40 palavras
+        const truncated = words.slice(0, 40).join(" ");
+        const lastPunct = truncated.lastIndexOf(".");
+        if (lastPunct > truncated.length * 0.5) return truncated.slice(0, lastPunct + 1);
+        return truncated + "...";
+      }
+      return b;
+    });
     const palavrasClienteUlt = state.palavras_ultima_msg ?? 5;
     const delays = baloes.map((b, i) => calcularDelay(b, i === 0, palavrasClienteUlt));
 
