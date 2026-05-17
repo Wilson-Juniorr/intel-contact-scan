@@ -165,10 +165,15 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (settings?.ativo) {
+      // Fallback: se não tem config, usa 8h-20h BRT (nunca manda de madrugada)
+      const effectiveSettings = (settings?.ativo)
+        ? settings
+        : { window_start: "08:00", window_end: "20:00", timezone: "America/Sao_Paulo", weekdays_only: false, ativo: true };
+
+      if (effectiveSettings.ativo) {
         const now = new Date();
         const fmt = new Intl.DateTimeFormat("pt-BR", {
-          timeZone: settings.timezone,
+          timeZone: effectiveSettings.timezone,
           hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false,
         }).formatToParts(now);
         const hour = parseInt(fmt.find((p) => p.type === "hour")!.value, 10);
@@ -177,13 +182,13 @@ Deno.serve(async (req) => {
         const isWeekend = weekday.startsWith("sáb") || weekday.startsWith("sab") || weekday.startsWith("dom");
 
         const currentMinutes = hour * 60 + minute;
-        const [sh, sm] = String(settings.window_start).split(":").map(Number);
-        const [eh, em] = String(settings.window_end).split(":").map(Number);
+        const [sh, sm] = String(effectiveSettings.window_start).split(":").map(Number);
+        const [eh, em] = String(effectiveSettings.window_end).split(":").map(Number);
         const startMin = sh * 60 + sm;
         const endMin = eh * 60 + em;
 
         const outsideWindow = currentMinutes < startMin || currentMinutes >= endMin;
-        const blockedByWeekday = settings.weekdays_only && isWeekend;
+        const blockedByWeekday = effectiveSettings.weekdays_only && isWeekend;
 
         if (outsideWindow || blockedByWeekday) {
           // Calcula "próxima janela válida" considerando timezone do user
@@ -192,7 +197,7 @@ Deno.serve(async (req) => {
           const pad = (n: number) => String(n).padStart(2, "0");
 
           const spDateFmt = new Intl.DateTimeFormat("en-CA", {
-            timeZone: settings.timezone,
+            timeZone: effectiveSettings.timezone,
             year: "numeric", month: "2-digit", day: "2-digit",
           });
           const [yStr, mStr, dStr] = spDateFmt.format(now).split("-");
@@ -200,7 +205,7 @@ Deno.serve(async (req) => {
           const m = parseInt(mStr, 10);
           const d = parseInt(dStr, 10);
 
-          const startStr = String(settings.window_start).slice(0, 5); // "08:00"
+          const startStr = String(effectiveSettings.window_start).slice(0, 5); // "08:00"
           let next = new Date(`${y}-${pad(m)}-${pad(d)}T${startStr}:00${BR_OFFSET}`);
 
           // Se já passou, avança até achar um dia válido
@@ -208,9 +213,9 @@ Deno.serve(async (req) => {
             next = new Date(next.getTime() + 86_400_000);
           }
 
-          if (settings.weekdays_only) {
+          if (effectiveSettings.weekdays_only) {
             const wkFmt = new Intl.DateTimeFormat("en-US", {
-              timeZone: settings.timezone,
+              timeZone: effectiveSettings.timezone,
               weekday: "short",
             });
             while (true) {
