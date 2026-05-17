@@ -321,12 +321,35 @@ function buildTechniquesBlockFromRows(rows: TechniqueRow[]): string {
 }
 
 function parseResponse(raw: string): { texto: string; meta: any | null } {
-  const m = raw.match(/<METADATA>([\s\S]*?)<\/METADATA>/);
-  if (!m) return { texto: raw.trim(), meta: null };
-  let meta: any = null;
-  try { meta = JSON.parse(m[1].trim()); } catch { meta = { parse_error: true }; }
-  const texto = raw.replace(/<METADATA>[\s\S]*?<\/METADATA>/, "").trim();
-  return { texto, meta };
+  // Tenta formato <METADATA>...</METADATA> primeiro
+  const tagMatch = raw.match(/<METADATA>([\s\S]*?)<\/METADATA>/);
+  if (tagMatch) {
+    let meta: any = null;
+    try { meta = JSON.parse(tagMatch[1].trim()); } catch { meta = { parse_error: true }; }
+    const texto = raw.replace(/<METADATA>[\s\S]*?<\/METADATA>/, "").trim();
+    return { texto, meta };
+  }
+
+  // Tenta JSON direto no final (com ou sem backticks ```json...```)
+  const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+  const jsonMatch = cleaned.match(/\n(\{[\s\S]*"raciocinio"[\s\S]*\})\s*$/);
+  if (jsonMatch) {
+    let meta: any = null;
+    try { meta = JSON.parse(jsonMatch[1].trim()); } catch { meta = { parse_error: true }; }
+    const texto = cleaned.replace(/\n?\{[\s\S]*"raciocinio"[\s\S]*\}\s*$/, "").trim();
+    return { texto, meta };
+  }
+
+  // Fallback: tenta qualquer JSON com "coletado" no final
+  const fallbackMatch = cleaned.match(/\n(\{[\s\S]*"coletado"[\s\S]*\})\s*$/);
+  if (fallbackMatch) {
+    let meta: any = null;
+    try { meta = JSON.parse(fallbackMatch[1].trim()); } catch { meta = { parse_error: true }; }
+    const texto = cleaned.replace(/\n?\{[\s\S]*"coletado"[\s\S]*\}\s*$/, "").trim();
+    return { texto, meta };
+  }
+
+  return { texto: raw.trim(), meta: null };
 }
 
 async function callGemini(
@@ -768,20 +791,14 @@ REGRAS:
 - Nunca diga "recebi seu áudio" ou mencione transcrição
 
 ## METADATA (OBRIGATÓRIO em TODA resposta — nunca omitir)
-Após o texto da mensagem, SEMPRE inclua um bloco JSON (mesmo em respostas curtas):
-{
-  "raciocinio": "pensamento interno sobre contexto, perfil, emoção, estratégia escolhida",
-  "coletado": {"campo": "valor"},
-  "perfil_detectado": "empresario|mae_familia|jovem|troca|reducao|idoso|desconhecido",
-  "cerebro_principal": "Voss|Hormozi|Belfort",
-  "tecnica_aplicada": "mirroring|labeling|ancoragem|looping|empathy|direto",
-  "tom_usado": "executivo|acolhedor|descontraido|tecnico|urgente",
-  "deve_transferir_junior": false,
-  "urgencia": "alta|media|baixa",
-  "objecao_principal": "string ou null",
-  "sugestao_proxima_msg_humana": "string ou null"
-}
-NUNCA omita o METADATA. Se não coletou nada, use "coletado": {}.`;
+Após o texto da mensagem, SEMPRE inclua o JSON diretamente (SEM backticks, SEM bloco de código, SEM markdown):
+{"raciocinio":"...", "coletado":{}, "perfil_detectado":"...", "cerebro_principal":"...", "tecnica_aplicada":"...", "tom_usado":"...", "deve_transferir_junior":false, "urgencia":"baixa", "objecao_principal":null, "sugestao_proxima_msg_humana":null}
+
+REGRAS DO METADATA:
+- NÃO use \`\`\`json — escreva o JSON direto após o texto
+- NÃO use backticks de nenhum tipo
+- Se não coletou nada, use "coletado": {}
+- NUNCA omita o METADATA`;
 }
 
 Deno.serve(async (req) => {
