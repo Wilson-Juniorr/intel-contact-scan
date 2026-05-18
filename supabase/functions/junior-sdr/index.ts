@@ -327,7 +327,7 @@ function parseResponse(raw: string): { texto: string; meta: any | null } {
     let meta: any = null;
     try { meta = JSON.parse(tagMatch[1].trim()); } catch { meta = { parse_error: true }; }
     const texto = raw.replace(/<METADATA>[\s\S]*?<\/METADATA>/, "").trim();
-    return { texto, meta };
+    return { texto: sanitizeTexto(texto), meta };
   }
 
   // Tenta JSON direto no final (com ou sem backticks ```json...```)
@@ -337,7 +337,7 @@ function parseResponse(raw: string): { texto: string; meta: any | null } {
     let meta: any = null;
     try { meta = JSON.parse(jsonMatch[1].trim()); } catch { meta = { parse_error: true }; }
     const texto = cleaned.replace(/\n?\{[\s\S]*"raciocinio"[\s\S]*\}\s*$/, "").trim();
-    return { texto, meta };
+    return { texto: sanitizeTexto(texto), meta };
   }
 
   // Fallback: tenta qualquer JSON com "coletado" no final
@@ -346,10 +346,43 @@ function parseResponse(raw: string): { texto: string; meta: any | null } {
     let meta: any = null;
     try { meta = JSON.parse(fallbackMatch[1].trim()); } catch { meta = { parse_error: true }; }
     const texto = cleaned.replace(/\n?\{[\s\S]*"coletado"[\s\S]*\}\s*$/, "").trim();
-    return { texto, meta };
+    return { texto: sanitizeTexto(texto), meta };
   }
 
-  return { texto: raw.trim(), meta: null };
+  // Último fallback: tenta encontrar qualquer JSON no texto e removê-lo
+  const anyJsonMatch = cleaned.match(/(\{[^{}]*("raciocinio"|"coletado"|"cerebro_principal"|"tecnica_aplicada")[^{}]*\})/);
+  if (anyJsonMatch) {
+    let meta: any = null;
+    try { meta = JSON.parse(anyJsonMatch[1].trim()); } catch { meta = { parse_error: true }; }
+    const texto = cleaned.replace(anyJsonMatch[0], "").trim();
+    return { texto: sanitizeTexto(texto), meta };
+  }
+
+  return { texto: sanitizeTexto(raw.trim()), meta: null };
+}
+
+function sanitizeTexto(texto: string): string {
+  // Remove qualquer JSON residual que possa ter vazado para o texto
+  let clean = texto
+    .replace(/\{[^{}]*"raciocinio"[^{}]*\}/g, "")
+    .replace(/\{[^{}]*"coletado"[^{}]*\}/g, "")
+    .replace(/\{[^{}]*"cerebro_principal"[^{}]*\}/g, "")
+    .replace(/\{[^{}]*"tecnica_aplicada"[^{}]*\}/g, "")
+    .replace(/<METADATA>[\s\S]*?<\/METADATA>/g, "")
+    .replace(/```json[\s\S]*?```/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .trim();
+
+  // Remove linhas que parecem ser metadata/instruções internas
+  clean = clean.split("\n").filter(line => {
+    const l = line.trim().toLowerCase();
+    if (l.startsWith("{") && l.endsWith("}")) return false;
+    if (l.startsWith("metadata:")) return false;
+    if (l.startsWith("[sistema]")) return false;
+    return true;
+  }).join("\n").trim();
+
+  return clean;
 }
 
 async function callGemini(
@@ -1025,13 +1058,13 @@ Deno.serve(async (req) => {
       allBrains,
       signal,
       campaignDetection?.campaign.preferred_brain_ids ?? [],
-      5,
+      2,
     );
     const prunedTechniques = pruneTechniques(
       allTechniques,
       signal,
       campaignDetection?.campaign.preferred_technique_ids ?? [],
-      4,
+      2,
     );
     const brainsBlock = buildBrainsBlockFromRows(prunedBrains);
     const techniquesBlock = buildTechniquesBlockFromRows(prunedTechniques);
@@ -1060,9 +1093,10 @@ Deno.serve(async (req) => {
 
     const historico = (conv?.mensagens ?? []) as Array<{ role: string; content: string }>;
 
-    // System prompt: SEMPRE usa o fallback completo (vendedor nato).
-    // O prompt da tabela é ignorado — o fallback é a fonte de verdade.
-    const rawPrompt = generateFallbackSystemPrompt();
+    // System prompt: usa o da tabela agents_config se preenchido (>200 chars),
+    // senão usa o fallback completo hardcoded.
+    const configPrompt = (agent.system_prompt || "").trim();
+    const rawPrompt = configPrompt.length > 200 ? configPrompt : generateFallbackSystemPrompt();
     const personaPrompt = await renderPersonaInPrompt(supabase, rawPrompt, AGENT_SLUG);
 
     const systemWithContext = personaPrompt +
@@ -1344,6 +1378,16 @@ Deno.serve(async (req) => {
       }
       return b;
     });
+
+    // GUARD FINAL: sanitiza cada balão antes de enviar — nunca mandar JSON/metadata pro cliente
+    baloes = baloes
+      .map(b => sanitizeTexto(b))
+      .filter(b => b.length > 0 && b.length < 500);
+
+    if (baloes.length === 0) {
+      baloes = ["Pode me dar um segundinho? Já te respondo!"];
+    }
+
     const palavrasClienteUlt = state.palavras_ultima_msg ?? 5;
     const delays = baloes.map((b, i) => calcularDelay(b, i === 0, palavrasClienteUlt));
 
