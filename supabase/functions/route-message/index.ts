@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
             lead_id,
             user_id: leadEarly.user_id,
             agent_slug: SDR_AGENT_SLUG,
+            skip_window_check: true, // SDR responde inbound 24/7; follow-ups respeitam horário
           },
         });
       } catch (sendErr) {
@@ -459,6 +460,7 @@ Deno.serve(async (req) => {
             lead_id,
             user_id: lead.user_id,
             agent_slug: SDR_AGENT_SLUG,
+            skip_window_check: true, // SDR responde inbound 24/7; follow-ups respeitam horário
           },
         });
       } catch (sendErr) {
