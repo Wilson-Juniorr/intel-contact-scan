@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Sparkles, Settings2, Bot, Play, MessageCircle, Mic, BarChart3 } from "lucide-react";
+import { Sparkles, Settings2, Bot, Play, MessageCircle, Mic, BarChart3, GraduationCap, Activity, Wrench } from "lucide-react";
 import { AgentsConfigTab } from "@/components/agents/AgentsConfigTab";
 import { AgentsConversationsTab } from "@/components/agents/AgentsConversationsTab";
 import { AgentsPlaygroundTab } from "@/components/agents/AgentsPlaygroundTab";
@@ -35,7 +35,7 @@ const MAIN_TABS = [
 
 export default function AgentsPage() {
   const [tab, setTab] = useState("config");
-  const [advancedOpen, setAdvancedOpen] = useState<string>("");
+  const [advancedOpen, setAdvancedOpen] = useState<string[]>([]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in-up">
@@ -45,7 +45,7 @@ export default function AgentsPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Agents IA</h1>
-          <p className="text-sm text-muted-foreground">Configure, teste e monitore seus agentes de pré-qualificação</p>
+          <p className="text-sm text-muted-foreground">Configure, teste e monitore seus agentes</p>
         </div>
       </div>
 
@@ -78,13 +78,63 @@ export default function AgentsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Seção Avançado */}
-      <Accordion type="single" collapsible value={advancedOpen} onValueChange={setAdvancedOpen}>
-        <AccordionItem value="advanced" className="border rounded-xl px-4">
+      <Accordion type="multiple" value={advancedOpen} onValueChange={setAdvancedOpen} className="space-y-3">
+        {/* Treinamento — o que muda o comportamento do agente */}
+        <AccordionItem value="training" className="border rounded-xl px-4">
           <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:text-foreground">
             <span className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              Avançado — Treinamento, Distribuição & Analytics
+              <GraduationCap className="h-4 w-4" />
+              Treinamento — Cérebros, Técnicas & Exemplos
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Tabs defaultValue="brains" className="space-y-4 pt-2">
+              <TabsList className="w-full flex overflow-x-auto no-scrollbar">
+                <TabsTrigger value="brains">Cérebros</TabsTrigger>
+                <TabsTrigger value="techniques">Técnicas</TabsTrigger>
+                <TabsTrigger value="examples">Exemplos</TabsTrigger>
+              </TabsList>
+              <Suspense fallback={<LazyFallback />}>
+                <TabsContent value="brains"><AgentsVendorProfilesTab /></TabsContent>
+                <TabsContent value="techniques"><AgentsTechniquesTab /></TabsContent>
+                <TabsContent value="examples"><AgentsExamplesTab /></TabsContent>
+              </Suspense>
+            </Tabs>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Monitoramento — o que você olha pra entender performance */}
+        <AccordionItem value="monitoring" className="border rounded-xl px-4">
+          <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:text-foreground">
+            <span className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Monitoramento — Métricas, Mentes & Custos
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Tabs defaultValue="metrics" className="space-y-4 pt-2">
+              <TabsList className="w-full flex overflow-x-auto no-scrollbar">
+                <TabsTrigger value="metrics">Métricas</TabsTrigger>
+                <TabsTrigger value="mentes">Mentes</TabsTrigger>
+                <TabsTrigger value="costs">Custos</TabsTrigger>
+                <TabsTrigger value="operations">Operações</TabsTrigger>
+              </TabsList>
+              <Suspense fallback={<LazyFallback />}>
+                <TabsContent value="metrics"><AgentsMetricsTab /></TabsContent>
+                <TabsContent value="mentes"><AgentsMentesTab /></TabsContent>
+                <TabsContent value="costs"><AgentsCostPanel /></TabsContent>
+                <TabsContent value="operations"><AgentsOperationsTab /></TabsContent>
+              </Suspense>
+            </Tabs>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Automações — configurações que rodam sozinhas */}
+        <AccordionItem value="automations" className="border rounded-xl px-4">
+          <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:text-foreground">
+            <span className="flex items-center gap-2">
+              <Wrench className="h-4 w-4" />
+              Automações — Distribuição, Campanhas & Compliance
             </span>
           </AccordionTrigger>
           <AccordionContent>
@@ -93,27 +143,13 @@ export default function AgentsPage() {
                 <TabsTrigger value="distribution">Distribuição</TabsTrigger>
                 <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
                 <TabsTrigger value="rewarming">Reaquecimento</TabsTrigger>
-                <TabsTrigger value="brains">Cérebros</TabsTrigger>
-                <TabsTrigger value="techniques">Técnicas</TabsTrigger>
-                <TabsTrigger value="examples">Exemplos</TabsTrigger>
-                <TabsTrigger value="mentes">Mentes</TabsTrigger>
                 <TabsTrigger value="compliance">Compliance</TabsTrigger>
-                <TabsTrigger value="operations">Operações</TabsTrigger>
-                <TabsTrigger value="metrics">Métricas</TabsTrigger>
-                <TabsTrigger value="costs">Custos</TabsTrigger>
               </TabsList>
               <Suspense fallback={<LazyFallback />}>
                 <TabsContent value="distribution"><AgentsDistributionTab /></TabsContent>
                 <TabsContent value="campaigns"><AgentsCampaignsTab /></TabsContent>
                 <TabsContent value="rewarming"><AgentsRewarmingTab /></TabsContent>
-                <TabsContent value="brains"><AgentsVendorProfilesTab /></TabsContent>
-                <TabsContent value="techniques"><AgentsTechniquesTab /></TabsContent>
-                <TabsContent value="examples"><AgentsExamplesTab /></TabsContent>
-                <TabsContent value="mentes"><AgentsMentesTab /></TabsContent>
                 <TabsContent value="compliance"><AgentsComplianceTab /></TabsContent>
-                <TabsContent value="operations"><AgentsOperationsTab /></TabsContent>
-                <TabsContent value="metrics"><AgentsMetricsTab /></TabsContent>
-                <TabsContent value="costs"><AgentsCostPanel /></TabsContent>
               </Suspense>
             </Tabs>
           </AccordionContent>
