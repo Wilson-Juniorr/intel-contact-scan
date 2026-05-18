@@ -596,17 +596,18 @@ async function syncLeadDataFromMetadata(
 
   const softFields: Array<[string, unknown]> = [
     ["regiao", coletadoMeta.regiao],
-    ["o_que_busca", coletadoMeta.o_que_busca],
+    ["o_que_busca", coletadoMeta.o_que_busca || coletadoMeta.motivo_busca],
     ["horario", coletadoMeta.horario],
     ["orcamento", coletadoMeta.orcamento],
     ["urgencia", coletadoMeta.urgencia],
-    ["rede_hospitais", coletadoMeta.rede],
+    ["rede_hospitais", coletadoMeta.rede || coletadoMeta.hospital_preferido],
     ["tipo", coletadoMeta.tipo],
     ["vidas", coletadoMeta.vidas],
-    ["faixa_etaria", coletadoMeta.faixa_etaria],
-    ["objetivo", coletadoMeta.objetivo],
+    ["faixa_etaria", coletadoMeta.faixa_etaria || coletadoMeta.idades],
+    ["objetivo", coletadoMeta.objetivo || coletadoMeta.motivo_busca],
     ["plano_atual", coletadoMeta.plano_atual],
     ["cnpj", coletadoMeta.cnpj],
+    ["hospital_preferido", coletadoMeta.hospital_preferido],
   ];
 
   let memChanged = false;
