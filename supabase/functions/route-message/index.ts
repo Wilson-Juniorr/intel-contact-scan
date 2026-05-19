@@ -182,11 +182,6 @@ Deno.serve(async (req) => {
         const lastActivity = new Date(activeConv.ultima_atividade).getTime();
         const elapsed = Date.now() - lastActivity;
         if (elapsed > INACTIVITY_TIMEOUT_MS) {
-          // Reativa conversa que estava ativa mas com timeout
-          await supabase.from("agent_conversations")
-            .update({ status: "ativa", ultima_atividade: new Date().toISOString() })
-            .eq("id", activeConv.id);
-
           if (leadEarly.user_id) {
             await supabase.from("action_log").insert({
               user_id: leadEarly.user_id,
