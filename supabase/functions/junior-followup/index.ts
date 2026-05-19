@@ -3,8 +3,8 @@
 // FASE 2 (após 72h): Cadência espaçada, tom mais institucional
 //
 // Gates aplicados em cada execução (fail-closed):
-//   - last_quote_sent_at não nulo OU conversa SDR pausada por timeout
-//   - estágio compatível (cotacao_enviada / contato_realizado)
+//   - last_quote_sent_at não nulo (cotação real enviada)
+//   - estágio compatível (cotacao_enviada)
 //   - sem in_manual_conversation
 //   - sem opted_out (whatsapp_contacts.opted_out)
 //   - sem inbound recente (4h na fase 1, 6h na fase 2)
@@ -33,7 +33,7 @@ const PHASE2_INBOUND_WINDOW_MS = 6 * 60 * 60 * 1000;
 const FULL_CADENCE_HOURS = [...PHASE1_CADENCE_HOURS, ...PHASE2_CADENCE_HOURS];
 const PHASE1_COUNT = PHASE1_CADENCE_HOURS.length;
 
-const ELIGIBLE_STAGES = new Set(["cotacao_enviada", "contato_realizado"]);
+const ELIGIBLE_STAGES = new Set(["cotacao_enviada"]);
 
 const OPT_OUT_PATTERNS: RegExp[] = [
   /\bn[aã]o (me )?(mande|manda|envie|envia|chame|chama)\b/i,
@@ -268,12 +268,9 @@ Deno.serve(async (req) => {
           metadata: { conversation_id: conv.id, ultima_atividade: conv.ultima_atividade },
         });
 
-        // Garante que o lead está elegível pro follow-up
-        const needsStageUpdate = !staleLead.stage ||
-          !["cotacao_enviada", "contato_realizado"].includes(staleLead.stage);
+        // Timeout do SDR NÃO é cotação enviada. Só pausa a conversa; follow-up
+        // de cotação continua reservado para leads com cotação real registrada.
         await supabase.from("leads").update({
-          ...(needsStageUpdate ? { stage: "contato_realizado" } : {}),
-          last_quote_sent_at: nowIso,
           updated_at: nowIso,
         }).eq("id", conv.lead_id);
       }
