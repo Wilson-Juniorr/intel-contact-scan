@@ -143,7 +143,8 @@ function buildState(
   const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
   const coletado: Record<string, unknown> = {};
   if (lead?.name && !/^\+?\d+$/.test(lead.name)) coletado.nome = lead.name;
-  if (lead?.type) coletado.tipo = lead.type;
+  if (mem.tipo) coletado.tipo = mem.tipo;
+  else if (lead?.type && String(lead.type).toUpperCase() !== "PF") coletado.tipo = lead.type;
   if (lead?.lives) coletado.vidas = lead.lives;
   if (lead?.operator) coletado.plano_atual = { operadora: lead.operator };
   if (mem.orcamento) coletado.orcamento = mem.orcamento;
@@ -795,7 +796,9 @@ Deno.serve(async (req) => {
     );
 
     // ═══ Qualificação estruturada determinística ═══
-    let qualProgress: QualProgress = evaluateQualification(state.coletado);
+    let qualProgress: QualProgress = evaluateQualification(state.coletado, {
+      turn_number: state.turn_number,
+    });
     console.log(`[SDR qual] score=${qualProgress.score} pct=${qualProgress.pct} next=${qualProgress.next_question_field ?? "-"} oos=${qualProgress.out_of_scope}`);
 
     // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
@@ -1297,7 +1300,9 @@ Deno.serve(async (req) => {
       ...state.coletado,
       ...(metadata?.coletado ?? {}),
     };
-    const qualFinal = evaluateQualification(coletadoFinal);
+    const qualFinal = evaluateQualification(coletadoFinal, {
+      turn_number: state.turn_number,
+    });
     console.log(`[SDR qual final] score=${qualFinal.score} pct=${qualFinal.pct} missing=${JSON.stringify(qualFinal.missing)}`);
 
     // Handoff só com score A — agente pode pedir, mas gate fecha se faltar dado.
