@@ -16,6 +16,7 @@ export type GateBlock = {
     | "personal_contact"
     | "manual_conversation"
     | "opted_out"
+    | "agent_disabled"
     | "rate_limited"
     | "outside_compliance_window"
     | "lead_not_found"
@@ -61,6 +62,20 @@ export async function evaluateAutomationGate(
   }
 
   try {
+    // 0. Kill switch: se o agente estiver desativado no painel, nenhum envio
+    // automático com esse agent_slug pode sair — inclusive fallbacks de áudio.
+    if (input.agent_slug) {
+      const { data: agent } = await supabase
+        .from("agents_config")
+        .select("ativo")
+        .eq("slug", input.agent_slug)
+        .maybeSingle();
+
+      if (agent?.ativo !== true) {
+        return { allowed: false, reason: "agent_disabled" };
+      }
+    }
+
     // 1. Lead em modo manual?
     if (input.lead_id) {
       const { data: lead } = await supabase
