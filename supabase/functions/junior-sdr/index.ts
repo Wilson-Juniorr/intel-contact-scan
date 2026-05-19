@@ -143,7 +143,8 @@ function buildState(
   const memSummary: string | null = lead?.lead_memory?.[0]?.summary ?? null;
   const coletado: Record<string, unknown> = {};
   if (lead?.name && !/^\+?\d+$/.test(lead.name)) coletado.nome = lead.name;
-  if (lead?.type) coletado.tipo = lead.type;
+  if (mem.tipo) coletado.tipo = mem.tipo;
+  else if (lead?.type && String(lead.type).toUpperCase() !== "PF") coletado.tipo = lead.type;
   if (lead?.lives) coletado.vidas = lead.lives;
   if (lead?.operator) coletado.plano_atual = { operadora: lead.operator };
   if (mem.orcamento) coletado.orcamento = mem.orcamento;
