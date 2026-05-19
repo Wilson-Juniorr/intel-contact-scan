@@ -796,7 +796,9 @@ Deno.serve(async (req) => {
     );
 
     // ═══ Qualificação estruturada determinística ═══
-    let qualProgress: QualProgress = evaluateQualification(state.coletado);
+    let qualProgress: QualProgress = evaluateQualification(state.coletado, {
+      turn_number: state.turn_number,
+    });
     console.log(`[SDR qual] score=${qualProgress.score} pct=${qualProgress.pct} next=${qualProgress.next_question_field ?? "-"} oos=${qualProgress.out_of_scope}`);
 
     // ═══ ÁUDIO RUIM/INAUDÍVEL: short-circuit humano, sem LLM ═══
@@ -1298,7 +1300,9 @@ Deno.serve(async (req) => {
       ...state.coletado,
       ...(metadata?.coletado ?? {}),
     };
-    const qualFinal = evaluateQualification(coletadoFinal);
+    const qualFinal = evaluateQualification(coletadoFinal, {
+      turn_number: state.turn_number,
+    });
     console.log(`[SDR qual final] score=${qualFinal.score} pct=${qualFinal.pct} missing=${JSON.stringify(qualFinal.missing)}`);
 
     // Handoff só com score A — agente pode pedir, mas gate fecha se faltar dado.
