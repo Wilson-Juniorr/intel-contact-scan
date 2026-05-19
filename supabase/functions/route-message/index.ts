@@ -269,6 +269,23 @@ Deno.serve(async (req) => {
         ` text_preview="${trimmedText.slice(0, 80)}"`,
       );
 
+      const { data: agentRowAudioFallback } = await supabase
+        .from("agents_config")
+        .select("ativo")
+        .eq("slug", SDR_AGENT_SLUG)
+        .maybeSingle();
+
+      if (agentRowAudioFallback?.ativo !== true) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            skipped: "agent_disabled_audio_fallback",
+            reason: audioFallbackReason,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       // Mensagem curta de confirmação — não avança estágio, não invoca SDR.
       const fallbackMsg =
         "Oi! Recebi seu áudio, mas não consegui entender com clareza 🙏 " +
