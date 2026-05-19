@@ -29,6 +29,7 @@ export type GateAllow = { allowed: true };
 export type GateResult = GateAllow | GateBlock;
 
 const BLOCKING_CATEGORIES = ["personal", "team", "partner", "vendor", "spam"];
+const RATE_LIMIT_EXEMPT_AGENTS = new Set(["junior-sdr", "sdr-qualificador"]);
 
 // Anti-spam: limites de envio AUTOMÁTICO por janela de tempo (por telefone+user).
 // Manual (corretor) NÃO passa por este gate.
@@ -94,27 +95,31 @@ export async function evaluateAutomationGate(
       };
     }
 
-    // 3.5. Anti-spam: limites de frequência por janela
-    const now = Date.now();
-    for (const rule of RATE_LIMIT_RULES) {
-      const since = new Date(now - rule.window_minutes * 60 * 1000).toISOString();
-      const { count } = await supabase
-        .from("whatsapp_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", input.user_id)
-        .eq("phone", input.phone)
-        .eq("direction", "outbound")
-        .gte("created_at", since);
-      if ((count ?? 0) >= rule.max_messages) {
-        return {
-          allowed: false,
-          reason: "rate_limited",
-          metadata: {
-            window_minutes: rule.window_minutes,
-            max_messages: rule.max_messages,
-            actual_count: count ?? 0,
-          },
-        };
+    // 3.5. Anti-spam: limites de frequência por janela.
+    // O SDR é reativo a inbound e pode enviar 2 balões no mesmo turno; limitar por
+    // mensagem quebrava o fluxo de pré-qualificação e bloqueava respostas como "sim".
+    if (!input.agent_slug || !RATE_LIMIT_EXEMPT_AGENTS.has(input.agent_slug)) {
+      const now = Date.now();
+      for (const rule of RATE_LIMIT_RULES) {
+        const since = new Date(now - rule.window_minutes * 60 * 1000).toISOString();
+        const { count } = await supabase
+          .from("whatsapp_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", input.user_id)
+          .eq("phone", input.phone)
+          .eq("direction", "outbound")
+          .gte("created_at", since);
+        if ((count ?? 0) >= rule.max_messages) {
+          return {
+            allowed: false,
+            reason: "rate_limited",
+            metadata: {
+              window_minutes: rule.window_minutes,
+              max_messages: rule.max_messages,
+              actual_count: count ?? 0,
+            },
+          };
+        }
       }
     }
 
