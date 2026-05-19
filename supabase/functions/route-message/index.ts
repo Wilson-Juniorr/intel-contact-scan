@@ -207,15 +207,9 @@ Deno.serve(async (req) => {
         .eq("direction", "inbound")
         .lt("created_at", new Date(Date.now() - 5000).toISOString()); // 5s de margem pra não pegar a msg atual
 
-      if ((previousInboundCount ?? 0) > 0) {
-        // Lead já tem histórico — Junior NÃO entra
-        return new Response(
-          JSON.stringify({ ok: true, skipped: "lead_has_history", previous_messages: previousInboundCount }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-
-      // É lead novo — verifica se a mensagem demonstra interesse em plano de saúde
+      // Verifica se a mensagem atual demonstra interesse em plano de saúde.
+      // Mesmo com histórico antigo, uma NOVA entrada explícita de cotação deve
+      // abrir/reativar o SDR; o histórico sozinho não pode silenciar o lead.
       const interestPatterns: RegExp[] = [
         /\binteresse\b/i,
         /\binforma(ç|c)([aã]o|oes|[oõ]e)/i,
@@ -250,6 +244,14 @@ Deno.serve(async (req) => {
 
       const textNorm = trimmedText.normalize("NFD").replace(/[̀-ͯ]/g, "");
       const hasInterest = interestPatterns.some(re => re.test(trimmedText) || re.test(textNorm));
+
+      if ((previousInboundCount ?? 0) > 0 && !hasInterest) {
+        // Lead já tem histórico e a mensagem atual não é uma nova entrada comercial.
+        return new Response(
+          JSON.stringify({ ok: true, skipped: "lead_has_history", previous_messages: previousInboundCount }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
 
       if (!hasInterest) {
         // Mensagem não demonstra interesse em plano — Junior não entra
