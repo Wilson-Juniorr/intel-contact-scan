@@ -1,0 +1,2 @@
+SELECT cron.unschedule(jobname) FROM cron.job WHERE jobname IN ('execute-follow-up-queue','rewarming-execute-hourly','process-scheduled-messages','junior-followup-tick','auto-retrabalho-daily','auto-unassume-manual-conversation');
+UPDATE public.agents_config SET ativo = false;
